@@ -1,0 +1,2778 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>COD Payment Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:             #f3f4f6;
+  --surface:        #ffffff;
+  --surface-2:      #f9fafb;
+  --border:         #e5e7eb;
+  --border-strong:  #d1d5db;
+  --text-primary:   #111827;
+  --text-secondary: #6b7280;
+  --text-muted:     #9ca3af;
+  --accent:         #2563eb;
+  --accent-light:   #eff6ff;
+  --accent-dark:    #1d4ed8;
+  --green:          #16a34a;
+  --green-light:    #f0fdf4;
+  --green-border:   #86efac;
+  --green-row-bg:   #f0fdf4;
+  --green-row-border:#86efac;
+  --red:            #dc2626;
+  --red-light:      #fef2f2;
+  --red-border:     #fca5a5;
+  --red-row-bg:     #fff1f2;
+  --red-row-border: #fecdd3;
+  --amber:          #d97706;
+  --amber-light:    #fffbeb;
+  --amber-border:   #fde68a;
+  --purple:         #7c3aed;
+  --purple-light:   #f5f3ff;
+  --purple-border:  #c4b5fd;
+  --cyan:           #0891b2;
+  --cyan-light:     #ecfeff;
+  --orange:         #ea580c;
+  --orange-light:   #fff7ed;
+  --orange-border:  #fed7aa;
+  --radius:         12px;
+  --radius-sm:      8px;
+  --shadow:         0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:      0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Noto Sans Arabic',sans-serif; background:var(--bg); color:var(--text-primary); min-height:100vh; font-size:14px; }
+
+/* ── Header ── */
+.app-header { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; justify-content:space-between; height:52px; position:sticky; top:0; z-index:50; box-shadow:var(--shadow); }
+.app-title { font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.app-title-icon { width:28px; height:28px; background:var(--accent); border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:14px; color:#fff; }
+.settings-btn { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:var(--surface); color:var(--text-secondary); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; }
+.settings-btn:hover { border-color:var(--accent); color:var(--accent); }
+.settings-btn.configured { border-color:var(--green); color:var(--green); background:var(--green-light); }
+
+/* ── Tabs ── */
+.tabs-bar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; display:flex; gap:4px; }
+.tab-btn { display:flex; align-items:center; gap:6px; padding:12px 16px; border:none; background:none; font-family:inherit; font-size:13px; font-weight:600; color:var(--text-secondary); cursor:pointer; border-bottom:2px solid transparent; transition:all .2s; margin-bottom:-1px; }
+.tab-btn:hover { color:var(--text-primary); }
+.tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab-badge { background:var(--accent-light); color:var(--accent); font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; font-family:'IBM Plex Mono',monospace; }
+.tab-badge.green { background:var(--green-light); color:var(--green); }
+.tab-badge.red   { background:var(--red-light);   color:var(--red); }
+
+/* ── Pages ── */
+.page { display:none; padding:20px; max-width:960px; margin:0 auto; }
+.page.active { display:block; }
+
+/* ── Banners ── */
+.not-configured-banner { background:var(--amber-light); border:1px solid var(--amber-border); border-radius:var(--radius-sm); padding:9px 13px; font-size:12px; color:var(--amber); margin-bottom:16px; display:none; }
+.not-configured-banner.show { display:block; }
+
+/* ── Card ── */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:16px; }
+.card-header { padding:14px 16px 0; font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
+.card-body { padding:0 16px 16px; }
+
+/* ── Input Methods ── */
+.input-methods { display:flex; flex-direction:column; gap:6px; }
+.input-method { border:0.5px solid var(--color-border-tertiary,var(--border)); border-radius:var(--radius-sm); background:var(--surface); transition:all .2s; overflow:hidden; }
+.input-method.active { border-color:var(--accent); background:var(--accent-light); }
+.input-method-header { display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:default; user-select:none; }
+.input-method-icon { font-size:14px; flex-shrink:0; }
+.input-method-label { font-size:12px; font-weight:600; color:var(--text-secondary); flex:1; }
+.input-method.active .input-method-label { color:var(--accent); }
+.input-method-body { padding:0 12px 10px; }
+
+/* ── Scanner ── */
+.scanner-wrap { position:relative; }
+.scanner-input { width:100%; padding:8px 12px 8px 34px; border:0.5px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--surface); font-family:'IBM Plex Mono',monospace; font-size:14px; color:var(--text-primary); outline:none; direction:ltr; transition:all .2s; }
+.input-method.active .scanner-input { border-color:var(--accent); background:#fff; box-shadow:0 0 0 2px rgba(37,99,235,.1); }
+.scanner-input::placeholder { color:var(--text-muted); font-size:12px; font-family:'Noto Sans Arabic',sans-serif; }
+.scanner-icon-wrap { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--accent); font-size:14px; pointer-events:none; }
+.scanner-hint { font-size:11px; color:var(--text-muted); margin-top:4px; }
+
+/* ── Manual ── */
+.manual-row { display:flex; gap:6px; }
+.manual-input { flex:1; padding:8px 10px; border:0.5px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--surface); font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--text-primary); outline:none; direction:ltr; transition:border-color .2s; }
+.manual-input:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(37,99,235,.08); }
+.manual-input::placeholder { color:var(--text-muted); font-size:12px; }
+.btn-manual { padding:8px 14px; border-radius:var(--radius-sm); border:0.5px solid var(--border-strong); background:var(--surface); color:var(--text-secondary); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; white-space:nowrap; }
+.btn-manual:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.btn-manual:disabled { opacity:.4; cursor:not-allowed; }
+
+/* ── Import method ── */
+.btn-import-method { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:9px 16px; border-radius:var(--radius-sm); border:none; background:var(--accent); color:#fff; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; transition:all .2s; }
+.btn-import-method:hover { background:var(--accent-dark); }
+.btn-import-method-courier { font-family:'IBM Plex Mono',monospace; font-size:11px; background:rgba(255,255,255,.2); padding:1px 8px; border-radius:10px; }
+
+/* ── Stats ── */
+.stats-bar { display:none; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+.stats-bar.show { display:flex; }
+.stat-chip { flex:1; min-width:80px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; text-align:center; box-shadow:var(--shadow); }
+.stat-chip-highlight { border:2px solid var(--border-strong); background:var(--surface); box-shadow:var(--shadow-md); padding:12px 14px; position:relative; }
+.stat-chip-highlight .stat-val { font-size:22px; }
+.stat-chip-highlight .stat-lbl { font-weight:700; color:var(--text-primary); font-size:11px; }
+.stat-val { font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:700; display:block; color:var(--text-primary); }
+.stat-val.accent { color:var(--accent); }
+.stat-val.green  { color:var(--green); }
+.stat-val.amber  { color:var(--amber); }
+.stat-val.red    { color:var(--red); }
+.stat-lbl { font-size:10px; color:var(--text-secondary); display:block; margin-top:2px; text-transform:uppercase; letter-spacing:.4px; }
+
+/* ── Progress ── */
+.progress-wrap { height:3px; background:var(--border); border-radius:2px; margin-bottom:16px; display:none; overflow:hidden; }
+.progress-wrap.show { display:block; }
+.progress-bar { height:100%; background:var(--accent); border-radius:2px; transition:width .3s ease; width:0; }
+
+/* ── Result ── */
+.result-box { border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:16px; display:none; font-size:13px; }
+.result-box.show-success { display:block; background:var(--green-light); border:1px solid var(--green-border); color:var(--green); }
+.result-box.show-error   { display:block; background:var(--red-light);   border:1px solid var(--red-border);   color:var(--red); }
+.result-title  { font-weight:700; margin-bottom:3px; }
+.result-detail { font-size:11px; opacity:.8; font-family:'IBM Plex Mono',monospace; }
+
+/* ── Payment methods ── */
+.pay-methods-card { display:none; margin-bottom:16px; }
+.pay-methods-card.show { display:block; }
+.courier-banner { display:flex; align-items:center; gap:8px; background:var(--purple-light); border:1px solid var(--purple-border); border-radius:var(--radius-sm); padding:9px 13px; margin-bottom:12px; }
+.courier-banner-label { font-size:11px; color:var(--text-secondary); }
+.courier-banner-name  { font-size:13px; font-weight:700; color:var(--purple); }
+.courier-banner-total { font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:700; margin-right:auto; direction:ltr; }
+.courier-banner-total.positive { color:var(--green); }
+.courier-banner-total.negative { color:var(--red); }
+
+/* ── Extra Shipping Entries ── */
+.extra-shipping-section { background:var(--orange-light); border:1px solid var(--orange-border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; }
+.extra-shipping-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.extra-shipping-title { font-size:12px; font-weight:700; color:var(--orange); display:flex; align-items:center; gap:6px; }
+.extra-shipping-total { font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:700; color:var(--orange); direction:ltr; }
+.extra-shipping-net { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--cyan); direction:ltr; }
+.btn-add-extra { display:flex; align-items:center; gap:4px; padding:4px 10px; border-radius:6px; border:1px dashed var(--orange-border); background:transparent; color:var(--orange); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; }
+.btn-add-extra:hover { background:rgba(234,88,12,.08); border-style:solid; }
+.extra-entries-list { display:flex; flex-direction:column; gap:6px; }
+.extra-entry { background:var(--surface); border:1px solid var(--orange-border); border-radius:var(--radius-sm); padding:8px 10px; display:flex; align-items:center; gap:8px; animation:entryIn .25s ease; }
+@keyframes entryIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.extra-entry-order { font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:700; color:var(--text-primary); min-width:80px; }
+.extra-entry-courier { font-size:11px; color:var(--purple); font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.extra-entry-amount-wrap { display:flex; align-items:center; gap:4px; flex-shrink:0; }
+.extra-entry-amount { width:80px; padding:4px 8px; border:1.5px solid var(--orange-border); border-radius:6px; background:transparent; font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:700; color:var(--orange); outline:none; direction:ltr; text-align:center; transition:border-color .2s; }
+.extra-entry-amount:focus { border-color:var(--orange); box-shadow:0 0 0 2px rgba(234,88,12,.1); }
+.extra-entry-amount::placeholder { color:var(--text-muted); font-weight:400; font-size:11px; }
+.extra-entry-currency { font-size:10px; color:var(--text-muted); }
+.btn-del-extra { background:none; border:none; cursor:pointer; font-size:14px; padding:2px; border-radius:4px; transition:transform .15s; flex-shrink:0; }
+.btn-del-extra:hover { transform:scale(1.2); }
+.extra-entry-status { font-size:11px; display:flex; align-items:center; gap:4px; }
+.extra-entry-loading { color:var(--cyan); }
+.extra-entry-error   { color:var(--red); font-size:10px; }
+/* Scanner input inside extra entries */
+.extra-add-panel { background:rgba(255,247,237,.7); border:1.5px dashed var(--orange-border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px; display:none; flex-direction:column; gap:8px; }
+.extra-add-panel.show { display:flex; }
+.extra-add-panel-title { font-size:10px; font-weight:700; color:var(--orange); text-transform:uppercase; letter-spacing:.4px; }
+.extra-scanner-row { display:flex; gap:6px; align-items:center; }
+.extra-scan-input { flex:1; padding:7px 10px; border:1.5px solid var(--orange-border); border-radius:var(--radius-sm); background:var(--surface); font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--text-primary); outline:none; direction:ltr; transition:border-color .2s; }
+.extra-scan-input:focus { border-color:var(--orange); box-shadow:0 0 0 2px rgba(234,88,12,.1); }
+.extra-scan-input::placeholder { color:var(--text-muted); font-size:11px; font-family:'Noto Sans Arabic',sans-serif; direction:rtl; }
+.extra-manual-row { display:flex; gap:6px; align-items:center; }
+.extra-manual-input { flex:1; padding:7px 10px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--surface); font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--text-primary); outline:none; direction:ltr; transition:border-color .2s; }
+.extra-manual-input:focus { border-color:var(--orange); box-shadow:0 0 0 2px rgba(234,88,12,.1); }
+.extra-manual-input::placeholder { color:var(--text-muted); font-size:11px; font-family:'Noto Sans Arabic',sans-serif; direction:rtl; }
+.extra-row-label { font-size:10px; font-weight:700; color:var(--text-secondary); white-space:nowrap; min-width:52px; }
+.extra-row-label.orange { color:var(--orange); }
+.btn-extra-action { padding:6px 12px; border-radius:var(--radius-sm); border:1px solid var(--orange-border); background:var(--surface); color:var(--orange); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; white-space:nowrap; }
+.btn-extra-action:hover:not(:disabled) { background:var(--orange-light); }
+.btn-extra-action:disabled { opacity:.4; cursor:not-allowed; }
+.btn-extra-cancel { padding:6px 10px; border-radius:var(--radius-sm); border:1px solid var(--border); background:transparent; color:var(--text-muted); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; }
+.btn-extra-cancel:hover { color:var(--text-secondary); border-color:var(--border-strong); }
+/* Courier mismatch warning */
+.extra-entry-courier-warn { font-size:11px; color:var(--red); font-weight:700; flex:1; min-width:0; display:flex; align-items:center; gap:4px; }
+.extra-entry-courier-warn .warn-name { background:var(--red-light); border:1px solid var(--red-border); border-radius:5px; padding:1px 7px; font-size:11px; font-weight:700; color:var(--red); }
+.extra-entry-courier-warn .warn-label { font-size:10px; color:var(--red); font-weight:600; }
+
+/* ── Pay grid ── */
+.pay-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px; }
+.pay-method-item { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; }
+.pay-method-label { font-size:10px; color:var(--text-secondary); font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
+.pay-method-input { width:100%; background:transparent; border:none; border-bottom:1.5px solid var(--border-strong); color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; outline:none; padding:3px 0; direction:ltr; transition:border-color .2s; }
+.pay-method-input:focus { border-bottom-color:var(--accent); }
+.pay-method-input::placeholder { color:var(--text-muted); font-weight:400; font-size:12px; }
+.pay-validation { display:flex; align-items:center; gap:6px; font-size:12px; padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); margin-bottom:12px; }
+.pay-validation.ok       { background:var(--green-light); border-color:var(--green-border); color:var(--green); }
+.pay-validation.mismatch { background:var(--red-light);   border-color:var(--red-border);   color:var(--red); }
+.pay-val-text { font-family:'IBM Plex Mono',monospace; }
+
+/* ── Buttons ── */
+.btn-row { display:flex; gap:8px; margin-bottom:16px; }
+.btn-pay { flex:1; padding:12px; border-radius:var(--radius-sm); border:none; background:var(--accent); color:#fff; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; transition:all .2s; }
+.btn-pay:hover:not(:disabled) { background:var(--accent-dark); }
+.btn-pay:disabled { opacity:.4; cursor:not-allowed; }
+.btn-pay.has-refund { background:linear-gradient(135deg,var(--accent) 60%,#be123c 100%); }
+
+/* ── Table ── */
+.table-wrap { display:none; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); box-shadow:var(--shadow); margin-bottom:16px; }
+.table-wrap.show { display:block; }
+table { width:100%; border-collapse:collapse; font-size:13px; background:var(--surface); }
+thead { background:#e5e7eb; }
+thead th { padding:10px 12px; text-align:right; font-size:11px; font-weight:700; color:var(--text-primary); border-bottom:2px solid var(--border-strong); white-space:nowrap; }
+thead th.col-ltr    { text-align:left; direction:ltr; }
+thead th.col-center { text-align:center; }
+thead th.col-del    { width:36px; }
+
+tbody tr.order-row { border-bottom:1px solid var(--border); transition:background .15s; }
+tbody tr.order-row:hover { background:var(--surface-2); }
+tbody tr.order-row.row-new { animation:rowIn .5s ease; }
+tbody tr.order-row.expanded { border-bottom:none; }
+
+/* ── Row color variants ── */
+tbody tr.order-row.ready-row    { background:var(--green-row-bg); border-right:3px solid var(--green); }
+tbody tr.order-row.ready-row:hover { background:#dcfce7; }
+tbody tr.order-row.ready-row.expanded { background:#dcfce7; }
+tbody tr.order-row.refund-row   { background:var(--red-row-bg);   border-right:3px solid var(--red); }
+tbody tr.order-row.refund-row:hover { background:#ffe4e6; }
+tbody tr.order-row.refund-row.expanded { background:#ffe4e6; }
+tbody tr.order-row.extra-row    { background:var(--orange-light); border-right:3px solid var(--orange); }
+tbody tr.order-row.extra-row:hover { background:#fed7aa33; }
+tbody tr.order-row.status-err-row { border-right:3px solid var(--red) !important; }
+
+@keyframes rowIn { from { background:rgba(37,99,235,.08); } to { background:transparent; } }
+
+tbody td { padding:10px 12px; vertical-align:middle; }
+.cell-order    { font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; color:var(--text-secondary); }
+.cell-courier  { font-size:13px; font-weight:600; color:var(--purple); }
+.cell-money    { font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:13px; text-align:left; direction:ltr; white-space:nowrap; }
+.cell-center   { text-align:center; }
+.cell-financial{ font-size:11px; color:var(--text-secondary); font-family:'IBM Plex Mono',monospace; text-align:center; }
+.expand-icon   { font-size:9px; color:var(--text-muted); margin-left:4px; display:inline-block; transition:transform .2s; }
+tr.expanded .expand-icon { transform:rotate(90deg); }
+
+/* ── Detail row ── */
+tbody tr.detail-row { display:none; }
+tbody tr.detail-row.show { display:table-row; }
+tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--border); }
+.detail-box { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; }
+.detail-section { padding:8px 12px; border-bottom:1px solid var(--border); }
+.detail-section:last-child { border-bottom:none; }
+.detail-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
+.detail-section.return-section { background:#fff8f8; border-right:3px solid var(--red); }
+.sku-table { width:100%; border-collapse:collapse; direction:rtl; }
+.sku-table th { padding:4px 6px; font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:var(--text-muted); border-bottom:1px solid var(--border); text-align:right; text-transform:uppercase; }
+.sku-table th.th-ltr    { text-align:left; }
+.sku-table th.th-center { text-align:center; }
+.sku-table td { padding:4px 6px; font-family:'IBM Plex Mono',monospace; font-size:12px; vertical-align:middle; }
+.td-sku   { color:var(--accent); font-weight:600; }
+.td-sku.returned { color:var(--red); }
+.td-qty   { color:var(--text-secondary); text-align:center; }
+.td-qty.negative { color:var(--red); font-weight:700; }
+.td-price { color:var(--text-secondary); text-align:left; direction:ltr; }
+.td-price.negative { color:var(--red); font-weight:700; }
+.td-total { color:var(--amber); font-weight:700; text-align:left; direction:ltr; }
+.td-total.negative { color:var(--red); font-weight:700; }
+
+/* ── Badges ── */
+.badge { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap; }
+.badge-scanning   { background:var(--accent-light); color:var(--accent); border:1px solid #bfdbfe; }
+.badge-loading    { background:var(--cyan-light);   color:var(--cyan);   border:1px solid #a5f3fc; }
+.badge-collect    { background:var(--green-light);  color:var(--green);  border:1px solid var(--green-border); font-weight:800; }
+.badge-prereg     { background:var(--purple-light); color:var(--purple); border:1px solid var(--purple-border); }
+.badge-done       { background:var(--green-light);  color:var(--green);  border:1px solid var(--green-border); }
+.badge-paid       { background:var(--green-light);  color:var(--green);  border:1px solid var(--green-border); }
+.badge-cancelled  { background:var(--red-light);    color:var(--red);    border:1px solid var(--red-border); }
+.badge-refund     { background:#ffe4e6; color:var(--red); border:2px solid #fda4af; font-weight:800; }
+.badge-refund-done{ background:var(--green-light);  color:var(--green);  border:1px solid var(--green-border); }
+.badge-skipped    { background:var(--surface-2);    color:var(--text-secondary); border:1px solid var(--border-strong); }
+.badge-notfound   { background:var(--surface-2);    color:var(--text-muted);     border:1px solid var(--border); }
+.badge-error      { background:var(--red-light);    color:var(--red);    border:1px solid var(--red-border); }
+.badge-status-err { background:var(--red-light); color:var(--red); border:2px solid var(--red-border); font-weight:800; font-size:10px; }
+
+/* S1 / S2 badges */
+.s-badge { display:inline-block; padding:2px 7px; border-radius:5px; font-size:10px; font-weight:600; white-space:nowrap; }
+.s-badge-delivered { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+.s-badge-returned  { background:#ffe4e6; color:var(--red); border:1px solid #fda4af; }
+.s-badge-other     { background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--border); }
+.s-badge-empty     { color:var(--text-muted); font-size:10px; }
+.s-badge-err       { background:var(--red-light); color:var(--red); border:2px solid var(--red-border); font-weight:800; font-size:10px; }
+
+/* ══ COURIER IMPORT MODAL ══ */
+.import-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .2s; }
+.import-overlay.open { opacity:1; pointer-events:all; }
+.import-modal { background:var(--surface); border-radius:var(--radius); width:100%; max-width:820px; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.2); transform:translateY(14px); transition:transform .2s cubic-bezier(.34,1.56,.64,1); }
+.import-overlay.open .import-modal { transform:translateY(0); }
+.import-modal-header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-shrink:0; position:sticky; top:0; background:var(--surface); z-index:1; border-radius:var(--radius) var(--radius) 0 0; }
+.import-modal-title { font-size:14px; font-weight:700; }
+.import-modal-close { background:none; border:1px solid var(--border); border-radius:var(--radius-sm); padding:5px 10px; cursor:pointer; font-size:12px; color:var(--text-secondary); font-family:inherit; font-weight:600; transition:all .2s; }
+.import-modal-close:hover { border-color:var(--red); color:var(--red); }
+.import-modal-body { padding:16px 18px; overflow-y:auto; flex:1; }
+.import-modal-footer { padding:12px 18px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:space-between; align-items:center; flex-shrink:0; background:var(--surface); border-radius:0 0 var(--radius) var(--radius); }
+.import-courier-row { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+.import-courier-select { flex:1; padding:9px 12px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--surface); font-family:inherit; font-size:13px; color:var(--text-primary); outline:none; cursor:pointer; transition:border-color .2s; appearance:none; -webkit-appearance:none; font-weight:600; }
+.import-courier-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.08); }
+.import-fetch-btn { padding:9px 18px; border-radius:var(--radius-sm); border:none; background:var(--accent); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; white-space:nowrap; flex-shrink:0; display:flex; align-items:center; gap:6px; }
+.import-fetch-btn:hover:not(:disabled) { background:var(--accent-dark); }
+.import-fetch-btn:disabled { opacity:.4; cursor:not-allowed; }
+.import-hint { font-size:11px; color:var(--text-muted); margin-bottom:12px; }
+.import-toolbar { display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+.import-sel-count { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:800; color:#fff; background:var(--accent); border:2px solid var(--accent-dark); padding:4px 12px; border-radius:20px; box-shadow:0 2px 6px rgba(37,99,235,.35); }
+.btn-import-sel { padding:5px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:var(--surface); color:var(--text-secondary); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; white-space:nowrap; }
+.btn-import-sel:hover { border-color:var(--accent); color:var(--accent); }
+.import-section-divider { display:flex; align-items:center; gap:10px; margin:12px 0 8px; }
+.import-section-divider-label { font-size:11px; font-weight:700; color:var(--red); text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; background:var(--red-light); border:1px solid var(--red-border); padding:3px 10px; border-radius:20px; }
+.import-section-divider-line { flex:1; height:1px; background:var(--red-border); }
+.btn-import-add { padding:8px 20px; border-radius:var(--radius-sm); border:none; background:var(--green); color:#fff; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; transition:all .2s; white-space:nowrap; display:flex; align-items:center; gap:6px; }
+.btn-import-add:hover:not(:disabled) { filter:brightness(.95); }
+.btn-import-add:disabled { opacity:.4; cursor:not-allowed; }
+.import-table-wrap { border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:10px; }
+.import-table { width:100%; border-collapse:collapse; font-size:12px; background:var(--surface); }
+.import-table thead { background:#e5e7eb; }
+.import-table thead th { padding:8px 10px; text-align:right; font-size:10px; font-weight:700; color:var(--text-primary); border-bottom:2px solid var(--border-strong); white-space:nowrap; }
+.import-table thead th.col-check { width:36px; text-align:center; }
+.import-table thead th.col-ltr { text-align:left; direction:ltr; }
+.import-table thead th.col-center { text-align:center; }
+.import-table tbody tr { border-bottom:1px solid var(--border); transition:background .1s; }
+.import-table tbody tr:hover { background:var(--surface-2); }
+.import-table tbody tr.selected-row { background:var(--accent-light); }
+.import-table tbody tr.already-row { opacity:.55; }
+.import-table tbody tr.import-err-row { border-right:3px solid var(--red); }
+.import-table tbody td { padding:8px 10px; vertical-align:middle; }
+.import-table td.col-check { text-align:center; padding:8px 6px; }
+.import-table td.col-center { text-align:center; }
+.import-table .cell-mono { font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:12px; }
+.import-table .cell-money { font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:12px; text-align:left; direction:ltr; color:var(--green); }
+.import-table .cell-dim { font-size:11px; color:var(--text-secondary); }
+.import-already-badge { background:var(--surface-2); color:var(--text-muted); border:1px solid var(--border); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:600; }
+.import-prereg-badge { background:var(--purple-light); color:var(--purple); border:1px solid var(--purple-border); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:600; }
+.import-empty { text-align:center; padding:32px; color:var(--text-muted); font-size:12px; }
+
+.row-del-btn { background:none; border:none; cursor:pointer; font-size:16px; padding:2px 4px; border-radius:4px; transition:transform .15s; display:inline-flex; align-items:center; justify-content:center; }
+.row-del-btn:hover { transform:scale(1.2); }
+
+/* ── Spinner ── */
+.spinner { width:12px; height:12px; border:2px solid transparent; border-top-color:currentColor; border-radius:50%; animation:spin .7s linear infinite; display:inline-block; vertical-align:middle; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── Toast ── */
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--text-primary); color:#fff; padding:9px 18px; border-radius:var(--radius-sm); font-size:12px; font-weight:500; transition:transform .3s cubic-bezier(.34,1.56,.64,1); white-space:nowrap; z-index:999; pointer-events:none; }
+.toast.show    { transform:translateX(-50%) translateY(0); }
+.toast.success { background:var(--green); }
+.toast.error   { background:var(--red); }
+
+/* ══ LOG PAGE ══ */
+.log-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:8px; flex-wrap:wrap; }
+.log-toolbar-title { font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.log-sync-badge { font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px; font-family:'IBM Plex Mono',monospace; }
+.log-sync-badge.synced  { background:var(--green-light); color:var(--green); border:1px solid var(--green-border); }
+.log-sync-badge.local   { background:var(--amber-light); color:var(--amber); border:1px solid var(--amber-border); }
+.log-sync-badge.loading { background:var(--accent-light); color:var(--accent); border:1px solid #bfdbfe; }
+.log-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.btn-log { padding:6px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:var(--surface); color:var(--text-secondary); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; }
+.btn-log:hover { border-color:var(--accent); color:var(--accent); }
+.btn-log.export:hover { border-color:var(--green); color:var(--green); }
+.btn-log.export-sel { display:none; }
+.btn-log.export-sel.show { display:inline-block; }
+.log-empty { text-align:center; padding:40px; color:var(--text-muted); font-size:13px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }
+.log-list { display:flex; flex-direction:column; gap:8px; }
+.log-entry { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+.log-entry-header { display:flex; align-items:center; gap:8px; padding:12px 14px; cursor:pointer; }
+.log-check { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; }
+.log-entry-info { flex:1; min-width:0; }
+.log-entry-date { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-muted); margin-bottom:4px; }
+.log-entry-tags { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.log-tag { padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; }
+.log-tag.courier { background:var(--purple-light); color:var(--purple); border:1px solid var(--purple-border); }
+.log-tag.count   { background:var(--accent-light);  color:var(--accent);  border:1px solid #bfdbfe; }
+.log-tag.amount  { background:var(--amber-light);   color:var(--amber);   border:1px solid var(--amber-border); font-family:'IBM Plex Mono',monospace; }
+.log-pay-methods { display:flex; gap:4px; flex-wrap:wrap; margin-top:5px; }
+.log-pm-chip { font-family:'IBM Plex Mono',monospace; font-size:10px; padding:2px 7px; border-radius:5px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-secondary); }
+.log-pm-chip span { color:var(--text-primary); font-weight:600; margin-right:3px; }
+.log-entry-stats { display:flex; gap:6px; font-size:11px; flex-shrink:0; }
+.log-stat-ok  { color:var(--green); font-family:'IBM Plex Mono',monospace; font-weight:700; }
+.log-stat-err { color:var(--red);   font-family:'IBM Plex Mono',monospace; font-weight:700; }
+.log-toggle   { color:var(--text-muted); font-size:10px; flex-shrink:0; transition:transform .2s; }
+.log-entry.open .log-toggle { transform:rotate(90deg); }
+.log-entry-details { display:none; border-top:1px solid var(--border); }
+.log-entry.open .log-entry-details { display:block; }
+.log-detail-item { border-bottom:1px solid var(--border); }
+.log-detail-item:last-child { border-bottom:none; }
+.log-detail-main { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; font-size:12px; cursor:pointer; transition:background .15s; gap:8px; }
+.log-detail-main:hover { background:var(--surface-2); }
+.log-detail-order  { font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--text-primary); }
+.log-detail-amount { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--amber); }
+.log-detail-ok     { background:var(--green-light); color:var(--green); border:1px solid var(--green-border); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:600; }
+.log-detail-err    { background:var(--red-light);   color:var(--red);   border:1px solid var(--red-border);   padding:2px 7px; border-radius:5px; font-size:10px; font-weight:600; }
+.log-detail-refund { background:#ffe4e6; color:var(--red); border:1px solid #fda4af; padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700; }
+.log-detail-extra  { background:var(--orange-light); color:var(--orange); border:1px solid var(--orange-border); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700; }
+.log-detail-sub { display:none; padding:8px 14px 10px; border-top:1px solid var(--border); background:rgba(0,0,0,.015); }
+.log-detail-item.open .log-detail-sub { display:block; }
+.log-sub-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; margin-top:6px; }
+.log-sub-label:first-child { margin-top:0; }
+.btn-log-more { width:100%; padding:10px; border-radius:var(--radius-sm); border:1px dashed var(--border-strong); background:var(--surface); color:var(--text-secondary); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; margin-top:8px; }
+.btn-log-more:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.btn-log-more:disabled { opacity:.5; cursor:not-allowed; }
+
+/* ══ MODALS ══ */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .2s; }
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal { background:var(--surface); border-radius:var(--radius); width:100%; max-width:540px; box-shadow:0 20px 60px rgba(0,0,0,.2); transform:translateY(14px); transition:transform .2s cubic-bezier(.34,1.56,.64,1); max-height:90vh; overflow-y:auto; }
+.modal-overlay.open .modal { transform:translateY(0); }
+.modal-header { padding:16px 18px; border-bottom:1px solid var(--border); font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; position:sticky; top:0; background:var(--surface); z-index:1; }
+.modal-body { padding:16px 18px; }
+.modal-footer { padding:12px 18px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; position:sticky; bottom:0; background:var(--surface); z-index:1; }
+.field-group { margin-bottom:14px; }
+.field-group:last-child { margin-bottom:0; }
+.field-label { display:block; font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
+.field-input { width:100%; padding:9px 12px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--surface); font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-primary); outline:none; direction:ltr; transition:border-color .2s; }
+.field-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.08); }
+.field-divider { height:1px; background:var(--border); margin:14px 0; }
+.field-section-label { font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px; }
+.btn-modal-cancel { padding:8px 16px; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:transparent; color:var(--text-secondary); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; }
+.btn-modal-cancel:hover { border-color:var(--text-secondary); color:var(--text-primary); }
+.btn-save { padding:8px 20px; border-radius:var(--radius-sm); border:none; background:var(--accent); color:#fff; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; transition:all .2s; }
+.btn-save:hover { background:var(--accent-dark); }
+.confirm-modal .modal-header { background:var(--surface-2); }
+.confirm-detail-row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); }
+.confirm-detail-row:last-of-type { border-bottom:none; }
+.confirm-detail-label { font-size:12px; color:var(--text-secondary); }
+.confirm-detail-val   { font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; }
+.confirm-detail-val.green  { color:var(--green); }
+.confirm-detail-val.red    { color:var(--red); }
+.confirm-detail-val.orange { color:var(--orange); }
+.confirm-refund-section { background:#fff1f2; border:2px solid #fda4af; border-radius:var(--radius-sm); padding:12px 14px; margin-top:14px; }
+.confirm-refund-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.confirm-refund-title { font-size:13px; font-weight:800; color:#9f1239; }
+.confirm-refund-list { display:flex; flex-direction:column; gap:6px; }
+.confirm-refund-item { display:flex; align-items:center; justify-content:space-between; background:#fff; border:1px solid #fecdd3; border-radius:6px; padding:7px 10px; font-size:12px; }
+.confirm-refund-order  { font-family:'IBM Plex Mono',monospace; font-weight:700; color:var(--text-primary); }
+.confirm-refund-amount { font-family:'IBM Plex Mono',monospace; font-weight:800; color:var(--red); }
+.confirm-note { font-size:12px; color:var(--text-secondary); background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-top:10px; }
+.btn-confirm-ok { padding:8px 20px; border-radius:var(--radius-sm); border:none; color:#fff; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; transition:all .2s; }
+.btn-confirm-ok.green-btn  { background:var(--green); }
+.btn-confirm-ok.accent-btn { background:var(--accent); }
+.btn-confirm-ok.red-btn    { background:var(--red); }
+.btn-confirm-ok:hover { filter:brightness(.95); }
+.confirm-warning { display:flex; align-items:flex-start; gap:10px; background:#fff7ed; border:2px solid #f97316; border-radius:var(--radius-sm); padding:12px 14px; margin-top:12px; }
+.confirm-warning-icon { font-size:20px; flex-shrink:0; line-height:1; }
+.confirm-warning-text { font-size:12px; font-weight:600; color:#9a3412; line-height:1.5; }
+.confirm-warning-title { font-size:13px; font-weight:800; color:#7c2d12; margin-bottom:2px; }
+
+/* ── Courier Balance — بانر الرصيد السابق ── */
+.balance-prev-banner { display:none; background:#fefce8; border:2px solid #facc15; border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:12px; }
+.balance-prev-banner.show { display:flex; align-items:center; gap:10px; }
+.balance-prev-icon { font-size:18px; flex-shrink:0; }
+.balance-prev-body { flex:1; min-width:0; }
+.balance-prev-label { font-size:11px; font-weight:700; color:#713f12; text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px; }
+.balance-prev-amount { font-family:'IBM Plex Mono',monospace; font-size:16px; font-weight:800; color:#92400e; }
+.balance-prev-total-label { font-size:11px; color:#78350f; margin-top:2px; }
+.balance-prev-total-val { font-family:'IBM Plex Mono',monospace; font-weight:700; color:#b45309; }
+
+/* ── Courier Balance — تاب المحافظ ── */
+.balance-page-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:8px; flex-wrap:wrap; }
+.balance-page-title { font-size:13px; font-weight:700; }
+.btn-balance { padding:6px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:var(--surface); color:var(--text-secondary); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; }
+.btn-balance:hover { border-color:var(--accent); color:var(--accent); }
+.btn-balance.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn-balance.primary:hover { background:var(--accent-dark); }
+.balance-empty { text-align:center; padding:40px; color:var(--text-muted); font-size:13px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }
+.balance-list { display:flex; flex-direction:column; gap:10px; }
+.balance-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+.balance-card-header { display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; border-bottom:1px solid transparent; transition:border-color .2s; }
+.balance-card.open .balance-card-header { border-bottom-color:var(--border); }
+.balance-courier-name { font-size:14px; font-weight:700; color:var(--purple); flex:1; }
+.balance-amount-chip { font-family:'IBM Plex Mono',monospace; font-size:16px; font-weight:800; color:var(--red); background:var(--red-light); border:1px solid var(--red-border); padding:4px 12px; border-radius:8px; }
+.balance-amount-chip.zero { color:var(--green); background:var(--green-light); border-color:var(--green-border); }
+.balance-card-toggle { color:var(--text-muted); font-size:10px; transition:transform .2s; }
+.balance-card.open .balance-card-toggle { transform:rotate(90deg); }
+.balance-card-body { display:none; padding:14px; }
+.balance-card.open .balance-card-body { display:block; }
+.balance-credit-row { display:flex; align-items:flex-end; gap:8px; margin-bottom:14px; background:var(--green-light); border:1px solid var(--green-border); border-radius:var(--radius-sm); padding:10px 12px; }
+.balance-credit-label { font-size:11px; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; white-space:nowrap; }
+.balance-credit-input-wrap { flex:1; }
+.balance-credit-input { width:100%; background:transparent; border:none; border-bottom:2px solid var(--green-border); color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:700; outline:none; padding:3px 0; direction:ltr; transition:border-color .2s; }
+.balance-credit-input:focus { border-bottom-color:var(--green); }
+.balance-credit-input::placeholder { color:var(--text-muted); font-weight:400; font-size:12px; }
+.btn-pay-credit { padding:8px 18px; border-radius:var(--radius-sm); border:none; background:var(--green); color:#fff; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; transition:all .2s; white-space:nowrap; flex-shrink:0; }
+.btn-pay-credit:hover:not(:disabled) { filter:brightness(.93); }
+.btn-pay-credit:disabled { opacity:.4; cursor:not-allowed; }
+.balance-history-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px; }
+.balance-history-list { display:flex; flex-direction:column; gap:4px; }
+.balance-history-item { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:var(--radius-sm); font-size:12px; border:1px solid var(--border); background:var(--surface-2); }
+.balance-history-item.debit  { border-right:3px solid var(--red);   }
+.balance-history-item.credit { border-right:3px solid var(--green); }
+.balance-history-date { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted); white-space:nowrap; flex-shrink:0; }
+.balance-history-note { flex:1; color:var(--text-secondary); font-size:11px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.balance-history-amount { font-family:'IBM Plex Mono',monospace; font-weight:700; white-space:nowrap; flex-shrink:0; }
+.balance-history-amount.debit  { color:var(--red); }
+.balance-history-amount.credit { color:var(--green); }
+.balance-history-badge { font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; flex-shrink:0; }
+.balance-history-badge.debit  { background:var(--red-light);   color:var(--red);   border:1px solid var(--red-border); }
+.balance-history-badge.credit { background:var(--green-light); color:var(--green); border:1px solid var(--green-border); }
+.tab-badge.amber { background:var(--amber-light); color:var(--amber); border:1px solid var(--amber-border); }
+
+/* ── Extra Entry wrap + status error ── */
+.extra-entry-wrap { display:flex; flex-direction:column; gap:0; }
+.extra-status-err-row { font-size:11px; font-weight:600; color:var(--amber); background:var(--amber-light); border:1px solid var(--amber-border); border-top:none; border-radius:0 0 var(--radius-sm) var(--radius-sm); padding:4px 10px; display:flex; align-items:center; gap:4px; }
+
+/* ── Changelog button ── */
+.changelog-btn { display:flex; align-items:center; gap:5px; padding:5px 10px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; }
+.changelog-btn:hover { border-color:var(--accent); color:var(--accent); }
+.changelog-version { font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:700; color:var(--accent); background:var(--accent-light); padding:1px 6px; border-radius:4px; }
+
+/* ── Changelog modal ── */
+.changelog-modal { max-width:500px; }
+.changelog-list { display:flex; flex-direction:column; gap:0; }
+.changelog-item { border-bottom:1px solid var(--border); padding:14px 0; }
+.changelog-item:last-child { border-bottom:none; padding-bottom:0; }
+.changelog-item-header { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.changelog-ver-badge { font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:700; background:var(--accent); color:#fff; padding:2px 8px; border-radius:5px; }
+.changelog-ver-badge.latest { background:var(--green); }
+.changelog-date { font-size:11px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; }
+.changelog-notes { display:flex; flex-direction:column; gap:5px; padding-right:4px; }
+.changelog-note { font-size:12px; color:var(--text-secondary); line-height:1.5; display:flex; align-items:flex-start; gap:6px; }
+.changelog-note::before { content:'•'; color:var(--accent); font-weight:700; flex-shrink:0; margin-top:1px; }
+.changelog-note b { color:var(--text-primary); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<header class="app-header">
+  <div class="app-title">
+    <div class="app-title-icon">💳</div>
+    COD Payment Center
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <button class="changelog-btn" onclick="openChangelog()">
+      📋 <span class="changelog-version">v1.3.0</span>
+    </button>
+    <button class="settings-btn" id="settingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
+  </div>
+</header>
+
+<!-- Changelog Modal -->
+<div class="modal-overlay" id="changelogOverlay" onclick="closeChangelogOnBackdrop(event)">
+  <div class="modal changelog-modal">
+    <div class="modal-header">📋 سجل التحديثات</div>
+    <div class="modal-body">
+      <div class="changelog-list">
+
+        <div class="changelog-item">
+          <div class="changelog-item-header">
+            <span class="changelog-ver-badge latest">v1.3.0</span>
+            <span class="changelog-date">13-08-2026</span>
+          </div>
+          <div class="changelog-notes">
+            <div class="changelog-note"><b>ترحيل لـ D1:</b> السجل بقى بيتقرأ ويتكتب مباشرة على D1 عن طريق نفس Worker الدفع — مفيش Log Worker منفصل تاني</div>
+            <div class="changelog-note"><b>تجميع الجلسات:</b> كل أوردرات نفس جلسة التحصيل بتتجمع مع بعض بالـ batchId بدل التخزين المحلي</div>
+            <div class="changelog-note"><b>Pagination:</b> السجل بيتحمّل صفحة صفحة (100 كل مرة) بدل تحميل كل حاجة مرة واحدة</div>
+            <div class="changelog-note"><b>حذف:</b> بانر ترحيل الـ KV القديم اتشال — خلاص بقى كله على D1</div>
+          </div>
+        </div>
+
+        <div class="changelog-item">
+          <div class="changelog-item-header">
+            <span class="changelog-ver-badge">v1.2.1</span>
+            <span class="changelog-date">18-05-2026</span>
+          </div>
+          <div class="changelog-notes">
+            <div class="changelog-note"><b>إصلاح زرار الاسترداد:</b> قسم طريقة الدفع يظهر الآن حتى لو لم يكن هناك أوردرات تحصيل — كان الزرار معطلاً مع أوردرات الاسترداد فقط</div>
+          </div>
+        </div>
+
+        <div class="changelog-item">
+          <div class="changelog-item-header">
+            <span class="changelog-ver-badge">v1.2.0</span>
+            <span class="changelog-date">20-04-2026</span>
+          </div>
+          <div class="changelog-notes">
+            <div class="changelog-note"><b>شرط الشحن الإضافي:</b> توسيع الحالات المقبولة — S1 يقبل الآن Returned / Ready / Cancelled، وS2 يقبل Returned / Ready</div>
+            <div class="changelog-note"><b>تنبيه الحالة الخاطئة:</b> أوردرات الشحن الإضافي ذات الحالة الخاطئة تُظهر تنبيهاً أصفر بالسبب تحت الصف مباشرةً</div>
+            <div class="changelog-note"><b>سجل التحديثات:</b> إضافة هذه النافذة</div>
+          </div>
+        </div>
+
+        <div class="changelog-item">
+          <div class="changelog-item-header">
+            <span class="changelog-ver-badge">v1.1.0</span>
+            <span class="changelog-date">—</span>
+          </div>
+          <div class="changelog-notes">
+            <div class="changelog-note"><b>Courier-Balance:</b> تكامل مع worker الأرصدة — عرض الرصيد السابق للمندوب وإضافة المبالغ المحتجزة</div>
+            <div class="changelog-note"><b>Import Modal:</b> استيراد أوردرات مندوب بالكامل من Shopify مع فلترة الحالة</div>
+            <div class="changelog-note"><b>الشحن الإضافي:</b> قسم منفصل لأوردرات الشحن الإضافي مع مسح باركود مستقل</div>
+            <div class="changelog-note"><b>Pre-Registration:</b> تكامل مع pre-register worker لعرض الأوردرات المسجلة مسبقاً</div>
+          </div>
+        </div>
+
+        <div class="changelog-item">
+          <div class="changelog-item-header">
+            <span class="changelog-ver-badge">v1.0.0</span>
+            <span class="changelog-date">—</span>
+          </div>
+          <div class="changelog-notes">
+            <div class="changelog-note">الإصدار الأول — مسح باركود، تحصيل واسترداد، سجل عمليات، تصدير XLSX</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal-cancel" onclick="closeChangelog()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" data-tab="scan" onclick="switchTab('scan')">
+    🔫 المسح والتحصيل
+    <span class="tab-badge" id="tabBadgeReady" style="display:none"></span>
+    <span class="tab-badge red" id="tabBadgeRefund" style="display:none"></span>
+  </button>
+  <button class="tab-btn" data-tab="log" onclick="switchTab('log')">
+    📜 السجل
+    <span class="tab-badge green" id="tabBadgeLog" style="display:none"></span>
+  </button>
+  <button class="tab-btn" data-tab="balance" onclick="switchTab('balance')">
+    💰 Courier-Balance
+    <span class="tab-badge amber" id="tabBadgeBalance" style="display:none"></span>
+  </button>
+</div>
+
+<div class="page active" id="page-scan">
+  <div class="not-configured-banner" id="notConfigBanner">⚠ الأداة غير مضبوطة — افتح الإعدادات وأدخل بيانات الاتصال</div>
+
+  <div class="card">
+    <div class="card-header">إضافة أوردرات</div>
+    <div class="card-body" style="padding-bottom:16px">
+      <div class="input-methods">
+
+        <!-- ١. ماسح الباركود -->
+        <div class="input-method active" id="methodScanner">
+          <div class="input-method-header">
+            <span class="input-method-icon">🔫</span>
+            <span class="input-method-label">ماسح الباركود</span>
+          </div>
+          <div class="input-method-body">
+            <div class="scanner-wrap">
+              <span class="scanner-icon-wrap">🔫</span>
+              <input type="text" id="scannerInput" class="scanner-input" placeholder="امسح الباركود هنا..." autocomplete="off" spellcheck="false" inputmode="none">
+            </div>
+            <div class="scanner-hint">💡 Scanner Gun: امسح وسيتم الاستعلام تلقائياً</div>
+          </div>
+        </div>
+
+        <!-- ٢. إدخال يدوي -->
+        <div class="input-method" id="methodManual">
+          <div class="input-method-header">
+            <span class="input-method-icon">⌨️</span>
+            <span class="input-method-label">إدخال يدوي</span>
+          </div>
+          <div class="input-method-body">
+            <div class="manual-row">
+              <input type="text" id="manualInput" class="manual-input" placeholder="أدخل رقم الأوردر..." autocomplete="off" spellcheck="false" inputmode="numeric">
+              <button class="btn-manual" id="manualBtn" onclick="handleManualAdd()">إضافة</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ٣. البحث عن أوردرات المندوب -->
+        <div class="input-method" id="methodImport">
+          <div class="input-method-header">
+            <span class="input-method-icon">🔍</span>
+            <span class="input-method-label">البحث عن أوردرات المندوب</span>
+          </div>
+          <div class="input-method-body">
+            <button class="btn-import-method" id="importBtn" onclick="openImportModal()">
+              🔍 <span id="importBtnText">البحث عن أوردرات المندوب</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-chip"><span class="stat-val accent" id="statCount">0</span><span class="stat-lbl">أوردر</span></div>
+    <div class="stat-chip"><span class="stat-val amber" id="statTotal">—</span><span class="stat-lbl">تحصيل شوبيفاي</span></div>
+    <div class="stat-chip"><span class="stat-val red" id="statRefundVal">—</span><span class="stat-lbl">استرداد شوبيفاي</span></div>
+    <div class="stat-chip"><span class="stat-val" id="statShipping">—</span><span class="stat-lbl">مصاريف الشحن</span></div>
+    <div class="stat-chip stat-chip-highlight" id="statNetChip"><span class="stat-val" id="statCourierCollect">—</span><span class="stat-lbl">صافي تحصيل المندوب</span></div>
+  </div>
+
+  <div class="card pay-methods-card" id="payMethodsCard">
+    <div class="card-header">طريقة الدفع</div>
+    <div class="card-body">
+      <div class="courier-banner">
+        <span class="courier-banner-label">المندوب:</span>
+        <span class="courier-banner-name" id="courierBannerName">—</span>
+        <span class="courier-banner-total" id="courierBannerTotal"></span>
+      </div>
+
+      <!-- Extra Shipping Section -->
+      <div class="extra-shipping-section" id="extraShippingSection">
+        <div class="extra-shipping-header">
+          <div class="extra-shipping-title">
+            🚚 مصاريف شحن إضافية
+            <span class="extra-shipping-total" id="extraShippingTotal" style="display:none"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="extra-shipping-net" id="extraNet"></span>
+            <button class="btn-add-extra" onclick="showExtraScanner()">+ إضافة أوردر</button>
+          </div>
+        </div>
+        <!-- Scanner row for extra shipping -->
+        <div class="extra-add-panel" id="extraAddPanel">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span class="extra-add-panel-title">إضافة أوردر شحن إضافي</span>
+            <button class="btn-extra-cancel" onclick="hideExtraScanner()">✕ إلغاء</button>
+          </div>
+          <div class="extra-scanner-row">
+            <span class="extra-row-label orange">🔫 سكانر</span>
+            <input type="text" id="extraScanInput" class="extra-scan-input" placeholder="امسح الباركود هنا..." autocomplete="off" spellcheck="false" inputmode="none">
+          </div>
+          <div class="extra-manual-row">
+            <span class="extra-row-label">✏️ يدوي</span>
+            <input type="text" id="extraManualInput" class="extra-manual-input" placeholder="12345 أو #12345" autocomplete="off" spellcheck="false" inputmode="numeric">
+            <button class="btn-extra-action" id="extraManualBtn" onclick="handleExtraManualAdd()">إضافة</button>
+          </div>
+        </div>
+        <div class="extra-entries-list" id="extraEntriesList"></div>
+      </div>
+
+      <!-- بانر الرصيد السابق -->
+      <div class="balance-prev-banner" id="balancePrevBanner">
+        <div class="balance-prev-icon">⚠️</div>
+        <div class="balance-prev-body">
+          <div class="balance-prev-label">هذا المندوب لديه رصيد سابق</div>
+          <div class="balance-prev-amount" id="balancePrevAmount">0 EGP</div>
+          <div class="balance-prev-total-label">إجمالي المستحق اليوم: <span class="balance-prev-total-val" id="balancePrevTotal">—</span></div>
+        </div>
+      </div>
+
+      <div class="pay-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+        <div class="pay-method-item"><div class="pay-method-label">💵 نقدي</div><input type="number" id="pmCash" class="pay-method-input" placeholder="0.00" min="0" step="0.01" oninput="updatePayValidation()"></div>
+        <div class="pay-method-item"><div class="pay-method-label">📱 انستاباي</div><input type="number" id="pmInstapay" class="pay-method-input" placeholder="0.00" min="0" step="0.01" oninput="updatePayValidation()"></div>
+        <div class="pay-method-item"><div class="pay-method-label">👛 محفظة</div><input type="number" id="pmWallet" class="pay-method-input" placeholder="0.00" min="0" step="0.01" oninput="updatePayValidation()"></div>
+        <div class="pay-method-item" style="border:1.5px solid #facc15;background:#fefce8;"><div class="pay-method-label" style="color:#92400e;">🏦 رصيد معه</div><input type="number" id="pmBalance" class="pay-method-input" placeholder="0.00" min="0" step="0.01" oninput="updatePayValidation()" style="border-bottom-color:#facc15;"></div>
+      </div>
+      <div class="pay-validation" id="payValidation"><span class="pay-val-text" id="payValText">أدخل طرق الدفع</span></div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-pay" id="payBtn" onclick="confirmBulkPay()" disabled>💵 تسجيل الدفع على شوبيفاي</button>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="result-box" id="resultBox"><div class="result-title" id="resultTitle"></div><div class="result-detail" id="resultDetail"></div></div>
+
+  <div class="table-wrap" id="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-del"></th>
+          <th>رقم الأوردر</th>
+          <th>المندوب</th>
+          <th class="col-ltr">تحصيل المندوب</th>
+          <th class="col-ltr">شحن</th>
+          <th class="col-ltr">إجمالي شوبيفاي</th>
+          <th class="col-center">نوع الأوردر</th>
+          <th class="col-center">Payment Status</th>
+          <th class="col-center">حالة الدفع</th>
+          <th class="col-center">S1</th>
+          <th class="col-center">S2</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="page" id="page-log">
+  <div class="log-toolbar">
+    <div class="log-toolbar-title">سجل العمليات <span class="log-sync-badge synced" id="logSyncBadge">D1</span></div>
+    <div class="log-actions">
+      <button class="btn-log" onclick="refreshLog()">🔄 تحديث</button>
+      <button class="btn-log export-sel" id="exportSelBtn" onclick="exportXLSX(true)">📥 تصدير المحدد</button>
+      <button class="btn-log export" onclick="exportXLSX(false)">📥 تصدير الكل</button>
+    </div>
+  </div>
+  <div id="logContainer"><div class="log-empty">اضغط تحديث لعرض السجل</div></div>
+</div>
+
+<!-- Import Courier Modal -->
+<div class="import-overlay" id="importOverlay" onclick="closeImportOnBackdrop(event)">
+  <div class="import-modal">
+    <div class="import-modal-header">
+      <div class="import-modal-title">🚚 استيراد أوردرات من مندوب</div>
+      <button class="import-modal-close" onclick="closeImportModal()">✕ إغلاق</button>
+    </div>
+    <div class="import-modal-body">
+      <div class="import-courier-row">
+        <select id="importCourierSelect" class="import-courier-select">
+          <option value="">جاري تحميل المناديب...</option>
+        </select>
+        <button class="import-fetch-btn" id="importFetchBtn" onclick="importFetchOrders()" disabled>
+          <span id="importFetchBtnTxt">🔍 استعلام</span>
+        </button>
+      </div>
+      <div class="import-hint" id="importHint">اختر مندوباً واستعلم عن الأوردرات</div>
+      <div id="importTableSection" style="display:none">
+        <div class="import-toolbar">
+          <button class="btn-import-sel" onclick="importSelectAll()">تحديد الكل</button>
+          <button class="btn-import-sel" onclick="importDeselectAll()">إلغاء الكل</button>
+          <span class="import-sel-count" id="importSelCount" style="display:none">0 محدد</span>
+        </div>
+        <div class="import-table-wrap">
+          <table class="import-table">
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" id="importHeadCb" onchange="importToggleAll(this)" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer"></th>
+                <th>رقم الأوردر</th>
+                <th>العميل</th>
+                <th class="col-ltr">إجمالي شوبيفاي</th>
+                <th class="col-ltr">شحن</th>
+                <th>تاريخ الإنشاء</th>
+                <th class="col-center">S1</th>
+                <th class="col-center">S2</th>
+                <th class="col-center">الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="importTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="import-empty" id="importEmptyMsg" style="display:none"></div>
+    </div>
+    <div class="import-modal-footer">
+      <span class="import-sel-count" id="importSelCountFooter" style="display:none"></span>
+      <div style="flex:1"></div>
+      <button class="btn-modal-cancel" onclick="closeImportModal()">إلغاء</button>
+      <button class="btn-import-add" id="importAddBtn" onclick="importAddSelected()" disabled>
+        ➕ <span id="importAddBtnTxt">إضافة المحدد للجدول</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-balance">
+  <div class="balance-page-toolbar">
+    <div class="balance-page-title">💰 Courier-Balance — أرصدة المناديب</div>
+    <button class="btn-balance primary" onclick="loadAllBalances()">🔄 تحديث</button>
+  </div>
+  <div id="balanceContainer"><div class="balance-empty">اضغط تحديث لجلب أرصدة المناديب</div></div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsOverlay" onclick="closeSettingsOnBackdrop(event)">
+  <div class="modal">
+    <div class="modal-header">⚙️ الإعدادات</div>
+    <div class="modal-body">
+      <div class="field-section-label">Payment Center Worker (دفع + استرداد + سجل)</div>
+      <div class="field-group"><label class="field-label">Worker URL</label><input type="text" class="field-input" id="cfWorkerUrl" placeholder="https://cod-payment-center-worker.ecommoda-dev.workers.dev"></div>
+      <div class="field-group"><label class="field-label">Worker Secret</label><input type="password" class="field-input" id="cfWorkerSecret" placeholder="••••••••"></div>
+      <div class="field-divider"></div>
+      <div class="field-section-label">Courier-Balance Worker</div>
+      <div class="field-group"><label class="field-label">Balance Worker URL</label><input type="text" class="field-input" id="cfBalanceUrl" placeholder="https://courier-balance-worker.ecommoda24.workers.dev"></div>
+      <div class="field-group"><label class="field-label">Balance Worker Secret</label><input type="password" class="field-input" id="cfBalanceSecret" placeholder="••••••••"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal-cancel" onclick="closeSettings()">إلغاء</button>
+      <button class="btn-save" onclick="saveSettings()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal confirm-modal">
+    <div class="modal-header" id="confirmHeader"></div>
+    <div class="modal-body" id="confirmBody"></div>
+    <div class="modal-footer">
+      <button class="btn-modal-cancel" id="confirmCancelBtn">إلغاء</button>
+      <button class="btn-confirm-ok accent-btn" id="confirmOkBtn">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG & STATE
+// ══════════════════════════════════════════════════════════════
+const LS = {
+  URL:'cod_center_worker_url', SECRET:'cod_center_worker_secret',
+  BALANCE_URL:'cod_center_balance_url', BALANCE_SECRET:'cod_center_balance_secret',
+};
+function getConfig() {
+  return { url:localStorage.getItem(LS.URL)||'', secret:localStorage.getItem(LS.SECRET)||'',
+           balanceUrl:localStorage.getItem(LS.BALANCE_URL)||'', balanceSecret:localStorage.getItem(LS.BALANCE_SECRET)||'' };
+}
+function isConfigured()        { const c=getConfig(); return c.url.startsWith('http')&&c.secret.length>0; }
+function isBalanceConfigured() { const c=getConfig(); return c.balanceUrl.startsWith('http')&&c.balanceSecret.length>0; }
+
+// رصيد المندوب الحالي المُحمَّل للجلسة
+let currentCourierBalance = 0;
+
+// orders = regular orders in table
+// extraEntries = extra shipping orders
+let orders=[], extraEntries=[], isProcessing=false;
+const $=id=>document.getElementById(id);
+
+window.addEventListener('load',()=>{
+  loadSettingsToForm(); updateSettingsBtn(); updateConfigBanner();
+  refocus();
+});
+
+// ══════════════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+tab));
+  if(tab==='scan') refocus();
+  if(tab==='balance') loadAllBalances();
+  if(tab==='log' && !logLoadedOnce) refreshLog();
+}
+
+// ══════════════════════════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════════════════════════
+function loadSettingsToForm(){const c=getConfig();$('cfWorkerUrl').value=c.url;$('cfWorkerSecret').value=c.secret;$('cfBalanceUrl').value=c.balanceUrl;$('cfBalanceSecret').value=c.balanceSecret;}
+function openSettings(){loadSettingsToForm();$('settingsOverlay').classList.add('open');}
+function closeSettings(){$('settingsOverlay').classList.remove('open');}
+function closeSettingsOnBackdrop(e){if(e.target===$('settingsOverlay'))closeSettings();}
+function saveSettings(){
+  const url=$('cfWorkerUrl').value.trim(),secret=$('cfWorkerSecret').value.trim(),
+        balanceUrl=$('cfBalanceUrl').value.trim(),balanceSecret=$('cfBalanceSecret').value.trim();
+  if(!url||!secret){showToast('أدخل Worker URL و Secret','error');return;}
+  localStorage.setItem(LS.URL,url);localStorage.setItem(LS.SECRET,secret);
+  localStorage.setItem(LS.BALANCE_URL,balanceUrl);localStorage.setItem(LS.BALANCE_SECRET,balanceSecret);
+  updateSettingsBtn();updateConfigBanner();closeSettings();showToast('تم حفظ الإعدادات ✓','success');
+  logLoadedOnce=false; logOffset=0; logGroups=[];
+}
+function updateSettingsBtn(){$('settingsBtn').classList.toggle('configured',isConfigured());}
+function updateConfigBanner(){$('notConfigBanner').classList.toggle('show',!isConfigured());}
+
+// ── تحديث نص زرار البحث عن أوردرات المندوب ──────────────────
+function updateImportBtn(){
+  const courier  = getReadyCourier();
+  const textEl   = $('importBtnText');
+  const methodEl = $('methodImport');
+  if(!textEl) return;
+  if(courier){
+    textEl.innerHTML = `البحث عن أوردرات <span class="btn-import-method-courier">${courier}</span>`;
+    if(methodEl) methodEl.classList.add('active');
+  } else {
+    textEl.textContent = 'البحث عن أوردرات المندوب';
+    if(methodEl) methodEl.classList.remove('active');
+  }
+}
+
+// ── active state للـ methods بناءً على الـ focus ─────────────
+function setActiveMethod(methodId){
+  ['methodScanner','methodManual','methodImport'].forEach(id=>{
+    const el = $(id);
+    if(!el) return;
+    if(id === 'methodImport') return;
+    el.classList.toggle('active', id === methodId);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// CHANGELOG
+// ══════════════════════════════════════════════════════════════
+function openChangelog(){$('changelogOverlay').classList.add('open');}
+function closeChangelog(){$('changelogOverlay').classList.remove('open');}
+function closeChangelogOnBackdrop(e){if(e.target===$('changelogOverlay'))closeChangelog();}
+
+// ══════════════════════════════════════════════════════════════
+// MAIN SCANNER
+// ══════════════════════════════════════════════════════════════
+const scannerInput=$('scannerInput');
+let lastKeyTime=0,scanTimer=null;
+function refocus(){
+  if($('page-scan').classList.contains('active')&&!$('extraAddPanel').classList.contains('show')&&!$('importOverlay').classList.contains('open')){
+    scannerInput.focus();
+    setActiveMethod('methodScanner');
+  }
+}
+document.addEventListener('click',e=>{
+  const skip=['.modal-overlay','.log-toolbar','#logContainer','.pay-methods-card','.table-wrap','.result-box','.manual-row','#settingsBtn','#extraAddPanel'];
+  if(skip.some(s=>e.target.closest(s)))return;
+  if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')return;
+  setTimeout(refocus,50);
+});
+scannerInput.addEventListener('focus',()=>setActiveMethod('methodScanner'));
+$('manualInput') && $('manualInput').addEventListener('focus',()=>setActiveMethod('methodManual'));
+scannerInput.addEventListener('input',()=>{
+  if(isProcessing)return;
+  const gap=Date.now()-lastKeyTime; lastKeyTime=Date.now();
+  clearTimeout(scanTimer); scanTimer=setTimeout(handleScan,gap<80?150:400);
+});
+scannerInput.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();clearTimeout(scanTimer);handleScan();}});
+$('manualInput').addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();handleManualAdd();}});
+
+async function handleScan(){
+  const raw=scannerInput.value.trim(); scannerInput.value=''; scannerInput.focus();
+  if(!raw||!/^\d+$/.test(raw))return;
+  if(orders.find(o=>o.id===raw)){showToast('⚠ موجود بالفعل');return;}
+  if(!isConfigured()){openSettings();return;}
+  await addOrder(raw);
+}
+async function handleManualAdd(){
+  const input=$('manualInput'),raw=input.value.trim().replace(/^#/,'');
+  if(!raw){input.focus();return;}
+  if(!isConfigured()){openSettings();return;}
+  const manualBtn=$('manualBtn');
+  manualBtn.disabled=true;manualBtn.textContent='...';input.disabled=true;
+  try{
+    if(orders.find(o=>o.orderName==='#'+raw)||orders.find(o=>o.id===raw)){showToast('⚠ موجود بالفعل');return;}
+    const c=getConfig();
+    const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'resolveByName',orderName:'#'+raw})});
+    const d=await res.json();
+    if(!d.success||!d.orderId){showToast(d.notFound?`⚠ #${raw} غير موجود`:'⚠ خطأ في الاستعلام');return;}
+    if(orders.find(o=>o.id===d.orderId)){showToast('⚠ موجود بالفعل');return;}
+    await addOrder(d.orderId);
+  }catch(e){showToast('خطأ في الاتصال','error');}
+  finally{manualBtn.disabled=false;manualBtn.textContent='إضافة';input.disabled=false;input.value='';input.focus();}
+}
+
+async function addOrder(numericId){
+  const order={
+    id:numericId, orderName:null, amount:null, subtotal:null, shippingAmount:null,
+    canMarkAsPaid:null, skipReason:null, financialStatus:null,
+    courier:null, lineItems:[], status:'scanning', error:null,
+    preRegistered:false, cancelled:false,
+    hasReturn:false, returnShipping:'0.00', returnedItems:[],
+    refundAmount:null, parentTransactionId:null, orderDiscount:null,
+    isExtraShipping: false,
+    s1:null, s2:null, statusError:null,
+  };
+  orders.unshift(order);
+  showTable(); updateStats(); renderTable();
+  showToast(`🔫 ${numericId}`);
+
+  try{
+    const c=getConfig();
+    const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'preview',orderId:numericId})});
+    const d=await res.json();
+    if(d.success){
+      if(d.cancelled){
+        order.orderName=d.orderName; order.financialStatus=d.financialStatus;
+        order.cancelled=true; order.status='cancelled';
+      } else {
+        order.orderName           = d.orderName;
+        order.amount              = parseFloat(d.amount);
+        order.subtotal            = parseFloat(d.subtotal);
+        order.shippingAmount      = parseFloat(d.shippingAmount);
+        order.canMarkAsPaid       = d.canMarkAsPaid;
+        order.skipReason          = d.skipReason||null;
+        order.financialStatus     = d.financialStatus;
+        order.courier             = d.courier||null;
+        order.lineItems           = d.lineItems||[];
+        order.preRegistered       = d.preRegistered||false;
+        order.orderDiscount       = d.orderDiscount??null;
+        order.parentTransactionId = d.parentTransactionId||null;
+        order.hasReturn           = d.hasReturn||false;
+        order.returnShipping      = d.returnShipping||'0.00';
+        order.returnedItems       = d.returnedItems||[];
+        order.s1                  = d.s1||null;
+        order.s2                  = d.s2||null;
+        order.statusError         = calcStatusError(order, false);
+        if(d.skipReason==='مستحق استرداد'){
+          order.status='refund'; order.refundAmount=Math.abs(order.amount);
+        } else {
+          order.status=d.canMarkAsPaid?'ready':'skipped';
+        }
+      }
+    } else if(d.notFound){
+      order.status='notfound';
+    } else {
+      order.status='error'; order.error=d.error||'خطأ';
+    }
+  }catch(e){order.status='error';order.error='خطأ في الاتصال';}
+
+  updateStats(); renderTable(); renderExtraEntries(); updatePayBtn(); updatePayMethodsCard(); updateImportBtn(); refocus();
+}
+
+function deleteOrder(idx){
+  orders.splice(idx,1);
+  if(!orders.length&&!extraEntries.length){$('tableWrap').classList.remove('show');$('statsBar').classList.remove('show');}
+  updateStats();updatePayBtn();renderTable();renderExtraEntries();hideResult();updatePayMethodsCard();updateImportBtn();refocus();
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXTRA SHIPPING SCANNER
+// ══════════════════════════════════════════════════════════════
+let extraScanTimer=null, extraLastKeyTime=0;
+
+function showExtraScanner(){
+  $('extraAddPanel').classList.add('show');
+  $('extraScanInput').focus();
+}
+function hideExtraScanner(){
+  $('extraAddPanel').classList.remove('show');
+  $('extraScanInput').value='';
+  $('extraManualInput').value='';
+  refocus();
+}
+
+const extraScanInput=$('extraScanInput');
+
+extraScanInput.addEventListener('input',()=>{
+  const gap=Date.now()-extraLastKeyTime; extraLastKeyTime=Date.now();
+  clearTimeout(extraScanTimer);
+  extraScanTimer=setTimeout(handleExtraScan, gap<80?150:400);
+});
+extraScanInput.addEventListener('keypress',e=>{
+  if(e.key==='Enter'){e.preventDefault();clearTimeout(extraScanTimer);handleExtraScan();}
+});
+
+$('extraManualInput').addEventListener('keypress',e=>{
+  if(e.key==='Enter'){e.preventDefault();handleExtraManualAdd();}
+});
+
+async function handleExtraScan(){
+  const raw=extraScanInput.value.trim(); extraScanInput.value='';
+  if(!raw)return;
+  if(/^\d+$/.test(raw)){
+    await processExtraOrderById(raw);
+  } else {
+    const clean=raw.replace(/^#/,'');
+    await processExtraOrderByName(clean);
+  }
+}
+
+async function handleExtraManualAdd(){
+  const input=$('extraManualInput'), raw=input.value.trim().replace(/^#/,'');
+  if(!raw){input.focus();return;}
+  if(!isConfigured()){openSettings();return;}
+  const btn=$('extraManualBtn');
+  input.disabled=true; btn.disabled=true; btn.textContent='...';
+  try{ await processExtraOrderByName(raw); }
+  finally{ input.disabled=false; btn.disabled=false; btn.textContent='إضافة'; input.value=''; input.focus(); }
+}
+
+async function processExtraOrderByName(orderNumber){
+  if(!isConfigured()){openSettings();return;}
+  try{
+    const c=getConfig();
+    const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'resolveByName',orderName:'#'+orderNumber})});
+    const d=await res.json();
+    if(!d.success||!d.orderId){showToast(d.notFound?`⚠ #${orderNumber} غير موجود`:'⚠ خطأ','error');return;}
+    await processExtraOrderById(d.orderId);
+  }catch(e){showToast('خطأ في الاتصال','error');}
+}
+
+async function processExtraOrderById(numericId){
+  if(orders.find(o=>o.id===numericId)){
+    showToast('⚠ هذا الأوردر موجود بالفعل في الجدول','error');
+    return;
+  }
+  if(extraEntries.find(e=>e.id===numericId)){
+    showToast('⚠ هذا الأوردر موجود بالفعل في الشحن الإضافي','error');
+    return;
+  }
+
+  const entry={ id:numericId, orderName:null, courier:null, amount:'', status:'loading', error:null, s1:null, s2:null, statusError:null };
+  extraEntries.push(entry);
+  hideExtraScanner();
+  renderExtraEntries();
+
+  try{
+    const c=getConfig();
+    const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'preview',orderId:numericId})});
+    const d=await res.json();
+    if(d.success&&!d.notFound){
+      entry.orderName=d.orderName||('#'+numericId);
+      entry.courier=d.courier||null;
+      entry.s1=d.s1||null;
+      entry.s2=d.s2||null;
+      entry.cancelled=d.cancelled||false;
+      entry.statusError=calcStatusError(entry,true);
+      entry.status='ok';
+    } else if(d.notFound){
+      entry.status='notfound'; entry.error='غير موجود';
+    } else {
+      entry.status='error'; entry.error=d.error||'خطأ';
+    }
+  }catch(e){
+    entry.status='error'; entry.error='خطأ في الاتصال';
+  }
+
+  renderExtraEntries();
+  updateStats();
+  updatePayValidation();
+  updatePayBtn();
+}
+
+function deleteExtraEntry(idx){
+  extraEntries.splice(idx,1);
+  renderExtraEntries();
+  updateStats();
+  updatePayValidation();
+  updatePayBtn();
+}
+
+function renderExtraEntries(){
+  const list=$('extraEntriesList');
+  const totalEl=$('extraShippingTotal');
+  const total=getTotalExtraShipping();
+  if(total>0){ totalEl.style.display='inline'; totalEl.textContent=`إجمالي: ${fmt(total)}`; }
+  else totalEl.style.display='none';
+
+  if(!extraEntries.length){ list.innerHTML=''; return; }
+
+  const expectedCourier = (()=>{
+    const readyOrders=orders.filter(o=>o.status==='ready');
+    const couriers=[...new Set(readyOrders.map(o=>o.courier).filter(Boolean))];
+    return couriers.length===1?couriers[0]:null;
+  })();
+
+  list.innerHTML=extraEntries.map((e,i)=>{
+    const hasStatusErr = e.statusError && e.status==='ok';
+    const hasCourierErr = e.status==='ok' && (!e.courier||(expectedCourier&&e.courier!==expectedCourier));
+    const rowBg = hasStatusErr
+      ? 'border-color:var(--amber-border);background:var(--amber-light);'
+      : hasCourierErr
+        ? 'border-color:var(--red-border);background:var(--red-light);'
+        : '';
+
+    let statusHtml='';
+    if(e.status==='loading') statusHtml=`<span class="extra-entry-status extra-entry-loading"><span class="spinner"></span></span>`;
+    else if(e.status==='error'||e.status==='notfound') statusHtml=`<span class="extra-entry-status extra-entry-error">⚠ ${e.error}</span>`;
+    else if(e.cancelled) statusHtml=`<span class="extra-entry-status" style="color:var(--text-muted);font-size:10px">ملغي</span>`;
+
+    let courierHtml='';
+    if(e.status==='loading'){
+      courierHtml=`<span class="extra-entry-courier" style="color:var(--text-muted)">...</span>`;
+    } else if(!e.courier){
+      courierHtml=`<span class="extra-entry-courier-warn">
+        <span class="warn-name">⚠ لا يوجد مندوب</span>
+      </span>`;
+    } else if(expectedCourier && e.courier !== expectedCourier){
+      courierHtml=`<span class="extra-entry-courier-warn">
+        <span class="warn-name">⚠ ${e.courier}</span>
+        <span class="warn-label">مندوب مختلف!</span>
+      </span>`;
+    } else {
+      courierHtml=`<span class="extra-entry-courier">${e.courier}</span>`;
+    }
+
+    const statusErrHtml = hasStatusErr
+      ? `<div class="extra-status-err-row">⚠ ${e.statusError}</div>`
+      : '';
+
+    return `<div class="extra-entry-wrap">
+      <div class="extra-entry" style="${rowBg}">
+        <span class="extra-entry-order">${e.orderName||('#'+e.id)}</span>
+        ${courierHtml}
+        ${statusHtml}
+        <div class="extra-entry-amount-wrap">
+          <input type="number" class="extra-entry-amount" placeholder="0.00" min="0" step="0.01"
+            value="${e.amount}"
+            oninput="updateExtraAmount(${i}, this.value)"
+            ${e.status==='loading'?'disabled':''}>
+          <span class="extra-entry-currency">EGP</span>
+        </div>
+        <button class="btn-del-extra" onclick="deleteExtraEntry(${i})" title="حذف">❌</button>
+      </div>
+      ${statusErrHtml}
+    </div>`;
+  }).join('');
+}
+
+function updateExtraAmount(idx, val){
+  extraEntries[idx].amount=val;
+  const total=getTotalExtraShipping();
+  const totalEl=$('extraShippingTotal');
+  if(total>0){ totalEl.style.display='inline'; totalEl.textContent=`إجمالي: ${fmt(total)}`; }
+  else totalEl.style.display='none';
+  updateStats();
+  updatePayValidation();
+  updatePayBtn();
+}
+
+function getTotalExtraShipping(){
+  return extraEntries.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATUS VALIDATION (S1 / S2)
+// ══════════════════════════════════════════════════════════════
+const EXTRA_S1_OK = ['Returned','Ready','Cancelled'];
+const EXTRA_S2_OK = ['Returned','Ready'];
+
+function calcStatusError(order, isExtra){
+  const s1 = order.s1 || null;
+  const s2 = order.s2 || null;
+
+  if(isExtra){
+    if(order.cancelled) return null;
+    if(EXTRA_S1_OK.includes(s1)||EXTRA_S2_OK.includes(s2)) return null;
+    return `حالة خاطئة — S1=${s1||'فارغ'}, S2=${s2||'فارغ'}`;
+  } else {
+    const s1ok = s1==='Delivered';
+    const s2ok = !s2||s2==='Returned';
+    if(s1ok&&s2ok) return null;
+    const parts=[];
+    if(!s1ok) parts.push(`S1=${s1||'فارغ'} (يجب Delivered)`);
+    if(!s2ok) parts.push(`S2=${s2} (يجب فارغ أو Returned)`);
+    return `حالة خاطئة — ${parts.join('، ')}`;
+  }
+}
+
+function renderSBadge(val, isErr){
+  if(isErr) return `<span class="s-badge s-badge-err">⚠ ${val||'فارغ'}</span>`;
+  if(!val)  return `<span class="s-badge-empty">—</span>`;
+  if(val==='Delivered') return `<span class="s-badge s-badge-delivered">${val}</span>`;
+  if(val==='Returned')  return `<span class="s-badge s-badge-returned">${val}</span>`;
+  return `<span class="s-badge s-badge-other">${val}</span>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// CALCULATIONS
+// ══════════════════════════════════════════════════════════════
+function fmt(n){return Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});}
+function fmtSigned(n){const v=Number(n);return (v<0?'−':'')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});}
+
+function calcCourierCollect(o) {
+  if(o.isExtraShipping) return -(parseFloat(o.extraAmount)||0);
+  if(o.status==='refund'||o.status==='refund-done'||o.status==='refund-error'){
+    return -(( o.refundAmount||0)+(parseFloat(o.returnShipping)||0));
+  }
+  if(o.hasReturn){
+    return (o.amount||0)-(parseFloat(o.returnShipping)||0);
+  }
+  if(o.amount!=null&&o.shippingAmount!=null) return o.amount-o.shippingAmount;
+  return null;
+}
+
+function financialLabel(s){
+  return {PAID:'Paid',PARTIALLY_PAID:'Partially Paid',PENDING:'Pending',
+    AUTHORIZED:'Authorized',PARTIALLY_REFUNDED:'Partially Refunded',
+    REFUNDED:'Refunded',VOIDED:'Voided',EXPIRED:'Expired'}[s]||s||'—';
+}
+
+// ══════════════════════════════════════════════════════════════
+// TABLE
+// ══════════════════════════════════════════════════════════════
+function showTable(){$('tableWrap').classList.add('show');$('statsBar').classList.add('show');}
+
+function renderTable(){
+  const tbody=$('tableBody');
+
+  if(!orders.length&&!extraEntries.length){ tbody.innerHTML=''; return; }
+
+  const rows=[];
+
+  orders.forEach((o,i)=>{
+    const nameDisplay=o.orderName||`ID: ${o.id}`;
+    const hasDetails=(o.lineItems&&o.lineItems.length>0)||(o.returnedItems&&o.returnedItems.length>0);
+    const expandIcon=hasDetails?`<span class="expand-icon">▶</span>`:'';
+    const isCancelled=o.cancelled||o.status==='cancelled';
+    const isRefundStatus=o.status==='refund'||o.status==='refund-done'||o.status==='refund-error';
+
+    function moneyCell(val,forceColor){
+      if(val==null)return`<span style="color:var(--text-muted)">—</span>`;
+      const color=forceColor||(val<0?'var(--red)':'var(--green)');
+      return`<span style="color:${color}">${val<0?'−':''}${fmt(Math.abs(val))}</span>`;
+    }
+
+    const courierCollect=(isCancelled||o.status==='scanning'||o.status==='loading'||o.status==='notfound'||o.status==='error')
+      ? null : calcCourierCollect(o);
+
+    let displayShipping=null;
+    if(!isCancelled&&!isRefundStatus){
+      if(o.hasReturn&&parseFloat(o.returnShipping)>0) displayShipping=parseFloat(o.returnShipping);
+      else if(!o.hasReturn&&o.shippingAmount) displayShipping=o.shippingAmount;
+    } else if(isRefundStatus){
+      if(parseFloat(o.returnShipping)>0) displayShipping=parseFloat(o.returnShipping);
+    }
+
+    let orderTypeCol;
+    if(isCancelled||o.status==='scanning'||o.status==='loading'||o.status==='notfound'||o.status==='error')
+      orderTypeCol=`<span style="color:var(--text-muted);font-size:11px">—</span>`;
+    else if(o.hasReturn){
+      const hasNewItems=o.lineItems&&o.lineItems.length>0;
+      orderTypeCol=hasNewItems
+        ?`<span style="background:var(--purple-light);color:var(--purple);border:1px solid var(--purple-border);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700">استبدال</span>`
+        :`<span style="background:var(--red-light);color:var(--red);border:1px solid var(--red-border);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700">استرجاع</span>`;
+    } else {
+      orderTypeCol=`<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700">عادي</span>`;
+    }
+
+    let shopifyTotal=null;
+    if(!isCancelled&&o.amount!=null) shopifyTotal=isRefundStatus?-Math.abs(o.refundAmount||o.amount):o.amount;
+
+    const courierDisplay=isCancelled?`<span style="color:var(--text-muted)">—</span>`:(o.courier||`<span style="color:var(--text-muted)">—</span>`);
+
+    let paymentStatusDisplay;
+    if(isCancelled) paymentStatusDisplay=`<span style="color:var(--red);font-size:11px">Cancelled</span>`;
+    else if(isRefundStatus&&o.status==='refund') paymentStatusDisplay=`<span style="color:var(--red);font-size:11px;font-weight:700">Refund owed</span>`;
+    else paymentStatusDisplay=`<span style="font-size:11px">${financialLabel(o.financialStatus)}</span>`;
+
+    let badge;
+    if(o.status==='scanning')    badge=`<span class="badge badge-scanning"><span class="spinner"></span> مسح...</span>`;
+    else if(o.status==='loading')badge=`<span class="badge badge-loading"><span class="spinner"></span> جاري...</span>`;
+    else if(o.status==='cancelled')badge=`<span class="badge badge-cancelled">ملغي</span>`;
+    else if(o.status==='refund') badge=`<span class="badge badge-refund">استرداد</span>`;
+    else if(o.status==='refund-done')badge=`<span class="badge badge-refund-done">✓ تم الاسترداد</span>`;
+    else if(o.status==='refund-error')badge=`<span class="badge badge-error" title="${o.error||''}">خطأ استرداد</span>`;
+    else if(o.status==='ready')  badge=o.preRegistered?`<span class="badge badge-prereg">📋 مسجل مسبقاً</span>`:`<span class="badge badge-collect">تحصيل</span>`;
+    else if(o.status==='done')   badge=`<span class="badge badge-done">✓ تم التحصيل</span>`;
+    else if(o.status==='skipped'){
+      if(o.skipReason==='مدفوع بالكامل')badge=`<span class="badge badge-paid">مدفوع بالكامل</span>`;
+      else badge=`<span class="badge badge-skipped">${o.skipReason||'مُتخطى'}</span>`;
+    }
+    else if(o.status==='notfound')badge=`<span class="badge badge-notfound">غير موجود</span>`;
+    else badge=`<span class="badge badge-error" title="${o.error||''}">خطأ</span>`;
+
+    let rowClass='order-row';
+    if(i===0&&orders.length===1) rowClass+=' row-new';
+    if(isRefundStatus) rowClass+=' refund-row';
+    else if(o.status==='ready'||o.status==='done') rowClass+=' ready-row';
+    if(o.statusError) rowClass+=' status-err-row';
+
+    const isActiveOrder=(o.status==='ready'||o.status==='refund'||o.status==='done'||o.status==='refund-done');
+    let s1Cell, s2Cell;
+    if(!isActiveOrder||isCancelled){
+      s1Cell=`<span class="s-badge-empty">—</span>`;
+      s2Cell=`<span class="s-badge-empty">—</span>`;
+    } else if(o.statusError){
+      const s1ok=o.s1==='Delivered';
+      const s2ok=!o.s2||o.s2==='Returned';
+      s1Cell=renderSBadge(o.s1,!s1ok);
+      s2Cell=renderSBadge(o.s2,!s2ok);
+    } else {
+      s1Cell=renderSBadge(o.s1,false);
+      s2Cell=renderSBadge(o.s2,false);
+    }
+
+    rows.push(`<tr class="${rowClass}" data-idx="${i}" data-type="order">
+      <td style="padding:6px 8px;text-align:center">
+        <button class="row-del-btn" onclick="deleteOrder(${i})" title="حذف">❌</button>
+      </td>
+      <td class="cell-order" onclick="${hasDetails?`toggleRow(${i})`:''}" style="${hasDetails?'cursor:pointer':''}">
+        ${expandIcon}${nameDisplay}
+        ${o.statusError?`<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:3px">⚠ ${o.statusError}</div>`:''}
+      </td>
+      <td class="cell-courier">${courierDisplay}</td>
+      <td class="cell-money">${courierCollect!=null?moneyCell(courierCollect,courierCollect<0?'var(--red)':null):`<span style="color:var(--text-muted)">—</span>`}</td>
+      <td class="cell-money">${displayShipping!=null?moneyCell(displayShipping):`<span style="color:var(--text-muted)">—</span>`}</td>
+      <td class="cell-money">${shopifyTotal!=null?moneyCell(shopifyTotal):`<span style="color:var(--text-muted)">—</span>`}</td>
+      <td class="cell-center">${orderTypeCol}</td>
+      <td class="cell-center">${paymentStatusDisplay}</td>
+      <td class="cell-center">${badge}</td>
+      <td class="cell-center">${s1Cell}</td>
+      <td class="cell-center">${s2Cell}</td>
+    </tr>`);
+
+    let detailContent='';
+    if(hasDetails){
+      let normalRows=o.lineItems?o.lineItems.map(li=>`<tr>
+        <td class="td-sku">${li.sku}</td><td class="td-qty">${li.quantity}</td>
+        <td class="td-price">${fmt(li.unitPrice)}</td><td class="td-total">${fmt(li.totalPrice)}</td>
+      </tr>`).join(''):'';
+      let returnRows=o.returnedItems?o.returnedItems.map(ri=>`<tr style="background:#fff8f8">
+        <td class="td-sku returned">↩ ${ri.sku}</td><td class="td-qty negative">−${ri.quantity}</td>
+        <td class="td-price negative">−${fmt(ri.discountedUnitPrice)}</td>
+        <td class="td-total negative">−${fmt(parseFloat(ri.discountedUnitPrice)*ri.quantity)}</td>
+      </tr>`).join(''):'';
+      detailContent=`<div class="detail-box"><div class="detail-section"><div class="detail-label">SKUs</div>
+        <table class="sku-table"><thead><tr><th>SKU</th><th class="th-center">Qty</th><th class="th-ltr">Unit Price</th><th class="th-ltr">Total</th></tr></thead>
+        <tbody>${normalRows}${returnRows}</tbody></table></div>
+        ${o.hasReturn&&parseFloat(o.returnShipping)>0?`<div class="detail-section return-section"><div class="detail-label">Return Shipping</div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--red);font-weight:700">−${fmt(parseFloat(o.returnShipping))} EGP</span></div>`:''}
+      </div>`;
+    }
+    rows.push(`<tr class="detail-row" data-idx="${i}"><td colspan="11">${hasDetails?detailContent:''}</td></tr>`);
+  });
+
+  extraEntries.forEach((e,i)=>{
+    const amount=parseFloat(e.amount)||0;
+    const nameDisplay=e.orderName||('#'+e.id);
+    const courierDisplay=e.courier?`<span style="color:var(--purple);font-weight:600">${e.courier}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+    const moneyDisplay=amount>0?`<span style="color:var(--orange);font-family:'IBM Plex Mono',monospace;font-weight:700">−${fmt(amount)}</span>`:`<span style="color:var(--text-muted)">—</span>`;
+    const statusHtml=e.status==='loading'
+      ?`<span class="badge badge-loading"><span class="spinner"></span> جاري...</span>`
+      :e.status==='error'||e.status==='notfound'
+        ?`<span class="badge badge-error">${e.error}</span>`
+        :e.statusError
+          ?`<span class="badge badge-status-err">⚠ حالة خاطئة</span>`
+          :e.cancelled
+            ?`<span class="badge badge-extra">🚚 شحن إضافي <span style="font-size:9px;opacity:.7">ملغي</span></span>`
+            :`<span class="badge badge-extra">🚚 شحن إضافي</span>`;
+
+    const isOk=e.status==='ok';
+    let s1Cell,s2Cell;
+    if(!isOk){
+      s1Cell=`<span class="s-badge-empty">—</span>`;
+      s2Cell=`<span class="s-badge-empty">—</span>`;
+    } else if(e.statusError){
+      const s1ok=e.s1==='Returned';
+      const s2ok=e.s2==='Returned';
+      const eitherOk=s1ok||s2ok;
+      s1Cell=renderSBadge(e.s1, !eitherOk||(!s1ok&&!s2ok));
+      s2Cell=renderSBadge(e.s2, !eitherOk||(!s1ok&&!s2ok));
+    } else {
+      s1Cell=renderSBadge(e.s1,false);
+      s2Cell=renderSBadge(e.s2,false);
+    }
+
+    const extraRowClass='order-row extra-row'+(e.statusError?' status-err-row':'');
+    rows.push(`<tr class="${extraRowClass}" data-type="extra" data-idx="${i}">
+      <td style="padding:6px 8px;text-align:center">
+        <button class="row-del-btn" onclick="deleteExtraEntry(${i})" title="حذف">❌</button>
+      </td>
+      <td class="cell-order">
+        ${nameDisplay}
+        ${e.statusError?`<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:3px">⚠ ${e.statusError}</div>`:''}
+      </td>
+      <td class="cell-courier">${courierDisplay}</td>
+      <td class="cell-money">${moneyDisplay}</td>
+      <td class="cell-money"><span style="color:var(--text-muted)">—</span></td>
+      <td class="cell-money"><span style="color:var(--text-muted)">—</span></td>
+      <td class="cell-center"><span style="background:var(--orange-light);color:var(--orange);border:1px solid var(--orange-border);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700">شحن إضافي</span></td>
+      <td class="cell-center"><span style="color:var(--text-muted);font-size:11px">—</span></td>
+      <td class="cell-center">${statusHtml}</td>
+      <td class="cell-center">${s1Cell}</td>
+      <td class="cell-center">${s2Cell}</td>
+    </tr>`);
+    rows.push(`<tr class="detail-row"><td colspan="11"></td></tr>`);
+  });
+
+  tbody.innerHTML=rows.join('');
+
+  if(orders.length||extraEntries.length){
+    $('tableWrap').classList.add('show');
+    $('statsBar').classList.add('show');
+  }
+}
+
+function toggleRow(idx){
+  const main=document.querySelector(`tr.order-row[data-type="order"][data-idx="${idx}"]`);
+  if(!main)return;
+  const next=main.nextElementSibling;
+  if(!next||!next.classList.contains('detail-row'))return;
+  const open=main.classList.contains('expanded');
+  main.classList.toggle('expanded',!open);
+  next.classList.toggle('show',!open);
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════════════════════════
+function updateStats(){
+  const active   = orders.filter(o=>o.status==='ready'||o.status==='done');
+  const refunds  = orders.filter(o=>o.status==='refund');
+  const sumTotal = active.reduce((s,o)=>s+(o.amount||0),0);
+  const sumRefund= refunds.reduce((s,o)=>s+(o.refundAmount||0),0);
+  const sumShipping=[...active,...refunds].reduce((s,o)=>{
+    if(o.status==='refund') return s+(parseFloat(o.returnShipping)||0);
+    return s+((o.hasReturn?parseFloat(o.returnShipping):o.shippingAmount)||0);
+  },0);
+  const extraTotal=getTotalExtraShipping();
+  const allForCollect=[...active,...refunds];
+  let sumCourierCollect=allForCollect.reduce((s,o)=>{const cc=calcCourierCollect(o);return s+(cc||0);},0);
+  sumCourierCollect -= extraTotal;
+
+  $('statTotal').textContent=sumTotal>0?fmt(sumTotal):'—';
+  $('statRefundVal').textContent=sumRefund>0?'−'+fmt(sumRefund):'—';
+  $('statShipping').textContent=(sumShipping+extraTotal)>0?fmt(sumShipping+extraTotal):'—';
+
+  const netEl=$('statCourierCollect');
+  netEl.textContent=sumCourierCollect!==0?fmtSigned(sumCourierCollect):'—';
+  netEl.className='stat-val '+(sumCourierCollect<0?'red':sumCourierCollect>0?'green':'');
+  const chip=$('statNetChip');
+  chip.style.borderColor=sumCourierCollect<0?'var(--red)':sumCourierCollect>0?'var(--green)':'var(--border-strong)';
+
+  const readyCount  = orders.filter(o=>o.status==='ready').length;
+  const refundCount = orders.filter(o=>o.status==='refund').length;
+  const countEl=$('statCount');
+
+  if(readyCount>0||refundCount>0){
+    const parts=[];
+    if(readyCount>0)  parts.push(`<span style="color:var(--green);font-weight:800">${readyCount}</span>`);
+    if(refundCount>0) parts.push(`<span style="color:var(--red);font-weight:800">${refundCount}</span>`);
+    countEl.innerHTML=parts.join(`<span style="color:var(--text-muted);font-size:14px;margin:0 2px">+</span>`);
+  } else {
+    const totalVisible=orders.length+extraEntries.length;
+    countEl.innerHTML=`<span>${totalVisible}</span>`;
+  }
+
+  $('tabBadgeReady').style.display='none';
+  $('tabBadgeRefund').style.display='none';
+}
+
+// ══════════════════════════════════════════════════════════════
+// PAYMENT METHODS
+// ══════════════════════════════════════════════════════════════
+function getCourierCollectNet(){
+  const all=orders.filter(o=>o.status==='ready'||o.status==='refund'||o.status==='done');
+  let sum=all.reduce((s,o)=>{const cc=calcCourierCollect(o);return s+(cc||0);},0);
+  sum -= getTotalExtraShipping();
+  return sum;
+}
+function getNetTarget(){ return getCourierCollectNet() + currentCourierBalance; }
+function getPaySum(){return(parseFloat($('pmCash').value)||0)+(parseFloat($('pmInstapay').value)||0)+(parseFloat($('pmWallet').value)||0)+(parseFloat($('pmBalance').value)||0);}
+function isPayEmpty(){return!$('pmCash').value&&!$('pmInstapay').value&&!$('pmWallet').value&&!$('pmBalance').value;}
+
+async function loadCourierBalance(courierName){
+  currentCourierBalance=0;
+  $('balancePrevBanner').classList.remove('show');
+  if(!courierName||!isBalanceConfigured()) return;
+  try{
+    const c=getConfig();
+    const res=await fetch(c.balanceUrl,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.balanceSecret}`},body:JSON.stringify({action:'getBalance',courierName})});
+    const d=await res.json();
+    if(d.success&&d.balance>0){
+      currentCourierBalance=d.balance;
+      $('balancePrevAmount').textContent=`${fmt(d.balance)} EGP`;
+      $('balancePrevBanner').classList.add('show');
+      updateBalancePrevTotal();
+    }
+  }catch{}
+}
+
+function updateBalancePrevTotal(){
+  const todayNet=getCourierCollectNet();
+  const total=todayNet+currentCourierBalance;
+  $('balancePrevTotal').textContent=`${fmtSigned(total)} EGP`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// updatePayMethodsCard — يشمل refund orders أيضاً
+// ══════════════════════════════════════════════════════════════
+function updatePayMethodsCard(){
+  const readyOrders  = orders.filter(o=>o.status==='ready');
+  const refundOrders = orders.filter(o=>o.status==='refund');
+  const card=$('payMethodsCard');
+
+  // الكارت بتظهر لو في ready أو refund orders
+  if(!readyOrders.length && !refundOrders.length){
+    card.classList.remove('show');
+    currentCourierBalance=0;
+    $('balancePrevBanner').classList.remove('show');
+    return;
+  }
+
+  card.classList.add('show');
+  const courier=getReadyCourier();
+  const courierErr=getReadyCourierError();
+  $('courierBannerName').textContent=courierErr?'⚠ خطأ في المندوب':(courier||'—');
+  $('courierBannerName').style.color=courierErr?'var(--red)':'var(--purple)';
+  $('courierBannerTotal').textContent='';
+  if(courier) loadCourierBalance(courier);
+  updatePayValidation();
+}
+
+function updatePayValidation(){
+  const el=$('payValidation'),textEl=$('payValText');
+  const target=getNetTarget(),entered=getPaySum();
+  const extraTotal=getTotalExtraShipping();
+  const todayNet=getCourierCollectNet();
+  let netLabel=extraTotal>0?`صافي اليوم: ${fmtSigned(todayNet)}`:'';
+  if(currentCourierBalance>0) netLabel=(netLabel?netLabel+' | ':'')+`رصيد سابق: ${fmt(currentCourierBalance)} | إجمالي: ${fmtSigned(target)}`;
+  $('extraNet').textContent=netLabel;
+  updateBalancePrevTotal();
+
+  if(isPayEmpty()){
+    el.className='pay-validation';
+    textEl.textContent=target<0
+      ?`المندوب يستحق منا ${fmt(Math.abs(target))} EGP — أدخل المبلغ الذي ستدفعه له`
+      :`أدخل طرق الدفع — المجموع يجب يساوي ${fmtSigned(target)}`;
+  } else {
+    const absTarget=Math.abs(target);
+    const diff=Math.abs(Math.abs(entered)-absTarget);
+    if(diff<0.01){
+      el.className='pay-validation ok';
+      textEl.textContent=`✓ المجموع مظبوط — ${fmt(Math.abs(entered))}`;
+    } else {
+      el.className='pay-validation mismatch';
+      const dir=Math.abs(entered)>absTarget?`زيادة ${fmt(Math.abs(entered)-absTarget)}`:`ناقص ${fmt(absTarget-Math.abs(entered))}`;
+      textEl.textContent=`المجموع ${fmt(Math.abs(entered))} — ${dir}`;
+    }
+  }
+  updatePayBtn();
+}
+
+function isPayValid(){
+  if(isPayEmpty()) return false;
+  const target=getNetTarget(),entered=getPaySum();
+  return Math.abs(Math.abs(entered)-Math.abs(target))<0.01;
+}
+
+function getReadyCourier(){
+  const allForCourier=[
+    ...orders.filter(o=>o.status==='ready'||o.status==='refund'),
+    ...extraEntries.filter(e=>e.status==='ok'),
+  ];
+  const couriers=[...new Set(allForCourier.map(o=>o.courier).filter(Boolean))];
+  return couriers.length===1?couriers[0]:null;
+}
+
+function getReadyCourierError(){
+  const readyOrders  = orders.filter(o=>o.status==='ready');
+  const refundOrders = orders.filter(o=>o.status==='refund');
+  const extraOk      = extraEntries.filter(e=>e.status==='ok');
+
+  if(!readyOrders.length&&!refundOrders.length&&!extraOk.length) return null;
+
+  const noCourier=readyOrders.filter(o=>!o.courier);
+  if(noCourier.length) return `بدون مندوب: ${noCourier.map(o=>o.orderName||o.id).join('، ')}`;
+
+  const refundNoCourier=refundOrders.filter(o=>!o.courier);
+  if(refundNoCourier.length) return `أوردر استرداد بدون مندوب: ${refundNoCourier.map(o=>o.orderName||o.id).join('، ')}`;
+
+  const extraNoCourier=extraOk.filter(e=>!e.courier);
+  if(extraNoCourier.length) return `شحن إضافي بدون مندوب: ${extraNoCourier.map(e=>e.orderName||e.id).join('، ')}`;
+
+  const allCouriers=[
+    ...readyOrders.map(o=>o.courier),
+    ...refundOrders.map(o=>o.courier),
+    ...extraOk.map(e=>e.courier),
+  ].filter(Boolean);
+  const unique=[...new Set(allCouriers)];
+  if(unique.length>1) return `أكثر من مندوب: ${unique.join('، ')}`;
+  return null;
+}
+
+function updatePayBtn(){
+  const hasReady  =orders.filter(o=>o.status==='ready').length>0;
+  const hasRefund =orders.filter(o=>o.status==='refund').length>0;
+  const courierErr=getReadyCourierError();
+  const hasStatusErr=orders.some(o=>o.statusError&&(o.status==='ready'||o.status==='refund'))
+    ||extraEntries.some(e=>e.statusError&&e.status==='ok');
+  const btn=$('payBtn');
+  const needsPayValid=hasReady;
+  btn.disabled=(!hasReady&&!hasRefund)||!!courierErr||(needsPayValid&&!isPayValid())||isProcessing||hasStatusErr;
+  if(hasReady&&hasRefund){btn.textContent='💵 تسجيل الدفع + 💸 تنفيذ الاسترداد';btn.classList.add('has-refund');}
+  else if(hasRefund&&!hasReady){btn.textContent='💸 تنفيذ الاسترداد';btn.classList.add('has-refund');}
+  else{btn.textContent='💵 تسجيل الدفع على شوبيفاي';btn.classList.remove('has-refund');}
+}
+
+// ══════════════════════════════════════════════════════════════
+// BULK PAY + REFUND
+// ══════════════════════════════════════════════════════════════
+async function confirmBulkPay(){
+  const readyOrders =orders.filter(o=>o.status==='ready');
+  const refundOrders=orders.filter(o=>o.status==='refund');
+  if(!readyOrders.length&&!refundOrders.length)return;
+  const courierErr=getReadyCourierError();
+  if(courierErr){showResult(false,'⚠ لا يمكن تسجيل الدفع',courierErr);return;}
+  if(readyOrders.length&&!isPayValid()){showResult(false,'⚠ طريقة الدفع غير مكتملة','');return;}
+
+  const courierName  =getReadyCourier();
+  const cash         =parseFloat($('pmCash').value)||0;
+  const instapay     =parseFloat($('pmInstapay').value)||0;
+  const wallet       =parseFloat($('pmWallet').value)||0;
+  const balanceDebit =parseFloat($('pmBalance').value)||0;
+  const prevBalance  =currentCourierBalance;
+  const extraTotal   =getTotalExtraShipping();
+
+  const readyCollectOnly  = readyOrders.reduce((s,o)=>s+(calcCourierCollect(o)||0),0);
+  const refundCollectOnly = refundOrders.reduce((s,o)=>s+(calcCourierCollect(o)||0),0);
+  const totalNet          = readyCollectOnly + refundCollectOnly - extraTotal;
+  const grandTotal        = totalNet + prevBalance;
+
+  const totalRefund = refundOrders.reduce((s,o)=>s+(o.refundAmount||0),0);
+  const totalRetShip= refundOrders.reduce((s,o)=>s+(parseFloat(o.returnShipping)||0),0);
+
+  const pureNormal=readyOrders.filter(o=>!o.hasReturn).length;
+  const readyExch =readyOrders.filter(o=>o.hasReturn&&o.lineItems&&o.lineItems.length>0).length;
+  const readyRet  =readyOrders.filter(o=>o.hasReturn&&!(o.lineItems&&o.lineItems.length>0)).length;
+  const refundExch=refundOrders.filter(o=>o.lineItems&&o.lineItems.length>0).length;
+  const refundRet =refundOrders.length-refundExch;
+
+  const orderParts=[];
+  if(pureNormal>0) orderParts.push(`<span style="color:var(--green);font-weight:700">${pureNormal} عادي</span>`);
+  if(readyExch>0)  orderParts.push(`<span style="color:var(--purple);font-weight:700">${readyExch} استبدال</span>`);
+  if(readyRet>0)   orderParts.push(`<span style="color:var(--amber);font-weight:700">${readyRet} استرجاع</span>`);
+  if(refundExch>0) orderParts.push(`<span style="color:var(--purple);font-weight:700">${refundExch} استرداد استبدال</span>`);
+  if(refundRet>0)  orderParts.push(`<span style="color:var(--red);font-weight:700">${refundRet} استرداد استرجاع</span>`);
+  if(extraEntries.filter(e=>e.status==='ok').length>0)
+    orderParts.push(`<span style="color:var(--orange);font-weight:700">${extraEntries.filter(e=>e.status==='ok').length} شحن إضافي</span>`);
+
+  const paySection=`
+    <div class="confirm-detail-row"><span class="confirm-detail-label">المندوب</span><span class="confirm-detail-val">${courierName||'—'}</span></div>
+    <div class="confirm-detail-row"><span class="confirm-detail-label">الأوردرات</span><span class="confirm-detail-val" style="font-size:12px">${orderParts.join(' + ')}</span></div>
+    <div class="confirm-detail-row"><span class="confirm-detail-label">تحصيل المندوب (اليوم)</span><span class="confirm-detail-val green">${fmtSigned(readyCollectOnly)} جنيه</span></div>
+    ${refundOrders.length>0?`<div class="confirm-detail-row"><span class="confirm-detail-label">استرداد + شحن مرتجع</span><span class="confirm-detail-val red">− ${fmt(totalRefund+totalRetShip)} جنيه</span></div>`:''}
+    ${extraTotal>0?`<div class="confirm-detail-row"><span class="confirm-detail-label">شحن إضافي</span><span class="confirm-detail-val" style="color:var(--orange)">− ${fmt(extraTotal)} جنيه</span></div>`:''}
+    <div style="background:${totalNet<0?'var(--red-light)':'var(--green-light)'};border:2px solid ${totalNet<0?'var(--red-border)':'var(--green-border)'};border-radius:var(--radius-sm);padding:8px 14px;margin:6px 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;font-weight:700">صافي تحصيل اليوم</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:800;color:${totalNet<0?'var(--red)':'var(--green)'}">${fmtSigned(totalNet)} جنيه</span>
+    </div>
+    ${prevBalance>0?`<div style="background:#fefce8;border:2px solid #facc15;border-radius:var(--radius-sm);padding:8px 14px;margin:4px 0;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:700;color:#92400e;">رصيد سابق مضاف</span><span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:800;color:#92400e;">+ ${fmt(prevBalance)} جنيه</span></div>`:''}
+    <div style="background:var(--accent-light);border:2px solid var(--accent);border-radius:var(--radius-sm);padding:10px 14px;margin:6px 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;font-weight:700">الإجمالي المستحق</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:800;color:var(--accent)">${fmtSigned(grandTotal)} جنيه</span>
+    </div>
+    ${cash>0?`<div class="confirm-detail-row"><span class="confirm-detail-label">💵 نقدي</span><span class="confirm-detail-val">${fmt(cash)} جنيه</span></div>`:''}
+    ${instapay>0?`<div class="confirm-detail-row"><span class="confirm-detail-label">📱 انستاباي</span><span class="confirm-detail-val">${fmt(instapay)} جنيه</span></div>`:''}
+    ${wallet>0?`<div class="confirm-detail-row"><span class="confirm-detail-label">👛 محفظة</span><span class="confirm-detail-val">${fmt(wallet)} جنيه</span></div>`:''}
+    ${balanceDebit>0?`<div class="confirm-detail-row"><span class="confirm-detail-label" style="color:#92400e;">🏦 رصيد معه (سيُضاف للرصيد)</span><span class="confirm-detail-val" style="color:#92400e;">${fmt(balanceDebit)} جنيه</span></div>`:''}`;
+
+  const bodyHTML=`${paySection}
+    <div class="confirm-warning">
+      <span class="confirm-warning-icon">⚠️</span>
+      <div>
+        <div class="confirm-warning-title">تحذير — لا يمكن التراجع</div>
+        <div class="confirm-warning-text">برجاء مراجعة الأرقام جيداً مع المندوب وعد الفلوس مرة أخرى قبل تنفيذ العملية</div>
+      </div>
+    </div>`;
+
+  const btnLabel=readyOrders.length&&refundOrders.length?'تأكيد التحصيل والاسترداد':refundOrders.length?'تأكيد الاسترداد':'تأكيد وتسجيل';
+  openConfirm('✅ تأكيد العملية',bodyHTML,btnLabel,'green-btn',doBulkPayAndRefund);
+}
+
+async function doBulkPayAndRefund(){
+  const readyOrders =orders.filter(o=>o.status==='ready');
+  const refundOrders=orders.filter(o=>o.status==='refund');
+  const c=getConfig();
+  const courierName=getReadyCourier();
+  const cash=parseFloat($('pmCash').value)||0;
+  const instapay=parseFloat($('pmInstapay').value)||0;
+  const wallet=parseFloat($('pmWallet').value)||0;
+  const balanceDebit=parseFloat($('pmBalance').value)||0;
+  const prevBalance=currentCourierBalance;
+  const extraTotal=getTotalExtraShipping();
+
+  // ── batchId + sessionMeta: بيتبعتوا مع كل نداء pay/refund عشان الـ Worker
+  // يخزنهم جوه extra، وبعدين تاب السجل يقدر يجمّع كل أوردرات الجلسة دي مع بعض
+  const batchId = (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(36).slice(2)));
+  const sessionMeta = {
+    courier: courierName,
+    paymentMethods: { cash:cash.toFixed(2), instapay:instapay.toFixed(2), wallet:wallet.toFixed(2), balance:balanceDebit.toFixed(2) },
+    extraShipping: extraEntries.filter(e=>e.status==='ok').map(e=>({ orderId:e.id, orderName:e.orderName||(''+e.id), courier:e.courier||courierName||'', amount:(parseFloat(e.amount)||0).toFixed(2) })),
+    extraShippingTotal: extraTotal.toFixed(2),
+  };
+
+  isProcessing=true;$('payBtn').disabled=true;setProgress(0);hideResult();
+
+  const total=[...readyOrders,...refundOrders].length;
+  let successPay=0,failPay=0,successRefund=0,failRefund=0,done=0;
+
+  for(const order of readyOrders){
+    order.status='loading';renderTable();
+    try{
+      const orderMeta={lineItems:order.lineItems,returnedItems:order.returnedItems,orderDiscount:order.orderDiscount,preRegistered:order.preRegistered,hasReturn:order.hasReturn,returnShipping:order.returnShipping,courierCollect:calcCourierCollect(order)};
+      const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'pay',orderId:order.id,amount:order.amount.toFixed(2),orderName:order.orderName,batchId,sessionMeta,orderMeta})});
+      const d=await res.json();
+      if(d.success){order.status='done';order.financialStatus='PAID';successPay++;}
+      else{order.status='error';order.error=d.error||'فشل';failPay++;}
+    }catch(e){order.status='error';order.error='خطأ في الاتصال';failPay++;}
+    done++;setProgress(done/total*100);updateStats();renderTable();
+  }
+
+  for(const order of refundOrders){
+    order.status='loading';renderTable();
+    try{
+      if(!order.parentTransactionId){
+        order.status='refund-error';order.error='لا يوجد transaction صالح';failRefund++;
+      } else {
+        const orderMeta={lineItems:order.lineItems,returnedItems:order.returnedItems,orderDiscount:order.orderDiscount,preRegistered:order.preRegistered,hasReturn:order.hasReturn,returnShipping:order.returnShipping,courierCollect:calcCourierCollect(order)};
+        const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'refund',orderId:order.id,refundAmount:order.refundAmount.toFixed(2),parentTransactionId:order.parentTransactionId,currency:'EGP',orderName:order.orderName,batchId,sessionMeta,orderMeta})});
+        const d=await res.json();
+        if(d.success){order.status='refund-done';order.financialStatus='REFUNDED';successRefund++;}
+        else{order.status='refund-error';order.error=d.error||'فشل';failRefund++;}
+      }
+    }catch(e){order.status='refund-error';order.error='خطأ في الاتصال';failRefund++;}
+    done++;setProgress(done/total*100);updateStats();renderTable();
+  }
+
+  isProcessing=false;updatePayBtn();updatePayMethodsCard();
+
+  const paidOrders      =readyOrders.filter(o=>o.status==='done');
+  const paidTotal       =paidOrders.reduce((s,o)=>s+o.amount,0);
+  const paidCourierColl =paidOrders.reduce((s,o)=>s+(calcCourierCollect(o)||0),0);
+  const refundedOrders  =refundOrders.filter(o=>o.status==='refund-done');
+  const refundedTotal   =refundedOrders.reduce((s,o)=>s+(o.refundAmount||0),0);
+  const refundedShip    =refundedOrders.reduce((s,o)=>s+(parseFloat(o.returnShipping)||0),0);
+
+  const allProcessed=[...readyOrders,...refundOrders];
+
+  // ── عرض محلي فوري لنتيجة الجلسة اللي خلصت (D1 اتكتب فيها أصلاً وقت كل pay/refund) ──
+  const successfulOrders=allProcessed.filter(o=>o.status==='done'||o.status==='refund-done');
+  if(successfulOrders.length){
+    const displayGroup={
+      date:new Date().toISOString(), batchId, courier:courierName,
+      totalOrders:successfulOrders.length, success:successfulOrders.length, errors:failPay+failRefund,
+      totalAmount:paidTotal.toFixed(2),
+      paymentMethods:sessionMeta.paymentMethods,
+      extraShipping:sessionMeta.extraShipping, extraShippingTotal:sessionMeta.extraShippingTotal,
+      orders:successfulOrders.map(o=>({
+        order:o.id, orderName:o.orderName||'', courier:o.courier||'',
+        amount:o.amount!=null?o.amount.toFixed(2):'0.00',
+        lineItems:o.lineItems||[], returnedItems:o.returnedItems||[],
+        orderDiscount:o.orderDiscount??null, preRegistered:o.preRegistered||false,
+        hasReturn:o.hasReturn||false, returnShipping:o.returnShipping||'0.00',
+        isRefund:o.status==='refund-done',
+        refundAmount:o.refundAmount!=null?o.refundAmount.toFixed(2):null,
+        courierCollect:(calcCourierCollect(o)||0).toFixed(2),
+        status:'success', error:null,
+      })),
+    };
+    prependLogGroup(displayGroup);
+  }
+
+  if(balanceDebit>0&&courierName&&isBalanceConfigured()){
+    try{
+      const cb=getConfig();
+      const successCount=(readyOrders.filter(o=>o.status==='done').length)+(refundOrders.filter(o=>o.status==='refund-done').length);
+      await fetch(cb.balanceUrl,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${cb.balanceSecret}`},
+        body:JSON.stringify({action:'addDebit',courierName,amount:balanceDebit.toFixed(2),note:`جلسة تحصيل — ${successCount} أوردر`,sessionDate:new Date().toISOString()})});
+    }catch{showToast('⚠ تم التحصيل لكن فشل تسجيل الرصيد — راجع Courier-Balance','error');}
+  }
+
+  orders=orders.filter(o=>o.status!=='done'&&o.status!=='refund-done');
+  extraEntries=[];
+  renderExtraEntries();
+  if(!orders.length){$('tableWrap').classList.remove('show');$('statsBar').classList.remove('show');}
+  updateStats();renderTable();updatePayMethodsCard();updateImportBtn();
+
+  const anySuccess=successPay>0||successRefund>0;
+  const anyFail=failPay>0||failRefund>0;
+  if(anySuccess&&!anyFail){
+    const parts=[];
+    if(successPay>0) parts.push(`✅ تحصيل ${successPay} أوردر`);
+    if(successRefund>0) parts.push(`💸 استرداد ${successRefund} أوردر`);
+    if(balanceDebit>0) parts.push(`🏦 رصيد ${fmt(balanceDebit)} EGP`);
+    showResult(true,parts.join(' — '),courierName?`المندوب: ${courierName}`:'');
+    setTimeout(hideResult,5000);
+  } else if(anySuccess){
+    showResult(true,`${successPay+successRefund} نجح ⚠ ${failPay+failRefund} فشل`,'راجع الجدول');
+  } else {
+    showResult(false,'فشلت جميع العمليات','راجع الجدول');
+  }
+
+  if(anySuccess&&!anyFail){$('pmCash').value='';$('pmInstapay').value='';$('pmWallet').value='';$('pmBalance').value='';currentCourierBalance=0;updatePayValidation();}
+  refocus();
+}
+
+// ══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════════
+function setProgress(pct){$('progressWrap').classList.add('show');$('progressBar').style.width=pct+'%';if(pct>=100)setTimeout(()=>$('progressWrap').classList.remove('show'),800);}
+function showResult(success,title,detail){const el=$('resultBox');el.className=`result-box ${success?'show-success':'show-error'}`;$('resultTitle').textContent=title;$('resultDetail').textContent=detail;}
+function hideResult(){$('resultBox').className='result-box';}
+function showToast(msg,type=''){const t=$('toast');t.textContent=msg;t.className='toast'+(type?' '+type:'');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+
+function openConfirm(headerHTML,bodyHTML,okLabel,okClass,onConfirm){
+  $('confirmHeader').innerHTML=headerHTML;$('confirmBody').innerHTML=bodyHTML;
+  const okBtn=$('confirmOkBtn'),cancelBtn=$('confirmCancelBtn');
+  const newOk=okBtn.cloneNode(true),newCancel=cancelBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newOk,okBtn);cancelBtn.parentNode.replaceChild(newCancel,cancelBtn);
+  newOk.textContent=okLabel;newOk.className='btn-confirm-ok '+okClass;
+  newOk.addEventListener('click',()=>{$('confirmOverlay').classList.remove('open');onConfirm();});
+  newCancel.addEventListener('click',()=>$('confirmOverlay').classList.remove('open'));
+  $('confirmOverlay').classList.add('open');
+}
+
+// ══════════════════════════════════════════════════════════════
+// COURIER IMPORT MODAL
+// ══════════════════════════════════════════════════════════════
+let importOrders=[], importLoading=false;
+
+function importReset(){
+  importOrders=[];
+  importLoading=false;
+  const sel=$('importCourierSelect');
+  if(sel) sel.selectedIndex=0;
+  $('importFetchBtn').disabled=true;
+  $('importTableSection').style.display='none';
+  $('importEmptyMsg').style.display='none';
+  if($('importHeadCb')) $('importHeadCb').checked=false;
+  $('importHint').textContent='اختر مندوباً للاستعلام عن أوردراته';
+  [$('importSelCount'),$('importSelCountFooter')].forEach(el=>{if(el){el.style.display='none';}});
+  $('importAddBtn').disabled=true;
+  $('importAddBtnTxt').textContent='إضافة المحدد للجدول';
+}
+
+function openImportModal(){
+  importReset();
+  $('importOverlay').classList.add('open');
+  importLoadCouriers();
+}
+function closeImportModal(){
+  $('importOverlay').classList.remove('open');
+  importReset();
+  refocus();
+}
+function closeImportOnBackdrop(e){
+  if(e.target===$('importOverlay')) closeImportModal();
+}
+
+async function importLoadCouriers(){
+  const sel=$('importCourierSelect'), btn=$('importFetchBtn'), hint=$('importHint');
+  if(!isConfigured()){
+    sel.innerHTML='<option value="">أدخل Worker URL في الإعدادات أولاً</option>';
+    btn.disabled=true; hint.textContent='⚠ الأداة غير مضبوطة'; return;
+  }
+  const activeCourier=getReadyCourier();
+  sel.innerHTML='<option value="">جاري تحميل المناديب...</option>';
+  btn.disabled=true; hint.textContent='جاري تحميل قائمة المناديب...';
+  try{
+    const c=getConfig();
+    const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'getCourierValues'})});
+    const data=await res.json();
+    if(data.success&&data.values?.length){
+      let values=data.values;
+      if(activeCourier) values=values.filter(v=>v===activeCourier);
+      if(values.length){
+        sel.innerHTML='<option value="">اختر مندوباً...</option>'+values.map(v=>`<option value="${v}">${v}</option>`).join('');
+        if(values.length===1){ sel.value=values[0]; btn.disabled=false; }
+        else { btn.disabled=true; }
+        hint.textContent=activeCourier?`يظهر فقط مندوب الأوردرات الحالية: ${activeCourier}`:'اختر مندوباً للاستعلام عن أوردراته';
+      } else {
+        sel.innerHTML=`<option value="">${activeCourier} — غير موجود في القائمة</option>`;
+        hint.textContent=`المندوب الحالي (${activeCourier}) غير موجود في الـ metafield choices`;
+      }
+    } else {
+      sel.innerHTML='<option value="">لا توجد مناديب</option>';
+      hint.textContent='لا توجد مناديب محددة في الـ metafield definition';
+    }
+  } catch {
+    sel.innerHTML='<option value="">خطأ في التحميل</option>';
+    hint.textContent='خطأ في تحميل قائمة المناديب';
+  }
+}
+
+$('importCourierSelect').addEventListener('change',()=>{
+  $('importFetchBtn').disabled=!$('importCourierSelect').value||importLoading;
+});
+
+async function importFetchOrders(){
+  const courier=$('importCourierSelect').value;
+  if(!courier||importLoading) return;
+  if(!isConfigured()){openSettings();return;}
+  importLoading=true;
+  const btn=$('importFetchBtn'), txt=$('importFetchBtnTxt');
+  btn.disabled=true; txt.innerHTML='<span class="spinner"></span> جاري...';
+  $('importHint').textContent=`جاري الاستعلام عن أوردرات ${courier}...`;
+  $('importTableSection').style.display='none';
+  $('importEmptyMsg').style.display='none';
+  importOrders=[];
+  try{
+    const c=getConfig();
+    const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'getCourierOrders',courier})});
+    const data=await res.json();
+    if(!data.success){
+      $('importHint').textContent=data.error||'خطأ في الاستعلام';
+    } else {
+      importOrders=data.orders||[];
+      if(!importOrders.length){
+        $('importHint').textContent=`لا توجد أوردرات مؤهلة لـ ${courier}`;
+        $('importEmptyMsg').textContent=`لا توجد أوردرات مؤهلة لـ ${courier}`;
+        $('importEmptyMsg').style.display='block';
+      } else {
+        const eligible=importOrders.filter(o=>!importCalcStatusError(o)&&!orders.some(ex=>ex.id===o.id));
+        const errs=importOrders.filter(o=>!!importCalcStatusError(o));
+        $('importHint').textContent=`تم الاستعلام — ${eligible.length} مؤهل، ${errs.length} خطأ حالة`;
+        $('importTableSection').style.display='block';
+        importRenderTable();
+      }
+    }
+  } catch { $('importHint').textContent='خطأ في الاتصال'; }
+  importLoading=false; btn.disabled=false; txt.textContent='🔍 استعلام';
+}
+
+function importFmtDate(iso){
+  if(!iso) return '—';
+  const d=new Date(iso);
+  return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+}
+
+function importCalcStatusError(o){
+  const s1=o.s1||null, s2=o.s2||null;
+  const s1ok=s1==='Delivered', s2ok=!s2||s2==='Returned';
+  if(s1ok&&s2ok) return null;
+  const parts=[];
+  if(!s1ok) parts.push(`S1=${s1||'فارغ'}`);
+  if(!s2ok) parts.push(`S2=${s2}`);
+  return parts.join('، ');
+}
+
+function importMakeRow(o,i){
+  const alreadyInTable=orders.some(ex=>ex.id===o.id);
+  const amount=parseFloat(o.amount), shipping=parseFloat(o.shippingAmount);
+  const statusErr=importCalcStatusError(o);
+  const s1=o.s1||null, s2=o.s2||null;
+  const s1Badge=s1==='Delivered'?`<span class="s-badge s-badge-delivered">${s1}</span>`
+    :s1==='Returned'?`<span class="s-badge s-badge-returned">${s1}</span>`
+    :s1?`<span class="s-badge s-badge-other">${s1}</span>`:`<span class="s-badge-empty">—</span>`;
+  const s2Badge=s2==='Returned'?`<span class="s-badge s-badge-returned">${s2}</span>`
+    :s2?`<span class="s-badge s-badge-other">${s2}</span>`:`<span class="s-badge-empty">—</span>`;
+  const statusBadge=alreadyInTable
+    ?`<span class="import-already-badge">موجود بالجدول</span>`
+    :statusErr
+      ?`<span class="s-badge-err" style="display:inline-block;padding:2px 7px;border-radius:5px">⚠ ${statusErr}</span>`
+      :o.preRegistered?`<span class="import-prereg-badge">📋 مسجل مسبقاً</span>`
+      :`<span style="color:var(--green);font-size:10px;font-weight:600">✓ مؤهل</span>`;
+  const rowClass=alreadyInTable?'already-row':(statusErr?' import-err-row':'');
+  return `<tr class="${rowClass}" id="irow-${i}">
+    <td class="col-check"><input type="checkbox" class="import-row-cb" data-idx="${i}"
+      style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer"
+      ${(alreadyInTable||!!statusErr)?'disabled':''}
+      onchange="importOnCheckChange()"></td>
+    <td class="cell-mono">${o.orderName}</td>
+    <td class="cell-dim">${o.customerName||'—'}</td>
+    <td class="cell-money">${amount.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+    <td class="cell-money" style="color:var(--text-secondary)">${shipping.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+    <td class="cell-dim">${importFmtDate(o.createdAt)}</td>
+    <td class="col-center">${s1Badge}</td>
+    <td class="col-center">${s2Badge}</td>
+    <td class="col-center">${statusBadge}</td>
+  </tr>`;
+}
+
+function importRenderTable(){
+  const tbody=$('importTableBody');
+  if(!importOrders.length){ tbody.innerHTML=''; importUpdateAddBtn(); return; }
+  const eligible=[], errored=[];
+  importOrders.forEach((o,i)=>{
+    const alreadyInTable=orders.some(ex=>ex.id===o.id);
+    if(!alreadyInTable&&!importCalcStatusError(o)) eligible.push({o,i});
+    else errored.push({o,i});
+  });
+  let html='';
+  eligible.forEach(({o,i})=>{ html+=importMakeRow(o,i); });
+  if(errored.length){
+    html+=`<tr><td colspan="9" style="padding:0">
+      <div class="import-section-divider">
+        <div class="import-section-divider-line"></div>
+        <div class="import-section-divider-label">⚠ أوردرات لا يمكن إضافتها (${errored.length})</div>
+        <div class="import-section-divider-line"></div>
+      </div></td></tr>`;
+    errored.forEach(({o,i})=>{ html+=importMakeRow(o,i); });
+  }
+  tbody.innerHTML=html;
+  $('importHeadCb').checked=false;
+  importUpdateAddBtn();
+}
+
+function importGetSelected(){
+  return [...document.querySelectorAll('.import-row-cb:checked')].map(c=>importOrders[parseInt(c.dataset.idx)]).filter(Boolean);
+}
+function importToggleAll(cb){
+  document.querySelectorAll('.import-row-cb:not(:disabled)').forEach(c=>c.checked=cb.checked);
+  importOnCheckChange();
+}
+function importSelectAll(){
+  document.querySelectorAll('.import-row-cb:not(:disabled)').forEach(c=>c.checked=true);
+  importOnCheckChange();
+}
+function importDeselectAll(){
+  document.querySelectorAll('.import-row-cb:not(:disabled)').forEach(c=>c.checked=false);
+  importOnCheckChange();
+}
+function importOnCheckChange(){
+  const sel=importGetSelected(), count=sel.length;
+  [$('importSelCount'),$('importSelCountFooter')].forEach(el=>{
+    if(!el) return;
+    el.textContent=`${count} محدد`;
+    el.style.display=count>0?'inline-flex':'none';
+  });
+  const all=document.querySelectorAll('.import-row-cb:not(:disabled)');
+  $('importHeadCb').checked=all.length>0&&[...all].every(c=>c.checked);
+  document.querySelectorAll('.import-row-cb').forEach(c=>{
+    const row=document.getElementById(`irow-${c.dataset.idx}`);
+    if(row&&!c.disabled) row.classList.toggle('selected-row',c.checked);
+  });
+  importUpdateAddBtn();
+}
+function importUpdateAddBtn(){
+  const sel=importGetSelected();
+  $('importAddBtn').disabled=sel.length===0;
+  $('importAddBtnTxt').textContent=sel.length>0?`إضافة ${sel.length} أوردر للجدول`:'إضافة المحدد للجدول';
+}
+async function importAddSelected(){
+  const sel=importGetSelected();
+  if(!sel.length) return;
+  if(!isConfigured()){openSettings();return;}
+  closeImportModal();
+  showToast(`➕ جاري إضافة ${sel.length} أوردر...`);
+  for(const o of sel){
+    if(orders.some(ex=>ex.id===o.id)) continue;
+    await addOrder(o.id);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// LOG — D1-backed (get_logs / get_logs_count / get_logs_export)
+// ══════════════════════════════════════════════════════════════
+// كل صف في D1 = أوردر واحد (payment/refund/extra_shipping)، مجمّع هنا في
+// الفرونت إند حسب extra.batchId عشان يترجع لنفس شكل "كارت الجلسة" القديم.
+let logGroups=[], logOffset=0, logHasMore=true, logLoadingMore=false, logLoadedOnce=false;
+const LOG_PAGE_SIZE=100;
+
+function groupRowsIntoSessions(rows, into){
+  const groups=into||{};
+  for(const row of rows){
+    let extra={};
+    try{ extra=row.extra?JSON.parse(row.extra):{}; }catch{}
+    if(row.type==='extra_shipping') continue; // ممثّلة أصلاً جوه extraShipping[] لأي صف تاني في نفس الـ batch
+    const batchId=extra.batchId||row.type+'-row-'+row.id;
+    if(!groups[batchId]){
+      groups[batchId]={
+        date:row.timestamp, batchId, courier:extra.courier||null,
+        totalOrders:0, success:0, errors:0, totalAmount:0, totalRefund:0,
+        extraShipping:extra.extraShipping||[], extraShippingTotal:extra.extraShippingTotal||'0.00',
+        paymentMethods:extra.paymentMethods||{}, isPreReg:row.type==='preregister',
+        orders:[],
+      };
+    }
+    const g=groups[batchId];
+    g.totalOrders++; g.success++;
+    const amt=parseFloat(row.value_after)||0;
+    if(row.type==='refund') g.totalRefund+=amt; else g.totalAmount+=amt;
+    g.orders.push({
+      order:row.order_id, orderName:row.order_name, courier:extra.courier||g.courier,
+      amount:row.value_after, lineItems:extra.lineItems||[], returnedItems:extra.returnedItems||[],
+      orderDiscount:extra.orderDiscount??null, preRegistered:extra.preRegistered||false,
+      hasReturn:extra.hasReturn||false, returnShipping:extra.returnShipping||'0.00',
+      isRefund:row.type==='refund', refundAmount:row.type==='refund'?row.value_after:null,
+      courierCollect:extra.courierCollect??null,
+      status:'success', error:null,
+    });
+  }
+  return groups;
+}
+
+function sortedGroups(map){
+  return Object.values(map).sort((a,b)=>new Date(b.date)-new Date(a.date));
+}
+
+function prependLogGroup(g){
+  logGroups.unshift(g);
+  renderLog();
+}
+
+async function refreshLog(){
+  if(!isConfigured()){showToast('الأداة غير مضبوطة','error');openSettings();return;}
+  logGroups=[]; logOffset=0; logHasMore=true; logLoadedOnce=true;
+  setSyncBadge('loading');
+  $('logContainer').innerHTML='<div class="log-empty" style="display:flex;align-items:center;justify-content:center;gap:8px"><span class="spinner" style="width:14px;height:14px;border-width:2px"></span> جاري التحميل...</div>';
+  await loadMoreLog();
+  loadLogCount();
+}
+
+async function loadMoreLog(){
+  if(logLoadingMore||!logHasMore) return;
+  logLoadingMore=true;
+  try{
+    const c=getConfig();
+    const res=await fetch(`${c.url}?action=get_logs&tool=cod_payment&limit=${LOG_PAGE_SIZE}&offset=${logOffset}`,{headers:{'Authorization':`Bearer ${c.secret}`}});
+    const d=await res.json();
+    if(!d.ok) throw new Error(d.error||'فشل الجلب');
+    const rows=d.entries||[];
+    const map=groupRowsIntoSessions(rows,Object.fromEntries(logGroups.map(g=>[g.batchId,g])));
+    logGroups=sortedGroups(map);
+    logOffset+=rows.length;
+    logHasMore=rows.length===LOG_PAGE_SIZE;
+    setSyncBadge('synced');
+  }catch(err){
+    setSyncBadge('local');
+    showToast('فشل تحميل السجل: '+err.message,'error');
+  }
+  logLoadingMore=false;
+  renderLog();
+}
+
+async function loadLogCount(){
+  if(!isConfigured()) return;
+  try{
+    const c=getConfig();
+    const res=await fetch(`${c.url}?action=get_logs_count&tool=cod_payment`,{headers:{'Authorization':`Bearer ${c.secret}`}});
+    const d=await res.json();
+    const badge=$('tabBadgeLog');
+    if(d.ok&&d.total>0){ badge.style.display=''; badge.textContent=d.total; }
+    else badge.style.display='none';
+  }catch{}
+}
+
+function setSyncBadge(state){const el=$('logSyncBadge');el.className=`log-sync-badge ${state}`;el.textContent=state==='synced'?'☁ D1':state==='loading'?'⏳ جاري...':'⚠ محلي';}
+
+function formatDateTime(iso){
+  const d=new Date(iso);const pad=n=>String(n).padStart(2,'0');
+  let h=d.getHours();const m=pad(d.getMinutes());const ampm=h>=12?'مساءً':'صباحاً';
+  h=h%12||12;return`${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()} الساعة ${pad(h)}:${m} ${ampm}`;
+}
+
+function renderLog(){
+  const container=$('logContainer');
+  if(!logGroups.length){
+    container.innerHTML=logLoadedOnce?'<div class="log-empty">لا توجد عمليات مسجلة</div>':'<div class="log-empty">اضغط تحديث لعرض السجل</div>';
+    return;
+  }
+
+  container.innerHTML=`<div class="log-list">${logGroups.map(entry=>{
+    const pm=entry.paymentMethods||{};
+    const pmChips=[];
+    if(parseFloat(pm.cash)>0)pmChips.push(`<span class="log-pm-chip">💵 نقدي <span>${fmt(pm.cash)}</span></span>`);
+    if(parseFloat(pm.instapay)>0)pmChips.push(`<span class="log-pm-chip">📱 انستاباي <span>${fmt(pm.instapay)}</span></span>`);
+    if(parseFloat(pm.wallet)>0)pmChips.push(`<span class="log-pm-chip">👛 محفظة <span>${fmt(pm.wallet)}</span></span>`);
+    if(parseFloat(pm.balance)>0)pmChips.push(`<span class="log-pm-chip" style="background:#fefce8;border-color:#facc15;color:#92400e">🏦 رصيد معه <span>${fmt(pm.balance)}</span></span>`);
+    if(entry.totalRefund>0)pmChips.push(`<span class="log-pm-chip" style="background:#fff1f2;border-color:#fecdd3;color:var(--red)">💸 استرداد <span>${fmt(entry.totalRefund)}</span></span>`);
+    const extraArr=Array.isArray(entry.extraShipping)?entry.extraShipping:[];
+    if(parseFloat(entry.extraShippingTotal||0)>0||extraArr.length>0){
+      const total=parseFloat(entry.extraShippingTotal)||extraArr.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      pmChips.push(`<span class="log-pm-chip" style="background:var(--orange-light);border-color:var(--orange-border);color:var(--orange)">🚚 شحن إضافي <span>${fmt(total)}</span></span>`);
+    }
+
+    const detailRows=(entry.orders||[]).map(o=>{
+      const hasSkus=o.lineItems&&o.lineItems.length>0;
+      const hasReturned=o.returnedItems&&o.returnedItems.length>0;
+      const hasSub=hasSkus||hasReturned;
+      const skuRows=hasSkus?o.lineItems.map(li=>`<tr><td class="td-sku">${li.sku}</td><td class="td-qty">${li.quantity}</td><td class="td-price">${fmt(li.unitPrice)}</td><td class="td-total">${fmt(li.totalPrice)}</td></tr>`).join(''):'';
+      const retRows=hasReturned?o.returnedItems.map(ri=>`<tr style="background:#fff8f8"><td class="td-sku returned">↩ ${ri.sku}</td><td class="td-qty negative">−${ri.quantity}</td><td class="td-price negative">−${fmt(ri.discountedUnitPrice)}</td><td class="td-total negative">−${fmt(parseFloat(ri.discountedUnitPrice)*ri.quantity)}</td></tr>`).join(''):'';
+      const statusBadge=`<span class="log-detail-ok">✓ ناجح</span>`;
+      return`<div class="log-detail-item">
+        <div class="log-detail-main" onclick="${hasSub?'toggleLogItem(this)':''}">
+          <span class="log-detail-order">${o.isRefund?'<span style="font-size:10px;margin-left:4px">💸</span>':''}${o.preRegistered?'<span style="font-size:10px;color:var(--purple);margin-left:4px">📋</span>':''}${o.orderName||''} <span style="color:var(--text-muted);font-size:10px">${o.order}</span>${o.courier?` <span style="color:var(--purple);font-size:11px">${o.courier}</span>`:''}</span>
+          <span class="log-detail-amount" style="${o.isRefund?'color:var(--red)':''}">${o.isRefund?`−${o.refundAmount||''}`:( o.amount||'')}</span>
+          ${statusBadge}${hasSub?'<span style="color:var(--text-muted);font-size:9px">▶</span>':''}
+        </div>
+        ${hasSub?`<div class="log-detail-sub">
+          ${(hasSkus||hasReturned)?`<div class="log-sub-label">SKUs</div><table class="sku-table"><thead><tr><th>SKU</th><th class="th-center">Qty</th><th class="th-ltr">Unit Price</th><th class="th-ltr">Total</th></tr></thead><tbody>${skuRows}${retRows}</tbody></table>`:''}
+          ${parseFloat(o.returnShipping)>0?`<div class="log-sub-label" style="margin-top:8px">Return Shipping</div><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--red)">−${fmt(parseFloat(o.returnShipping))} EGP</span>`:''}
+        </div>`:''}
+      </div>`;
+    }).join('');
+
+    const extraDetailRows=extraArr.map(e=>`<div class="log-detail-item">
+      <div class="log-detail-main">
+        <span class="log-detail-order">🚚 <span style="color:var(--orange)">${e.orderName||('#'+e.orderId)}</span> ${e.courier?`<span style="color:var(--purple);font-size:11px">${e.courier}</span>`:''}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--orange)">−${fmt(e.amount)}</span>
+        <span class="log-detail-extra">شحن إضافي</span>
+      </div>
+    </div>`).join('');
+
+    return`<div class="log-entry">
+      <div class="log-entry-header" onclick="toggleLogEntry(this)">
+        <input type="checkbox" class="log-check" data-batch="${entry.batchId}" onclick="event.stopPropagation();onCheckChange()">
+        <div class="log-entry-info">
+          <div class="log-entry-date">${formatDateTime(entry.date)}</div>
+          <div class="log-entry-tags">
+            <span class="log-tag courier">👤 ${entry.courier||'COD'}</span>
+            <span class="log-tag count">${entry.totalOrders} أوردر</span>
+            ${entry.totalAmount?`<span class="log-tag amount">${entry.totalAmount.toLocaleString('en-US',{minimumFractionDigits:2})}</span>`:''}
+          </div>
+          ${pmChips.length?`<div class="log-pay-methods">${pmChips.join('')}</div>`:''}
+        </div>
+        <div class="log-entry-stats"><span class="log-stat-ok">✓${entry.success}</span></div>
+        <span class="log-toggle">▶</span>
+      </div>
+      <div class="log-entry-details">${detailRows}${extraDetailRows}</div>
+    </div>`;
+  }).join('')}</div>
+  ${logHasMore?`<button class="btn-log-more" id="logMoreBtn" onclick="loadMoreLog()" ${logLoadingMore?'disabled':''}>${logLoadingMore?'جاري التحميل...':'⬇ تحميل المزيد'}</button>`:''}`;
+}
+
+function toggleLogEntry(el){el.closest('.log-entry').classList.toggle('open');}
+function toggleLogItem(el){el.closest('.log-detail-item').classList.toggle('open');}
+function onCheckChange(){$('exportSelBtn').classList.toggle('show',document.querySelectorAll('.log-check:checked').length>0);}
+
+// ══════════════════════════════════════════════════════════════
+// XLSX EXPORT — من D1 (get_logs_export) لحد 2000 صف
+// ══════════════════════════════════════════════════════════════
+async function exportXLSX(selectedOnly){
+  if(!isConfigured()){showToast('الأداة غير مضبوطة','error');return;}
+  let log;
+  if(selectedOnly){
+    const batchIds=[...document.querySelectorAll('.log-check:checked')].map(cb=>cb.dataset.batch);
+    if(!batchIds.length){showToast('اختر عمليات أولاً','error');return;}
+    log=logGroups.filter(g=>batchIds.includes(g.batchId));
+  } else {
+    showToast('⏳ جاري تجهيز التصدير...');
+    try{
+      const c=getConfig();
+      const res=await fetch(`${c.url}?action=get_logs_export&tool=cod_payment`,{headers:{'Authorization':`Bearer ${c.secret}`}});
+      const d=await res.json();
+      if(!d.ok) throw new Error(d.error||'فشل الجلب');
+      log=sortedGroups(groupRowsIntoSessions(d.entries||[],{}));
+    }catch(err){showToast('فشل التصدير: '+err.message,'error');return;}
+  }
+  if(!log.length){showToast('لا توجد عمليات للتصدير','error');return;}
+
+  if(!window.ExcelJS){
+    await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+  }
+
+  const wb=new ExcelJS.Workbook();
+  wb.views=[{rightToLeft:true}];
+  const ws=wb.addWorksheet('سجل التحصيل',{views:[{rightToLeft:true}]});
+
+  ws.columns=[
+    {header:'التاريخ',                          key:'date',          width:14},
+    {header:'المندوب',                          key:'courier',       width:14},
+    {header:'رقم الأوردر',                      key:'order',         width:16},
+    {header:'نوع الأوردر',                      key:'orderType',     width:14},
+    {header:'SKU',                              key:'sku',           width:26},
+    {header:'الكمية',                           key:'qty',           width:8},
+    {header:'سعر الوحدة',                       key:'unit',          width:13},
+    {header:'خصم الوحدة',                       key:'unitDiscount',  width:13},
+    {header:'سعر بعد الخصم',                    key:'collect',       width:18},
+    {header:'خصم إضافي الأوردر',                key:'orderDiscount', width:18},
+    {header:'تحصيل الأوردر كامل (بدون الشحن)', key:'courierCollect',width:24},
+    {header:'شحن',                              key:'ship',          width:12},
+    {header:'النتيجة',                          key:'result',        width:9},
+    {header:'الخطأ',                            key:'error',         width:18},
+    {header:'مسجل مسبقاً',                      key:'prereg',        width:13},
+  ];
+
+  const HEADER_BG='FFD700', GRAND_BG='1F4E79', EXTRA_BG='FFFBEB', NUM_FMT='#,##0';
+  const NUM_COLS=[6,7,8,9,10,11,12];
+  const MED_BORDER={style:'medium',color:{argb:'FF888888'}};
+
+  function applyHeader(row){
+    row.eachCell(cell=>{
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+HEADER_BG}};
+      cell.font={bold:true,size:11,name:'Arial'};
+      cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'};
+      cell.border={bottom:{style:'medium',color:{argb:'FF000000'}}};
+    });
+    const c11=row.getCell(11);
+    c11.border={bottom:{style:'medium',color:{argb:'FF000000'}},left:MED_BORDER,right:MED_BORDER};
+    row.height=20;
+  }
+
+  function orderTypeColor(t){
+    if(t==='استرجاع') return {argb:'FFCC0000'};
+    if(t==='استبدال') return {argb:'FF7030A0'};
+    if(t==='شحن إضافي') return {argb:'FFEA580C'};
+    return {argb:'FF000000'};
+  }
+
+  function applyData(row, isFailed, qty, isReturnLine, orderType, isExtraShipping){
+    row.eachCell({includeEmpty:false},(cell,col)=>{
+      cell.font={size:10,name:'Arial',color:{argb:'FF000000'}};
+      cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'};
+      if(NUM_COLS.includes(col)&&cell.value!==null&&cell.value!==''){
+        cell.numFmt=NUM_FMT;
+        cell.alignment={horizontal:'center',vertical:'middle'};
+      }
+      if(col<=3){ cell.fill={type:'pattern',pattern:'none'}; return; }
+      if(col===4){
+        cell.fill={type:'pattern',pattern:'none'};
+        if(cell.value){
+          const bold=(cell.value==='استرجاع'||cell.value==='استبدال'||cell.value==='شحن إضافي');
+          cell.font={size:10,name:'Arial',bold,color:orderTypeColor(cell.value)};
+        }
+        return;
+      }
+      if(isExtraShipping){
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF7ED'}};
+        if(col===12) cell.font={size:10,name:'Arial',bold:true,color:{argb:'FFEA580C'}};
+        return;
+      }
+      if(isReturnLine){
+        cell.font={size:10,name:'Arial',color:{argb:'FFCC0000'},italic:true};
+        cell.fill={type:'pattern',pattern:'none'};
+        return;
+      }
+      if(isFailed){ cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFCCCC'}}; return; }
+      if(col===8&&cell.value!==null&&cell.value!==''){
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF2CC'}};
+        cell.font={size:10,name:'Arial',bold:true,color:{argb:'FFC00000'}};
+      }
+      if(col===10&&cell.value!==null&&cell.value!==''){
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF2CC'}};
+        cell.font={size:10,name:'Arial',bold:true,color:{argb:'FFC00000'}};
+      }
+    });
+    const c11=row.getCell(11);
+    c11.border={top:{style:'thin',color:{argb:'FFD0D0D0'}},bottom:{style:'thin',color:{argb:'FFD0D0D0'}},left:MED_BORDER,right:MED_BORDER};
+    if(isFailed&&!isReturnLine){
+      const rc=row.getCell(13);
+      rc.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFCC0000'}};
+      rc.font={bold:true,color:{argb:'FFFFFFFF'},size:10,name:'Arial'};
+    }
+  }
+
+  function getOrderType(o){
+    if(o.isExtraShipping) return 'شحن إضافي';
+    if(o.isRefund) return (o.returnedItems&&o.returnedItems.length>0&&o.lineItems&&o.lineItems.length>0)?'استبدال':'استرجاع';
+    if(o.hasReturn) return (o.lineItems&&o.lineItems.length>0)?'استبدال':'استرجاع';
+    return 'عادي';
+  }
+
+  applyHeader(ws.getRow(1));
+
+  let grandCourierNet=0;
+
+  for(const entry of log){
+    const date=new Date(entry.date).toLocaleDateString('en-GB');
+    const courier=entry.courier||'';
+    const extraArr=Array.isArray(entry.extraShipping)?entry.extraShipping:[];
+
+    for(const o of(entry.orders||[])){
+      const isFailed    = o.status!=='success';
+      const isRefundRow = o.isRefund===true;
+      const cc          = parseFloat(o.courierCollect)||0;
+      const otype       = getOrderType(o);
+      const odv         = o.orderDiscount?parseFloat(o.orderDiscount):null;
+      grandCourierNet  += cc;
+
+      const shipVal = (o.hasReturn||isRefundRow)
+        ? (parseFloat(o.returnShipping)||0)
+        : 0;
+
+      const writeRow=(item, isFirst, isReturn)=>{
+        const qty       = isReturn ? -(item.quantity||1) : (parseFloat(item.quantity)||0);
+        const unitP     = isReturn ? -(parseFloat(item.discountedUnitPrice)||0) : (parseFloat(item.unitPrice)||0);
+        const unitD     = isReturn ? null : ((item.unitDiscount!=null)?parseFloat(item.unitDiscount):null);
+        const total     = isReturn ? unitP*(item.quantity||1) : (parseFloat(item.totalPrice)||0);
+        const skuLabel  = isReturn ? ('\u21A9 '+(item.sku||'')) : (item.sku||'');
+        const r=ws.addRow({
+          date: isFirst?date:null, courier,
+          order: isFirst?(o.orderName||''):null,
+          orderType: isFirst?otype:null,
+          sku: skuLabel, qty: qty||null, unit: unitP||null, unitDiscount: unitD||null,
+          collect: total||null, orderDiscount: isFirst?odv:null,
+          courierCollect: isFirst?cc:null,
+          ship: isFirst?shipVal:null,
+          result: isFirst?(isFailed?'فشل':'ناجح'):null,
+          error: isFirst?(o.error||null):null,
+          prereg: isFirst?(o.preRegistered?'نعم':'لا'):null,
+        });
+        applyData(r,isFailed,qty,isReturn,otype,false);
+      };
+
+      if(isFailed){
+        const r=ws.addRow({date,courier,order:o.orderName||'',orderType:otype,
+          sku:null,qty:null,unit:null,unitDiscount:null,collect:null,orderDiscount:odv,
+          courierCollect:null,ship:shipVal,result:'فشل',error:o.error||null,prereg:o.preRegistered?'نعم':'لا'});
+        applyData(r,true,0,false,otype,false);
+      } else {
+        const allItems=[
+          ...(o.lineItems||[]).map(li=>({item:li,isReturn:false})),
+          ...(o.returnedItems||[]).map(ri=>({item:ri,isReturn:true}))
+        ];
+        if(!allItems.length){
+          const r=ws.addRow({date,courier,order:o.orderName||'',orderType:otype,
+            sku:null,qty:null,unit:null,unitDiscount:null,collect:cc||null,orderDiscount:odv,
+            courierCollect:cc,ship:shipVal,result:'ناجح',error:null,prereg:o.preRegistered?'نعم':'لا'});
+          applyData(r,false,0,false,otype,false);
+        } else {
+          allItems.forEach(({item,isReturn},idx)=>writeRow(item,idx===0,isReturn));
+        }
+      }
+    }
+
+    for(const e of extraArr){
+      const amount=parseFloat(e.amount)||0;
+      if(!amount)continue;
+      grandCourierNet -= amount;
+      const r=ws.addRow({
+        date,
+        courier: e.courier||courier,
+        order: e.orderName||(e.orderId?('#'+e.orderId):''),
+        orderType: 'شحن إضافي',
+        sku: null, qty: null, unit: null, unitDiscount: null,
+        collect: null, orderDiscount: null,
+        courierCollect: -amount,
+        ship: amount,
+        result: 'ناجح', error: null, prereg: 'لا',
+      });
+      applyData(r,false,0,false,'شحن إضافي',true);
+    }
+  }
+
+  ws.views=[{state:'frozen',ySplit:1,rightToLeft:true}];
+  ws.eachRow((row,rowNum)=>{
+    if(rowNum===1)return;
+    const c=row.getCell(11);
+    if(!c.border||!c.border.left){
+      c.border={top:{style:'thin',color:{argb:'FFD0D0D0'}},bottom:{style:'thin',color:{argb:'FFD0D0D0'}},left:{style:'medium',color:{argb:'FF888888'}},right:{style:'medium',color:{argb:'FF888888'}}};
+    }
+  });
+
+  // ── Sheet 2 ──────────────────────────────────────────────────
+  const ws2=wb.addWorksheet('الإجمالي',{views:[{rightToLeft:true}]});
+  ws2.columns=[
+    {header:'المندوب',                         key:'courier',    width:16},
+    {header:'تحصيل المندوب الصافي بدون شحن',   key:'courierNet', width:26},
+    {header:'نقدي',                            key:'cash',       width:14},
+    {header:'انستاباي',                        key:'instapay',   width:14},
+    {header:'محفظة',                           key:'wallet',     width:14},
+    {header:'رصيد معه',                        key:'balance',    width:14},
+    {header:'شحن إضافي',                       key:'extra',      width:14},
+    {header:'عدد الأوردرات',                   key:'orders',     width:14},
+  ];
+  ws2.getRow(1).eachCell(cell=>{
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+HEADER_BG}};
+    cell.font={bold:true,size:11,name:'Arial'};
+    cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'};
+    cell.border={bottom:{style:'medium',color:{argb:'FF000000'}}};
+  });
+  ws2.getRow(1).getCell(6).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF3CD'}};
+  ws2.getRow(1).height=20;
+
+  const courierTotals={};
+  let grandNet2=0;
+  for(const entry of log){
+    const cr=entry.courier||'—';
+    const pm=entry.paymentMethods||{};
+    if(!courierTotals[cr]) courierTotals[cr]={courierNet:0,cash:0,instapay:0,wallet:0,balance:0,extra:0,orders:0};
+    for(const o of(entry.orders||[])){
+      courierTotals[cr].courierNet += parseFloat(o.courierCollect)||0;
+      grandNet2                    += parseFloat(o.courierCollect)||0;
+    }
+    const extraArr=Array.isArray(entry.extraShipping)?entry.extraShipping:[];
+    for(const e of extraArr){
+      const amt=parseFloat(e.amount)||0;
+      courierTotals[cr].extra    += amt;
+      courierTotals[cr].courierNet -= amt;
+      grandNet2                   -= amt;
+    }
+    courierTotals[cr].cash     += parseFloat(pm.cash)||0;
+    courierTotals[cr].instapay += parseFloat(pm.instapay)||0;
+    courierTotals[cr].wallet   += parseFloat(pm.wallet)||0;
+    courierTotals[cr].balance  += parseFloat(pm.balance)||0;
+    courierTotals[cr].orders   += entry.totalOrders||0;
+  }
+
+  const dataStyle=(cell,col)=>{
+    cell.font={size:10,name:'Arial'};
+    cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'};
+    if(col>=2&&col<=7) cell.numFmt=NUM_FMT;
+  };
+
+  Object.entries(courierTotals).forEach(([cr,t])=>{
+    const r=ws2.addRow({courier:cr,courierNet:t.courierNet,cash:t.cash,instapay:t.instapay,wallet:t.wallet,balance:t.balance>0?t.balance:null,extra:t.extra>0?t.extra:null,orders:t.orders});
+    r.eachCell({includeEmpty:false},(cell,col)=>dataStyle(cell,col));
+    if(t.balance>0){const bc=r.getCell(6);bc.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF3CD'}};bc.font={size:10,name:'Arial',bold:true,color:{argb:'FF92400E'}};}
+  });
+
+  const grandCash2    =log.reduce((s,e)=>s+(parseFloat((e.paymentMethods||{}).cash)||0),0);
+  const grandInstapay2=log.reduce((s,e)=>s+(parseFloat((e.paymentMethods||{}).instapay)||0),0);
+  const grandWallet2  =log.reduce((s,e)=>s+(parseFloat((e.paymentMethods||{}).wallet)||0),0);
+  const grandBalance2 =log.reduce((s,e)=>s+(parseFloat((e.paymentMethods||{}).balance)||0),0);
+  const grandExtra2   =log.reduce((s,e)=>s+(parseFloat(e.extraShippingTotal)||0),0);
+  const grandOrders2  =log.reduce((s,e)=>s+(e.totalOrders||0),0);
+
+  const gt=ws2.addRow({courier:'جميع المناديب',courierNet:grandNet2,cash:grandCash2,instapay:grandInstapay2,wallet:grandWallet2,balance:grandBalance2>0?grandBalance2:null,extra:grandExtra2>0?grandExtra2:null,orders:grandOrders2});
+  gt.eachCell({includeEmpty:true},cell=>{
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+GRAND_BG}};
+    cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11,name:'Arial'};
+    cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'};
+  });
+  [2,3,4,5,6,7].forEach(c=>{gt.getCell(c).numFmt=NUM_FMT;});
+  gt.height=20;
+  ws2.views=[{state:'frozen',ySplit:1,rightToLeft:true}];
+
+  const buffer=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=`cod-payment-center-${new Date().toISOString().slice(0,10)}.xlsx`;
+  a.click();URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════════════════
+// COURIER BALANCE PAGE
+// ══════════════════════════════════════════════════════════════
+function fmtBalanceDate(iso){
+  const d=new Date(iso);const pad=n=>String(n).padStart(2,'0');
+  let h=d.getHours();const m=pad(d.getMinutes());const ampm=h>=12?'م':'ص';
+  h=h%12||12;return`${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()} ${pad(h)}:${m}${ampm}`;
+}
+
+async function loadAllBalances(){
+  const container=$('balanceContainer');
+  if(!isBalanceConfigured()){
+    container.innerHTML='<div class="balance-empty">⚠ أدخل Courier-Balance Worker بيانات في الإعدادات أولاً</div>';
+    openSettings(); return;
+  }
+  container.innerHTML='<div class="balance-empty" style="display:flex;align-items:center;justify-content:center;gap:8px"><span class="spinner" style="width:16px;height:16px;border-width:2px"></span> جاري التحميل...</div>';
+  try{
+    const c=getConfig();
+    const res=await fetch(c.balanceUrl,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.balanceSecret}`},body:JSON.stringify({action:'getAllBalances'})});
+    const d=await res.json();
+    if(!d.success){container.innerHTML=`<div class="balance-empty">خطأ: ${d.error||'فشل الاتصال'}</div>`;return;}
+    renderBalancePage(d.couriers||[]);
+    updateBalanceTabBadge(d.couriers||[]);
+  }catch(e){container.innerHTML=`<div class="balance-empty">خطأ في الاتصال: ${e.message}</div>`;}
+}
+
+function updateBalanceTabBadge(couriers){
+  const badge=$('tabBadgeBalance');
+  const withBalance=(couriers||[]).filter(c=>c.balance>0);
+  badge.style.display=withBalance.length>0?'':'none';
+  badge.textContent=withBalance.length;
+}
+
+function renderBalancePage(couriers){
+  const container=$('balanceContainer');
+  if(!couriers.length){
+    container.innerHTML='<div class="balance-empty">✅ لا يوجد أي مندوب لديه رصيد مستحق</div>';
+    return;
+  }
+  container.innerHTML=`<div class="balance-list">${couriers.map((c,ci)=>`
+    <div class="balance-card" id="bcard-${ci}">
+      <div class="balance-card-header" onclick="toggleBalanceCard(${ci})">
+        <span style="font-size:18px">👤</span>
+        <span class="balance-courier-name">${c.courierName}</span>
+        <span class="balance-amount-chip ${c.balance<=0?'zero':''}">${fmt(c.balance)} EGP</span>
+        <span class="balance-card-toggle">▶</span>
+      </div>
+      <div class="balance-card-body">
+        <div class="balance-credit-row">
+          <div class="balance-credit-input-wrap">
+            <div class="balance-credit-label">💵 مبلغ السداد</div>
+            <input type="number" class="balance-credit-input" id="creditInput-${ci}" placeholder="0" min="0" step="1" max="${c.balance}">
+          </div>
+          <button class="btn-pay-credit" onclick="submitCredit(${ci},'${c.courierName.replace(/'/g,"\'")}',${c.balance})">✓ تسجيل السداد</button>
+        </div>
+        <div class="balance-history-label">سجل الحركات (${c.history.length})</div>
+        <div class="balance-history-list">
+          ${c.history.length===0?'<div style="color:var(--text-muted);font-size:12px;padding:8px">لا توجد حركات</div>':
+            [...c.history].reverse().map(h=>`
+            <div class="balance-history-item ${h.type}">
+              <span class="balance-history-badge ${h.type}">${h.type==='debit'?'احتجاز':'سداد'}</span>
+              <span class="balance-history-date">${fmtBalanceDate(h.date)}</span>
+              <span class="balance-history-note">${h.note||''}</span>
+              <span class="balance-history-amount ${h.type}">${h.type==='debit'?'+':'-'}${fmt(h.amount)}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function toggleBalanceCard(ci){
+  document.getElementById(`bcard-${ci}`).classList.toggle('open');
+}
+
+async function submitCredit(ci, courierName, currentBalance){
+  const input=document.getElementById(`creditInput-${ci}`);
+  const amount=parseFloat(input.value)||0;
+  if(amount<=0){showToast('أدخل مبلغ صالح','error');return;}
+  if(amount>currentBalance+0.01){showToast(`المبلغ أكبر من الرصيد (${fmt(currentBalance)} EGP)`,'error');return;}
+  if(!isBalanceConfigured()){showToast('Courier-Balance Worker غير مضبوط','error');return;}
+
+  openConfirm(`💵 تسجيل سداد — ${courierName}`,
+    `<div class="confirm-detail-row"><span class="confirm-detail-label">المندوب</span><span class="confirm-detail-val">${courierName}</span></div>
+     <div class="confirm-detail-row"><span class="confirm-detail-label">الرصيد الحالي</span><span class="confirm-detail-val red">${fmt(currentBalance)} EGP</span></div>
+     <div class="confirm-detail-row"><span class="confirm-detail-label">مبلغ السداد</span><span class="confirm-detail-val green">${fmt(amount)} EGP</span></div>
+     <div class="confirm-detail-row"><span class="confirm-detail-label">الرصيد بعد السداد</span><span class="confirm-detail-val">${fmt(Math.max(0,currentBalance-amount))} EGP</span></div>
+     <div class="confirm-note">سيُسجَّل هذا السداد في سجل رصيد المندوب.</div>`,
+    'تأكيد السداد','green-btn',async()=>{
+      try{
+        const c=getConfig();
+        const res=await fetch(c.balanceUrl,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.balanceSecret}`},
+          body:JSON.stringify({action:'addCredit',courierName,amount:amount.toFixed(2),note:'سداد يدوي'})});
+        const d=await res.json();
+        if(d.success){
+          showToast(`✓ تم تسجيل سداد ${fmt(amount)} EGP من ${courierName}`,'success');
+          await loadAllBalances();
+        } else {
+          showToast(`فشل: ${d.error||'خطأ'}`, 'error');
+        }
+      }catch{showToast('خطأ في الاتصال','error');}
+    });
+}
+</script>
+</body>
+</html>
