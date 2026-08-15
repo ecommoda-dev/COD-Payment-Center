@@ -1045,7 +1045,7 @@ async function addOrder(numericId){
     courier:null, lineItems:[], status:'scanning', error:null,
     preRegistered:false, cancelled:false,
     hasReturn:false, returnShipping:'0.00', returnedItems:[],
-    refundAmount:null, parentTransactionId:null, orderDiscount:null,
+    refundAmount:null, saleTransactions:[], orderDiscount:null,
     isExtraShipping: false,
     s1:null, s2:null, statusError:null,
   };
@@ -1073,7 +1073,7 @@ async function addOrder(numericId){
         order.lineItems           = d.lineItems||[];
         order.preRegistered       = d.preRegistered||false;
         order.orderDiscount       = d.orderDiscount??null;
-        order.parentTransactionId = d.parentTransactionId||null;
+        order.saleTransactions = d.saleTransactions||[];
         order.hasReturn           = d.hasReturn||false;
         order.returnShipping      = d.returnShipping||'0.00';
         order.returnedItems       = d.returnedItems||[];
@@ -1870,11 +1870,11 @@ async function doBulkPayAndRefund(){
   for(const order of refundOrders){
     order.status='loading';renderTable();
     try{
-      if(!order.parentTransactionId){
+      if(!order.saleTransactions||!order.saleTransactions.length){
         order.status='refund-error';order.error='لا يوجد transaction صالح';failRefund++;
       } else {
         const orderMeta={lineItems:order.lineItems,returnedItems:order.returnedItems,orderDiscount:order.orderDiscount,preRegistered:order.preRegistered,hasReturn:order.hasReturn,returnShipping:order.returnShipping,courierCollect:calcCourierCollect(order)};
-        const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'refund',orderId:order.id,refundAmount:order.refundAmount.toFixed(2),parentTransactionId:order.parentTransactionId,currency:'EGP',orderName:order.orderName,batchId,sessionMeta,orderMeta})});
+        const res=await fetch(c.url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${c.secret}`},body:JSON.stringify({action:'refund',orderId:order.id,refundAmount:order.refundAmount.toFixed(2),saleTransactions:order.saleTransactions,currency:'EGP',orderName:order.orderName,batchId,sessionMeta,orderMeta})});
         const d=await res.json();
         if(d.success){order.status='refund-done';order.financialStatus='REFUNDED';successRefund++;}
         else{order.status='refund-error';order.error=d.error||'فشل';failRefund++;}
