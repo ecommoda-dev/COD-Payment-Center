@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -9,9 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <style>
-/* ══════════════════════════════════════════════════════════════
-   §STYLES — CSS Variables (design-system.md)
-   ══════════════════════════════════════════════════════════════ */
 :root {
   --bg:             #f3f4f6;
   --surface:        #ffffff;
@@ -47,7 +43,7 @@
   --shadow-md:      0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04);
   --font-body:      'Noto Sans Arabic', -apple-system, sans-serif;
   --font-mono:      'IBM Plex Mono', monospace;
-  --container-max:  980px;   /* عرض الأداة — نوافذ About/Changelog = 90% منه */
+  --container-max:  980px;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -61,7 +57,6 @@ body {
 }
 .container { max-width: var(--container-max); margin: 0 auto; }
 
-/* ── Main Tabs — full width, equal split (UI Standard v2) ──── */
 .main-tabs-bar { display:flex; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:6px; margin-bottom:14px; box-shadow:var(--shadow); }
 .main-tab-btn { flex:1; padding:9px 10px; border:2px solid transparent; background:transparent; border-radius:var(--radius-sm); font-family:inherit; font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
 .main-tab-btn:hover  { background:var(--surface-2); color:var(--text-primary); }
@@ -71,7 +66,6 @@ body {
 .tab-panel        { display:none; }
 .tab-panel.active { display:block; }
 
-/* ── Header ─────────────────────────────────────────────────── */
 .app-header { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 16px; margin-bottom:12px; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
 .app-title { display:flex; align-items:center; gap:10px; }
 .app-icon { width:34px; height:34px; background:var(--accent); border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:16px; color:#fff; flex-shrink:0; }
@@ -88,7 +82,6 @@ body {
 .hbtn.active-user:hover { border-color:var(--red); color:var(--red); background:var(--red-light); }
 .hbtn.settings-configured { border-color:var(--green); color:var(--green); background:var(--green-light); }
 
-/* ── Settings Modal ─────────────────────────────────────────── */
 .settings-overlay { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:600; display:none; align-items:center; justify-content:center; padding:20px; }
 .settings-overlay.open { display:flex; }
 .settings-modal { background:var(--surface); border-radius:var(--radius); width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,.18); animation:modalIn .2s ease; overflow:hidden; }
@@ -107,7 +100,6 @@ body {
 .btn-modal-save { padding:8px 18px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius-sm); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:background .15s; }
 .btn-modal-save:hover { background:var(--accent-dark); }
 
-/* ── Modal Shell — About / Changelog (UI Standard v2) ──────── */
 .eco-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:600; display:none; align-items:center; justify-content:center; padding:20px; }
 .eco-overlay.open { display:flex; }
 .eco-modal { background:var(--surface); border-radius:var(--radius); width:90%; max-width:calc(var(--container-max) * .9); max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.18); overflow:hidden; }
@@ -115,7 +107,6 @@ body {
 .eco-modal-body { overflow-y:auto; padding:16px 20px; flex:1; }
 .eco-modal-ftr { padding:12px 18px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; flex-shrink:0; }
 
-/* ── Changelog content ─────────────────────────────────────── */
 .cl-version-block { margin-bottom:4px; }
 .cl-version-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
 .cl-ver-badge { font-family:var(--font-mono); font-size:12px; font-weight:700; padding:3px 10px; border-radius:5px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; direction:ltr; }
@@ -129,7 +120,6 @@ body {
 .cl-tag.fix    { background:#fef2f2; color:#dc2626; }
 .cl-tag.change { background:#fffbeb; color:#92400e; }
 
-/* ── About content ─────────────────────────────────────────── */
 .about-sec { border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:10px; overflow:hidden; }
 .about-sec > summary { padding:11px 14px; font-weight:700; font-size:14px; background:var(--surface-2); cursor:pointer; user-select:none; }
 .about-sec-body { padding:14px; display:flex; flex-direction:column; gap:10px; font-size:13px; line-height:1.75; }
@@ -140,12 +130,10 @@ body {
 .about-sec-body th, .about-sec-body td { padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; }
 .about-pre { font-family:var(--font-mono); font-size:11px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; overflow-x:auto; white-space:pre; direction:ltr; text-align:left; line-height:1.65; margin:0; }
 
-/* ── Order number hyperlink ─────────────────────────────────── */
 .order-link { font-family:var(--font-mono); font-weight:600; color:var(--accent); text-decoration:none; }
 .order-link:hover { text-decoration:underline; }
 .order-num { font-family:var(--font-mono); font-weight:600; }
 
-/* ── Toast ──────────────────────────────────────────────────── */
 .toast-container { position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
 .toast { padding:10px 16px; border-radius:var(--radius-sm); font-size:13px; font-weight:600; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,.2); animation:toastIn .3s ease; max-width:340px; }
 @keyframes toastIn { from{transform:translateX(100%);opacity:0} to{transform:none;opacity:1} }
@@ -153,15 +141,11 @@ body {
 .toast-error   { background:var(--red); }
 .toast-neutral { background:#1a1d27; }
 
-/* ── Spinner ────────────────────────────────────────────────── */
 .spinner { width:12px; height:12px; border:2px solid transparent; border-top-color:currentColor; border-radius:50%; animation:spin .7s linear infinite; display:inline-block; vertical-align:middle; }
 @keyframes spin { to{transform:rotate(360deg)} }
 </style>
 </head>
 <style>
-/* ══════════════════════════════════════════════════════════════
-   §STYLES — Login Screen (Universal D1 Auth — UI Standard v2)
-   ══════════════════════════════════════════════════════════════ */
 .login-overlay { position:fixed; inset:0; background:var(--bg); z-index:500; display:flex; align-items:center; justify-content:center; padding:20px; }
 .login-overlay.hidden { display:none; }
 .login-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:0 22px 70px rgba(0,0,0,.22); width:100%; max-width:420px; padding:28px 26px 24px; position:relative; animation:loginIn .18s ease; }
@@ -216,9 +200,6 @@ body {
 .login-secondary.visible { display:inline-flex; }
 .login-secondary:hover { border-color:var(--accent); background:var(--accent-light); color:var(--accent); }
 
-/* ══════════════════════════════════════════════════════════════
-   §STYLES — Tool content (Scan & Collect tab)
-   ══════════════════════════════════════════════════════════════ */
 .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:16px; }
 .card-header { padding:14px 16px 0; font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
 .card-body { padding:0 16px 16px; }
@@ -420,7 +401,6 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 .s-badge-empty     { color:var(--text-muted); font-size:10px; }
 .s-badge-err       { background:var(--red-light); color:var(--red); border:2px solid var(--red-border); font-weight:800; font-size:10px; }
 
-/* ── Courier Import Modal ─────────────────────────────────────── */
 .import-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:600; display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .2s; }
 .import-overlay.open { opacity:1; pointer-events:all; }
 .import-modal { background:var(--surface); border-radius:var(--radius); width:100%; max-width:calc(var(--container-max) * .9); max-height:88vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.2); transform:translateY(14px); transition:transform .2s cubic-bezier(.34,1.56,.64,1); }
@@ -470,7 +450,11 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 .row-del-btn { background:none; border:none; cursor:pointer; font-size:16px; padding:2px 4px; border-radius:4px; transition:transform .15s; display:inline-flex; align-items:center; justify-content:center; }
 .row-del-btn:hover { transform:scale(1.2); }
 
-/* ── Confirm modal (payment/refund confirmation — richer content) ── */
+.import-source-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.import-source-btn { flex:1; min-width:200px; display:flex; align-items:center; justify-content:center; gap:7px; padding:10px 12px; border-radius:var(--radius-sm); border:2px solid var(--border-strong); background:var(--surface); font-family:inherit; font-size:12.5px; font-weight:700; color:var(--text-secondary); cursor:pointer; transition:all .15s; text-align:center; }
+.import-source-btn:hover { border-color:var(--accent); color:var(--accent); }
+.import-source-btn.active { border-color:var(--accent); background:var(--accent-light); color:var(--accent-dark); }
+
 .confirm-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:600; display:none; align-items:center; justify-content:center; padding:20px; }
 .confirm-overlay.open { display:flex; }
 .confirm-modal { background:var(--surface); border-radius:var(--radius); width:100%; max-width:520px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.2); animation:modalIn .2s ease; }
@@ -494,64 +478,172 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 .btn-confirm-ok.red-btn    { background:var(--red); }
 .btn-confirm-ok:hover { filter:brightness(.95); }
 
-/* ══════════════════════════════════════════════════════════════
-   §STYLES — Log Tab (session cards)
-   ══════════════════════════════════════════════════════════════ */
-.log-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:8px; flex-wrap:wrap; }
-.log-toolbar-title { font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
-.log-sync-badge { font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px; font-family:var(--font-mono); }
-.log-sync-badge.synced  { background:var(--green-light); color:var(--green); border:1px solid var(--green-border); }
-.log-sync-badge.local   { background:var(--amber-light); color:var(--amber); border:1px solid var(--amber-border); }
-.log-sync-badge.loading { background:var(--accent-light); color:var(--accent); border:1px solid #bfdbfe; }
-.log-actions { display:flex; gap:6px; flex-wrap:wrap; }
-.btn-log { padding:6px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-strong); background:var(--surface); color:var(--text-secondary); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; }
-.btn-log:hover { border-color:var(--accent); color:var(--accent); }
-.btn-log.export:hover { border-color:var(--green); color:var(--green); }
-.btn-log.export-sel { display:none; }
-.btn-log.export-sel.show { display:inline-block; }
-.log-empty { text-align:center; padding:40px; color:var(--text-muted); font-size:13px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }
-.log-list { display:flex; flex-direction:column; gap:8px; }
-.log-entry { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
-.log-entry-header { display:flex; align-items:center; gap:8px; padding:12px 14px; cursor:pointer; }
-.log-check { width:15px; height:15px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; }
-.log-entry-info { flex:1; min-width:0; }
-.log-entry-date { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); margin-bottom:4px; }
-.log-entry-tags { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.log-tag { padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; }
-.log-tag.courier { background:var(--purple-light); color:var(--purple); border:1px solid var(--purple-border); }
-.log-tag.count   { background:var(--accent-light);  color:var(--accent);  border:1px solid #bfdbfe; }
-.log-tag.amount  { background:var(--amber-light);   color:var(--amber);   border:1px solid var(--amber-border); font-family:var(--font-mono); }
-.log-tag.emp     { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
-.log-pay-methods { display:flex; gap:4px; flex-wrap:wrap; margin-top:5px; }
-.log-pm-chip { font-family:var(--font-mono); font-size:10px; padding:2px 7px; border-radius:5px; background:var(--surface-2); border:1px solid var(--border); color:var(--text-secondary); }
-.log-pm-chip span { color:var(--text-primary); font-weight:600; margin-right:3px; }
-.log-entry-stats { display:flex; gap:6px; font-size:11px; flex-shrink:0; }
-.log-stat-ok  { color:var(--green); font-family:var(--font-mono); font-weight:700; }
-.log-toggle   { color:var(--text-muted); font-size:10px; flex-shrink:0; transition:transform .2s; }
-.log-entry.open .log-toggle { transform:rotate(90deg); }
-.log-entry-details { display:none; border-top:1px solid var(--border); }
-.log-entry.open .log-entry-details { display:block; }
-.log-detail-item { border-bottom:1px solid var(--border); }
-.log-detail-item:last-child { border-bottom:none; }
-.log-detail-main { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; font-size:12px; cursor:pointer; transition:background .15s; gap:8px; }
-.log-detail-main:hover { background:var(--surface-2); }
-.log-detail-order  { font-family:var(--font-mono); font-weight:600; color:var(--text-primary); }
-.log-detail-ok     { background:var(--green-light); color:var(--green); border:1px solid var(--green-border); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:600; }
-.log-detail-extra  { background:var(--orange-light); color:var(--orange); border:1px solid var(--orange-border); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700; }
-.log-detail-sub { display:none; padding:8px 14px 10px; border-top:1px solid var(--border); background:rgba(0,0,0,.015); }
-.log-detail-item.open .log-detail-sub { display:block; }
-.log-sub-label { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; margin-top:6px; }
-.log-sub-label:first-child { margin-top:0; }
-.btn-log-more { width:100%; padding:10px; border-radius:var(--radius-sm); border:1px dashed var(--border-strong); background:var(--surface); color:var(--text-secondary); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; margin-top:8px; }
-.btn-log-more:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
-.btn-log-more:disabled { opacity:.5; cursor:not-allowed; }
+.log-tab-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.log-filters-section{border-bottom:1px solid var(--border);}
+.log-filters-header{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;background:var(--surface-2);cursor:pointer;user-select:none;transition:background .12s;}
+.log-filters-header:hover{background:#f0f4f8;}
+.log-filters-title{font-size:12px;font-weight:600;color:var(--text-secondary);display:flex;align-items:center;gap:6px;}
+.log-filters-toggle{font-size:13px;color:var(--text-muted);transition:transform .25s;}
+.log-filters-toggle.open{transform:rotate(180deg);}
+.log-filters-body{padding:12px 16px;display:flex;flex-direction:column;gap:10px;}
+.log-filters-body.collapsed{display:none;}
+.log-frow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.log-fg{display:flex;flex-direction:column;gap:3px;}
+.log-flabel{font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
+.log-finput{border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:6px 10px;font-family:inherit;font-size:12px;color:var(--text-primary);background:var(--surface);outline:none;height:34px;box-sizing:border-box;transition:border-color .15s, background .15s;}
+.log-finput:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.08);}
+.log-finput.has-value{border-color:var(--accent);background:var(--accent-light);}
+.log-finput.w-search{width:200px;}
+.log-clear-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--red-border);border-radius:var(--radius-sm);font-family:inherit;font-size:12px;font-weight:600;color:var(--red);background:var(--red-light);cursor:pointer;transition:all .15s;white-space:nowrap;height:34px;}
+.log-clear-btn:hover{background:var(--red);color:#fff;border-color:var(--red);}
+.log-stats-bar{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface-2);flex-wrap:wrap;}
+.log-refresh-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border:1px solid var(--green-border);border-radius:var(--radius-sm);font-family:inherit;font-size:11px;font-weight:600;color:var(--green);background:var(--green-light);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.log-refresh-btn:hover{background:var(--green);color:#fff;}
+.log-stat-chip{font-size:11px;font-weight:600;color:var(--text-secondary);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:3px 10px;}
+.log-stat-chip strong{color:var(--text-primary);}.log-stat-chip.filtered strong{color:var(--accent);}
+.log-export-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border:1px solid var(--green-border);border-radius:var(--radius-sm);font-family:inherit;font-size:11px;font-weight:600;color:var(--green);background:var(--green-light);cursor:pointer;transition:all .15s;}
+.log-export-btn:hover{background:var(--green);color:#fff;}
+.log-btns-end{margin-inline-start:auto;display:flex;gap:8px;flex-wrap:wrap;}
+.log-body{overflow-y:auto;max-height:600px;}
+.log-empty{padding:40px;text-align:center;color:var(--text-muted);font-size:13px;}
+
+.log-otbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.log-otbl thead th { position: sticky; top: 0; text-align: center; padding: 8px 8px; background: var(--surface-2); border-bottom: 1.5px solid var(--border); font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; border-inline-start: 1px solid var(--border); z-index: 2; }
+.log-otbl thead th:first-child { border-inline-start: none; }
+.log-otbl tbody td { padding: 8px 8px; text-align: center; vertical-align: middle; border-inline-start: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.log-otbl tbody td:first-child { border-inline-start: none; }
+.log-batch-row { cursor: pointer; transition: background .12s; }
+.log-batch-row:hover { background: var(--surface-2); }
+.log-batch-row.open { background: var(--accent-light); }
+.log-batch-row .lb-arrow { font-size: 10px; color: var(--text-muted); transition: transform .2s; display: inline-block; }
+.log-batch-row.open .lb-arrow { transform: rotate(90deg); }
+.log-detail-row td { padding: 0; border-inline-start: none; background: var(--surface-2); }
+.log-detail-inner { padding: 6px 10px 10px 34px; }
+.log-detail-tbl { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--surface); border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.log-detail-tbl th { padding: 6px 8px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-align: center; border-inline-start: 1px solid var(--border); }
+.log-detail-tbl th:first-child { border-inline-start: none; }
+.log-detail-tbl td { padding: 6px 8px; text-align: center; border-bottom: 1px solid var(--border); border-inline-start: 1px solid var(--border); }
+.log-detail-tbl td:first-child { border-inline-start: none; }
+.log-detail-tbl tr:last-child td { border-bottom: none; }
+.log-order-row { cursor: default; }
+.log-order-row.has-sub { cursor: pointer; }
+.log-order-row.open .lo-arrow { transform: rotate(90deg); }
+.lo-arrow { font-size: 9px; color: var(--text-muted); transition: transform .2s; display: inline-block; margin-inline-start: 4px; }
+.log-sub-row td { padding: 0; border-inline-start: none; }
+.log-sub-row.hidden { display: none; }
+.log-sub-inner { padding: 6px 10px 8px 24px; background: var(--surface-2); }
+.log-tag { padding: 1px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; border: 1px solid; display: inline-block; }
+.log-tag.type-payment { background: var(--green-light); color: var(--green); border-color: var(--green-border); }
+.log-tag.type-refund  { background: var(--red-light);   color: var(--red);   border-color: var(--red-border); }
+.log-tag.cr  { background: var(--purple-light); color: var(--purple); border-color: var(--purple-border); }
+.log-tag.emp { background: var(--accent-light); color: var(--accent-dark); border-color: #bfdbfe; }
+.log-cb { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+
+.ms-wrap { position: relative; }
+.ms-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-width: 170px; height: 34px; padding: 6px 10px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface); font-family: inherit; font-size: 12px; font-weight: 600;
+  color: var(--text-primary); cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.ms-btn:hover { border-color: var(--accent); }
+.ms-btn.has-selection { border-color: var(--accent); color: var(--accent-dark); background: var(--accent-light); }
+.ms-btn.open { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,.08); }
+.ms-btn .ms-count {
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: #fff;
+  background: var(--accent); border-radius: 20px; padding: 1px 7px; min-width: 18px; text-align: center;
+}
+.ms-btn .ms-arrow { font-size: 9px; color: var(--text-muted); transition: transform .2s; flex-shrink: 0; }
+.ms-btn.open .ms-arrow { transform: rotate(180deg); }
+.ms-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 200;
+  width: 260px; max-width: 80vw;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 28px rgba(0,0,0,.14); display: none; flex-direction: column; overflow: hidden;
+}
+.ms-menu.open { display: flex; }
+.ms-search-wrap { padding: 8px; border-bottom: 1px solid var(--border); }
+.ms-search {
+  width: 100%; height: 32px; border: 1px solid var(--border-strong); border-radius: 6px;
+  padding: 0 10px; font-family: inherit; font-size: 12px; outline: none; background: var(--surface-2);
+}
+.ms-search:focus { border-color: var(--accent); background: var(--surface); }
+.ms-selectall-row {
+  display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+  border-bottom: 1px solid var(--border); background: var(--surface-2); font-size: 12px; font-weight: 700;
+  cursor: pointer; user-select: none;
+}
+.ms-selectall-row:hover { background: #f0f4f8; }
+.ms-list { max-height: 220px; overflow-y: auto; padding: 4px; }
+.ms-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px;
+  font-size: 12.5px; cursor: pointer; user-select: none; transition: background .1s;
+}
+.ms-item:hover { background: var(--surface-2); }
+.ms-item.checked { background: var(--accent-light); }
+.ms-item input[type=checkbox], .ms-selectall-row input[type=checkbox] {
+  width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0;
+}
+.ms-item .ms-item-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-item .ms-item-mono { font-family: var(--font-mono); direction: ltr; }
+.ms-empty { padding: 18px; text-align: center; font-size: 12px; color: var(--text-muted); }
+.ms-ftr {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 7px 10px; border-top: 1px solid var(--border); background: var(--surface-2);
+}
+.ms-ftr-clear {
+  font-size: 11.5px; font-weight: 700; color: var(--red); background: none; border: none;
+  cursor: pointer; padding: 4px 6px; border-radius: 5px;
+}
+.ms-ftr-clear:hover { background: var(--red-light); }
+.ms-ftr-count { font-size: 11px; color: var(--text-muted); }
+.ms-chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.ms-chips-row:empty { display: none; }
+.ms-chip {
+  display: flex; align-items: center; gap: 5px; background: var(--accent-light); color: var(--accent-dark);
+  border: 1px solid #bfdbfe; border-radius: 20px; padding: 3px 6px 3px 10px; font-size: 11.5px; font-weight: 600;
+}
+.ms-chip button { border: none; background: rgba(37,99,235,.15); color: var(--accent-dark);
+  width: 16px; height: 16px; border-radius: 50%; font-size: 11px; cursor: pointer; line-height: 1; }
+.ms-chip button:hover { background: var(--accent); color: #fff; }
+
+.range-frow { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+.range-fg { display:flex; flex-direction:column; gap:3px; }
+.range-flabel { font-size:10px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
+.range-date-wrap input[type=date] {
+  width:150px; height:34px; border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  padding:6px 10px; font-family:var(--font-mono); font-size:12px; color:var(--text-primary);
+  background:var(--surface); outline:none; cursor:pointer;
+}
+.range-preset-wrap { position:relative; }
+.range-preset-btn {
+  display:flex; align-items:center; gap:6px; padding:6px 12px; border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm); font-family:var(--font-body); font-size:12px; font-weight:600;
+  color:var(--text-secondary); background:var(--surface); cursor:pointer; height:34px; white-space:nowrap;
+}
+.range-preset-btn.has-preset { border-color:var(--accent); color:var(--accent); background:var(--accent-light); }
+.range-preset-menu {
+  position:absolute; top:calc(100% + 4px); right:0; background:var(--surface); border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm); box-shadow:0 4px 20px rgba(0,0,0,.12); z-index:200; min-width:170px; padding:4px; display:none;
+}
+.range-preset-menu.open { display:block; }
+.range-preset-item { padding:7px 12px; font-size:12px; cursor:pointer; border-radius:6px; color:var(--text-primary); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.range-preset-item:hover { background:var(--surface-2); }
+.range-preset-item.active { background:var(--accent-light); color:var(--accent); }
+.range-preset-item .pr-check { font-size:11px; color:var(--accent); display:none; }
+.range-preset-item.active .pr-check { display:block; }
+.range-preset-sep { height:1px; background:var(--border); margin:3px 4px; }
+
+.pagination-row { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; flex-wrap: wrap; }
+.page-info { font-size: 13px; color: var(--text-secondary); font-family: var(--font-mono); padding: 0 8px; }
+.page-btn { padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border-strong); background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font-body); color: var(--text-primary); }
+.page-btn:hover:not(:disabled) { background: var(--accent-light); border-color: #bfdbfe; color: var(--accent); }
+.page-btn:disabled { opacity: .4; cursor: not-allowed; }
 </style>
 <body>
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- ══════════════════════════════════════════════════════════════
-     §LOGIN — Universal D1 Auth (two-step reveal)
-     ══════════════════════════════════════════════════════════════ -->
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
     <button class="login-settings-btn missing" id="loginSettingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
@@ -601,7 +693,6 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
 <div class="container">
 
-  <!-- ══ Header ══ -->
   <div class="app-header">
     <div class="app-title">
       <div class="app-icon">💳</div>
@@ -613,12 +704,11 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
     <div class="app-header-btns">
       <button class="hbtn active-user" id="activeUserBtn" onclick="doLogout()">👤 —</button>
       <button class="hbtn" id="aboutBtn" onclick="openAbout()">ℹ️ عن الأداة</button>
-      <button class="hbtn ver-btn" onclick="openChangelog()">v2.0.0 📋</button>
+      <button class="hbtn ver-btn" onclick="openChangelog()">v3.0.0 📋</button>
       <button class="hbtn" id="settingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
     </div>
   </div>
 
-  <!-- ══ Main Tabs ══ -->
   <div class="main-tabs-bar">
     <button class="main-tab-btn active" id="tabScan" onclick="switchMainTab('scan')">
       🔫 المسح والتحصيل
@@ -630,7 +720,6 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
     </button>
   </div>
 
-  <!-- ══ TAB: Scan & Collect ══ -->
   <div class="tab-panel active" id="panelScan">
     <div class="not-configured-banner" id="notConfigBanner">⚠ الأداة غير مضبوطة — افتح الإعدادات وأدخل بيانات الاتصال</div>
 
@@ -765,21 +854,166 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
     </div>
   </div>
 
-  <!-- ══ TAB: Log ══ -->
   <div class="tab-panel" id="panelLog">
-    <div class="log-toolbar">
-      <div class="log-toolbar-title">سجل العمليات <span class="log-sync-badge synced" id="logSyncBadge">D1</span></div>
-      <div class="log-actions">
-        <button class="btn-log" onclick="refreshLog()">🔄 تحديث</button>
-        <button class="btn-log export-sel" id="exportSelBtn" onclick="exportXLSX(true)">📥 تصدير المحدد</button>
-        <button class="btn-log export" onclick="exportXLSX(false)">📥 تصدير الكل</button>
+    <div class="log-tab-wrap">
+
+      <div class="log-filters-section">
+        <div class="log-filters-header" onclick="toggleLogFilters()">
+          <div class="log-filters-title">🔎 الفلاتر</div>
+          <span class="log-filters-toggle open" id="logFiltersToggleIcon">▲</span>
+        </div>
+        <div class="log-filters-body" id="logFiltersBody">
+          <div class="log-frow">
+            <div class="log-fg">
+              <span class="log-flabel">نوع العملية</span>
+              <div class="ms-wrap" id="msWrap-logType">
+                <button class="ms-btn" id="msBtn-logType" onclick="msToggle('logType')">
+                  <span id="msBtnLabel-logType">كل الأنواع</span>
+                  <span class="ms-arrow">▾</span>
+                </button>
+                <div class="ms-menu" id="msMenu-logType">
+                  <div class="ms-selectall-row" onclick="msToggleSelectAll('logType')">
+                    <input type="checkbox" id="msSelectAll-logType"
+                      onclick="event.stopPropagation()" onchange="msToggleSelectAll('logType', this.checked)">
+                    <span id="msSelectAllLabel-logType">تحديد الكل</span>
+                  </div>
+                  <div class="ms-list" id="msList-logType"></div>
+                  <div class="ms-ftr">
+                    <button class="ms-ftr-clear" onclick="msClear('logType')">مسح الاختيار</button>
+                    <span class="ms-ftr-count" id="msFtrCount-logType"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="log-fg">
+              <span class="log-flabel">المندوب</span>
+              <div class="ms-wrap" id="msWrap-logCourier">
+                <button class="ms-btn" id="msBtn-logCourier" onclick="msToggle('logCourier')">
+                  <span id="msBtnLabel-logCourier">كل المناديب</span>
+                  <span class="ms-arrow">▾</span>
+                </button>
+                <div class="ms-menu" id="msMenu-logCourier">
+                  <div class="ms-search-wrap">
+                    <input type="text" class="ms-search" id="msSearch-logCourier"
+                      placeholder="بحث..." oninput="msFilterList('logCourier', this.value)">
+                  </div>
+                  <div class="ms-selectall-row" onclick="msToggleSelectAll('logCourier')">
+                    <input type="checkbox" id="msSelectAll-logCourier"
+                      onclick="event.stopPropagation()" onchange="msToggleSelectAll('logCourier', this.checked)">
+                    <span id="msSelectAllLabel-logCourier">تحديد الكل</span>
+                  </div>
+                  <div class="ms-list" id="msList-logCourier"></div>
+                  <div class="ms-ftr">
+                    <button class="ms-ftr-clear" onclick="msClear('logCourier')">مسح الاختيار</button>
+                    <span class="ms-ftr-count" id="msFtrCount-logCourier"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="log-fg">
+              <label class="log-flabel">بحث برقم الأوردر</label>
+              <input type="text" class="log-finput w-search" id="logSearch" placeholder="مثال: 1780" autocomplete="off" spellcheck="false" oninput="toggleSearchActiveState(this)">
+            </div>
+
+            <div class="log-fg">
+              <span class="log-flabel">الموظف</span>
+              <div class="ms-wrap" id="msWrap-logEmp">
+                <button class="ms-btn" id="msBtn-logEmp" onclick="msToggle('logEmp')">
+                  <span id="msBtnLabel-logEmp">كل الموظفين</span>
+                  <span class="ms-arrow">▾</span>
+                </button>
+                <div class="ms-menu" id="msMenu-logEmp">
+                  <div class="ms-selectall-row" onclick="msToggleSelectAll('logEmp')">
+                    <input type="checkbox" id="msSelectAll-logEmp"
+                      onclick="event.stopPropagation()" onchange="msToggleSelectAll('logEmp', this.checked)">
+                    <span id="msSelectAllLabel-logEmp">تحديد الكل</span>
+                  </div>
+                  <div class="ms-list" id="msList-logEmp"></div>
+                  <div class="ms-ftr">
+                    <button class="ms-ftr-clear" onclick="msClear('logEmp')">مسح الاختيار</button>
+                    <span class="ms-ftr-count" id="msFtrCount-logEmp"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button class="log-clear-btn" onclick="clearLogFilters()">✕ مسح كل الفلاتر</button>
+          </div>
+
+          <div class="log-frow">
+            <div class="log-fg">
+              <span class="range-flabel">فترة سريعة</span>
+              <div class="range-preset-wrap" id="rangePresetWrap">
+                <button class="range-preset-btn" id="rangePresetBtn" onclick="toggleRangePresetMenu(event)">
+                  <span id="rangePresetLabel">⚡ اختار فترة</span><span class="pr-arrow">▾</span>
+                </button>
+                <div class="range-preset-menu" id="rangePresetMenu">
+                  <div class="range-preset-item" data-preset="today"       onclick="applyRangePreset('today')">      <span>اليوم</span>        <span class="pr-check">✓</span></div>
+                  <div class="range-preset-item" data-preset="yesterday"   onclick="applyRangePreset('yesterday')">  <span>أمس</span>          <span class="pr-check">✓</span></div>
+                  <div class="range-preset-sep"></div>
+                  <div class="range-preset-item" data-preset="last3"       onclick="applyRangePreset('last3')">      <span>آخر 3 أيام</span>   <span class="pr-check">✓</span></div>
+                  <div class="range-preset-item" data-preset="last7"       onclick="applyRangePreset('last7')">      <span>آخر 7 أيام</span>   <span class="pr-check">✓</span></div>
+                  <div class="range-preset-item" data-preset="last30"      onclick="applyRangePreset('last30')">     <span>آخر 30 يوم</span>   <span class="pr-check">✓</span></div>
+                  <div class="range-preset-item" data-preset="last90"      onclick="applyRangePreset('last90')">     <span>آخر 90 يوم</span>   <span class="pr-check">✓</span></div>
+                  <div class="range-preset-sep"></div>
+                  <div class="range-preset-item" data-preset="thisMonth"   onclick="applyRangePreset('thisMonth')">  <span>الشهر الحالي</span>  <span class="pr-check">✓</span></div>
+                  <div class="range-preset-item" data-preset="lastMonth"   onclick="applyRangePreset('lastMonth')">  <span>الشهر السابق</span>  <span class="pr-check">✓</span></div>
+                  <div class="range-preset-item" data-preset="thisQuarter" onclick="applyRangePreset('thisQuarter')"><span>الربع الحالي</span>  <span class="pr-check">✓</span></div>
+                  <div class="range-preset-sep"></div>
+                  <div class="range-preset-item" data-preset="thisYear"    onclick="applyRangePreset('thisYear')">   <span>العام الحالي</span>  <span class="pr-check">✓</span></div>
+                  <div class="range-preset-item" data-preset="lastYear"    onclick="applyRangePreset('lastYear')">   <span>العام السابق</span>  <span class="pr-check">✓</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="log-fg">
+              <span class="range-flabel">من تاريخ</span>
+              <div class="range-date-wrap">
+                <input type="date" id="rangeDateFrom"
+                  onclick="this.showPicker&&this.showPicker();"
+                  onchange="onRangeDateChange()">
+              </div>
+            </div>
+            <div class="log-fg">
+              <span class="range-flabel">إلى تاريخ</span>
+              <div class="range-date-wrap">
+                <input type="date" id="rangeDateTo"
+                  onclick="this.showPicker&&this.showPicker();"
+                  onchange="onRangeDateChange()">
+              </div>
+            </div>
+          </div>
+
+          <div class="ms-chips-row" id="chipsRow-logType"></div>
+          <div class="ms-chips-row" id="chipsRow-logCourier"></div>
+          <div class="ms-chips-row" id="chipsRow-logEmp"></div>
+        </div>
       </div>
+
+      <div class="log-stats-bar">
+        <button class="log-refresh-btn" onclick="fetchLog()">↺ تحديث</button>
+        <div class="log-stat-chip filtered">نتائج الفلتر: <strong id="logFilteredCount">—</strong></div>
+        <div class="log-btns-end">
+          <button class="log-export-btn" id="logExportSelectedBtn" onclick="exportXLSX(true)" style="display:none">⬇ تصدير المحدد (<span id="logExportSelCount">0</span>)</button>
+          <button class="log-export-btn" id="logExportBtn" onclick="exportXLSX(false)">⬇ تصدير الكل</button>
+        </div>
+      </div>
+
+      <div class="log-body" id="logBody">
+        <div class="log-empty">اضغط تحديث لعرض السجل</div>
+      </div>
+
+      <div class="pagination-row" id="paginationRow" style="display:none;">
+        <button class="page-btn" id="btnPrevPage" onclick="goPage(-1)">→ السابق</button>
+        <span class="page-info" id="pageInfo"></span>
+        <button class="page-btn" id="btnNextPage" onclick="goPage(1)">التالي ←</button>
+      </div>
+
     </div>
-    <div id="logContainer"><div class="log-empty">اضغط تحديث لعرض السجل</div></div>
   </div>
 
 </div>
-<!-- Import Courier Modal -->
 <div class="import-overlay" id="importOverlay" onclick="closeImportOnBackdrop(event)">
   <div class="import-modal">
     <div class="import-modal-header">
@@ -787,6 +1021,10 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
       <button class="modal-close-x" onclick="closeImportModal()">✕</button>
     </div>
     <div class="import-modal-body">
+      <div class="import-source-row" id="importSourceRow">
+        <button class="import-source-btn active" id="srcShopifyBtn" onclick="setImportSource('shopify')">🛒 من شوبيفاي مباشرة</button>
+        <button class="import-source-btn" id="srcOsuBtn" onclick="setImportSource('osu')">🚚 من تسليمات ومرتجعات المسجّلة اليوم</button>
+      </div>
       <div class="import-courier-row">
         <select id="importCourierSelect" class="import-courier-select">
           <option value="">جاري تحميل المناديب...</option>
@@ -834,7 +1072,6 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
   </div>
 </div>
 
-<!-- Settings Modal -->
 <div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOnBackdrop(event)">
   <div class="settings-modal">
     <div class="settings-modal-hdr">
@@ -862,7 +1099,6 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
   </div>
 </div>
 
-<!-- Changelog Modal -->
 <div class="eco-overlay" id="changelogOverlay" onclick="if(event.target===this)closeChangelog()">
   <div class="eco-modal">
     <div class="eco-modal-hdr">
@@ -873,7 +1109,19 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
       <div class="cl-version-block">
         <div class="cl-version-row">
-          <span class="cl-ver-badge">v2.0.0</span>
+          <span class="cl-ver-badge">v3.0.0</span>
+          <span class="cl-ver-date">17-08-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span>مصدر ثاني لاستيراد أوردرات مندوب: "🚚 من تسليمات ومرتجعات المسجّلة اليوم" — بيجيب كل الأوردرات اللي Order Status Updater سجّلها Delivered أو Returned (S1 أو S2) النهارده لمندوب معيّن، بدل إعادة إدخالها يدوياً في الأداة دي. أوردرات Returned بتتعرض هي كمان (مش بس Delivered) عشان الموظف يشوف كل حركة اليوم ويقرر بنفسه — جدول الاستيراد بيمنع تحديد أي أوردر مش قابل للتحصيل فعلياً تلقائياً زي ما هو معمول بالفعل، وعمود "تاريخ الإنشاء" فضل زي ما هو من غير تغيير.</span></li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span>تاب "السجل" بالكامل: إعادة بناء ليطابق تصميم Order Status Updater — فلاتر اختيار متعدد (نوع العملية / المندوب / الموظف) + بحث برقم الأوردر + فترة تاريخ (سريعة + من/إلى)، جدول منظم بالأعمدة بدل الكروت العشوائية، تفاصيل كل جلسة قابلة للتوسيع (أوردر بأوردر، وSKUs جوه كل أوردر)، Pagination بصفحات (100 لكل صفحة)، وتصدير XLSX للكل أو للمحدد فقط.</span></li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span><span>الـ Worker: get_logs/get_logs_count/get_logs_export بقوا يدعموا فلاتر المندوب وفترة التاريخ فعلياً (زي order-status-updater) — الفلاتر شغالة بالكامل من السيرفر.</span></li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v2.0.0</span>
           <span class="cl-ver-date">15-08-2026</span>
         </div>
         <ul class="cl-items">
@@ -946,7 +1194,6 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
   </div>
 </div>
 
-<!-- About Modal -->
 <div class="eco-overlay" id="aboutOverlay" onclick="if(event.target===this)closeAbout()">
   <div class="eco-modal">
     <div class="eco-modal-hdr">
@@ -958,18 +1205,18 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
       <details class="about-sec" open>
         <summary>📋 وصف الأداة</summary>
         <div class="about-sec-body">
-          <p><strong>الهدف:</strong> تسجيل تحصيل مدفوعات الدفع عند الاستلام (COD) من مناديب Bosta والمناديب الداخليين على أوردرات شوبيفاي، وتنفيذ الاسترداد (Refund) للأوردرات المستحقة استرداد، مع دعم مصاريف الشحن الإضافية واستيراد أوردرات مندوب كامل دفعة واحدة.</p>
+          <p><strong>الهدف:</strong> تسجيل تحصيل مدفوعات الدفع عند الاستلام (COD) من مناديب Bosta والمناديب الداخليين على أوردرات شوبيفاي، وتنفيذ الاسترداد (Refund) للأوردرات المستحقة استرداد، مع دعم مصاريف الشحن الإضافية واستيراد أوردرات مندوب كامل دفعة واحدة (من شوبيفاي مباشرة أو من سجل Order Status Updater لليوم الحالي).</p>
           <p><strong>المستخدمون المستهدفون:</strong> أمين الخزينة / موظفو الاستلام في نقطة تسليم المناديب.</p>
 
           <h4>كيف تعمل — Workflow</h4>
           <ol>
             <li>تسجيل الدخول بالـ PIN (Universal D1 Auth).</li>
-            <li>إضافة الأوردرات عبر ماسح الباركود، الإدخال اليدوي، أو استيراد كل أوردرات مندوب دفعة واحدة.</li>
+            <li>إضافة الأوردرات عبر ماسح الباركود، الإدخال اليدوي، أو نافذة "🔍 البحث عن أوردرات المندوب" — واللي فيها مصدرين: "🛒 من شوبيفاي مباشرة" (بحث حي بحالة Delivered/Returned) أو "🚚 من تسليمات ومرتجعات المسجّلة اليوم" (بيجيب من Order Status Updater كل أوردر اتسجّل Delivered أو Returned النهارده لمندوب معيّن، بدل إعادة كتابته يدوياً).</li>
             <li>كل أوردر يُستعلَم عنه فوراً من شوبيفاي (<code>preview</code>) لمعرفة حالته: تحصيل عادي / استرجاع / استبدال / استرداد مستحق / ملغي.</li>
             <li>لو فيه أكتر من مندوب في نفس الدفعة، الأداة بتمنع الدفع لحد ما يبقى مندوب واحد فقط.</li>
             <li>إدخال طرق الدفع (نقدي / انستاباي / محفظة) لحد ما المجموع يطابق صافي التحصيل المطلوب.</li>
             <li>تأكيد العملية — الأداة بتنفّذ <code>pay</code> لكل أوردر تحصيل و<code>refund</code> لكل أوردر استرداد بالتتابع، وتسجّل الكل في D1 تحت نفس الـ <code>batchId</code>.</li>
-            <li>مراجعة العمليات السابقة من تاب "السجل" — كل الأوردرات في نفس جلسة الدفع بتتجمع في كارت واحد.</li>
+            <li>مراجعة العمليات السابقة من تاب "السجل" — فلاتر (نوع العملية/المندوب/الموظف/فترة تاريخ) + جدول جلسات قابل للتوسيع لكل أوردر، ولكل SKU جوه الأوردر.</li>
           </ol>
 
           <h4>الـ Endpoints الرئيسية</h4>
@@ -980,8 +1227,9 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <tr><td><code>pay</code></td><td>تسجيل الدفع على شوبيفاي (Mark as Paid)</td></tr>
             <tr><td><code>refund</code></td><td>تنفيذ استرداد على شوبيفاي</td></tr>
             <tr><td><code>getCourierValues</code></td><td>جلب قائمة المناديب من الـ metafield definition</td></tr>
-            <tr><td><code>getCourierOrders</code></td><td>جلب كل الأوردرات المؤهلة لمندوب معيّن</td></tr>
-            <tr><td><code>get_logs</code> / <code>get_logs_count</code> / <code>get_logs_export</code></td><td>سجل العمليات من D1 — صفحات / عدّاد / تصدير</td></tr>
+            <tr><td><code>getCourierOrders</code></td><td>جلب أوردرات مندوب مؤهلة للتحصيل من شوبيفاي مباشرة (بحث حي)</td></tr>
+            <tr><td><code>getCourierOrdersToday</code></td><td>جلب أوردرات مندوب اتسجّلت Delivered/Returned اليوم من سجل Order Status Updater (Worker-to-Worker)</td></tr>
+            <tr><td><code>get_logs</code> / <code>get_logs_count</code> / <code>get_logs_export</code></td><td>سجل العمليات من D1 — يدعم فلاتر نوع/مندوب/موظف/بحث/فترة تاريخ</td></tr>
             <tr><td><code>get_employees</code> / <code>check_employee</code> / <code>verify_employee</code> / <code>register_pin</code> / <code>log_logout</code></td><td>Universal D1 Auth — تسجيل الدخول والخروج</td></tr>
           </table>
         </div>
@@ -995,8 +1243,8 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li><code>§AUTH-JS</code> — Universal D1 Auth (خطوتين: اختيار الموظف ثم PIN)</li>
             <li><code>§SCAN</code> — ماسح الباركود الرئيسي + ماسح الشحن الإضافي (نفس نمط handleScan)</li>
             <li><code>§TOOL-JS</code> — إضافة/حذف الأوردرات، الحسابات (<code>calcCourierCollect</code>)، جدول العرض، طرق الدفع، التأكيد والتنفيذ الجماعي (pay/refund)</li>
-            <li><code>§TOOL-JS::import</code> — نافذة استيراد أوردرات مندوب كامل</li>
-            <li><code>§LOG-JS</code> — تجميع صفوف D1 في جلسات بالـ <code>batchId</code>، تحميل تدريجي (Load More)، تصدير XLSX عبر ExcelJS</li>
+            <li><code>§TOOL-JS::import</code> — نافذة استيراد أوردرات مندوب — مصدرين (<code>importSource</code>: 'shopify' | 'osu') بنفس جدول العرض والـ helpers (importRenderTable/importMakeRow/importCalcStatusError)</li>
+            <li><code>§LOG-JS</code> — فلاتر اختيار متعدد (نوع/مندوب/موظف) + بحث + فترة تاريخ، Pagination بصفحات عبر get_logs_count، جدول جلسات قابل للتوسيع (جلسة ← أوردر ← SKUs)، تصدير XLSX عبر ExcelJS</li>
           </ul>
 
           <h4>KEY VARIABLES</h4>
@@ -1006,6 +1254,9 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li><code>TOOL_NAME = 'cod_payment'</code> — قيمة <code>tool</code> في جدول logs بـ D1</li>
             <li><code>orders[]</code> — الأوردرات في الجدول الرئيسي (تحصيل/استرجاع/استبدال)</li>
             <li><code>extraEntries[]</code> — أوردرات الشحن الإضافي (منفصلة عن الجدول الرئيسي)</li>
+            <li><code>importSource</code> — 'shopify' (getCourierOrders) أو 'osu' (getCourierOrdersToday) — بيتصفّر لـ 'shopify' كل ما تتفتح نافذة الاستيراد</li>
+            <li><code>msState</code> — حالة فلاتر الاختيار المتعدد في تاب السجل (logType/logCourier/logEmp)</li>
+            <li><code>logCurrentPage</code> / <code>logTotalCount</code> — Pagination بتاع تاب السجل (100 صف/صفحة)</li>
           </ul>
 
           <h4>NOTES</h4>
@@ -1015,6 +1266,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li>الشحن الإضافي بيتقبل بس لو S1 ∈ {Returned, Ready, Cancelled} أو S2 ∈ {Returned, Ready}.</li>
             <li>الأوردر العادي (غير شحن إضافي) بيتقبل بس لو S1=Delivered و S2 فارغ أو Returned.</li>
             <li><code>batchId</code> بيتولّد بالـ Frontend (<code>crypto.randomUUID</code>) ويتبعت مع كل نداء <code>pay</code>/<code>refund</code> في نفس الجلسة، عشان تاب السجل يقدر يجمّعهم في كارت واحد.</li>
+            <li><code>getCourierOrdersToday</code> عن قصد من غير فلترة canMarkAsPaid — بترجّع كل أوردر اتسجّل Delivered/Returned اليوم حتى لو مش قابل للتحصيل فعلياً (مثلاً S1=Returned كامل)، عشان الموظف يشوف كل حركة اليوم ويقرر بنفسه؛ importCalcStatusError() في الفرونت إند بيمنع تحديده تلقائياً برضو.</li>
           </ul>
         </div>
       </details>
@@ -1023,7 +1275,6 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
   </div>
 </div>
 
-<!-- Confirm Modal (payment / refund confirmation) -->
 <div class="confirm-overlay" id="confirmOverlay">
   <div class="confirm-modal">
     <div class="confirm-modal-hdr">
@@ -1103,7 +1354,7 @@ function saveSettings() {
   closeSettings();
   showToast('تم حفظ الإعدادات ✓', 'success');
   loadEmployeesList();
-  logLoadedOnce = false; logOffset = 0; logGroups = [];
+  logLoaded = false; logCurrentPage = 1;
 }
 
 function updateSettingsBtn()    { $('settingsBtn').classList.toggle('settings-configured', isConfigured()); }
@@ -1129,8 +1380,19 @@ function showToast(msg, type = 'neutral', duration = 3000) {
   setTimeout(() => t.remove(), duration);
 }
 
-// ── Date/Time (Cairo UTC+3) ───────────────────────────────────
-function toCairo(iso) { return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000); }
+// ── Cairo time (UTC+3). Egypt DST ends 29-10-2026 → change to 2 ──
+const CAIRO_OFFSET_HOURS = 3;
+function toCairo(iso) { return new Date(new Date(iso).getTime() + CAIRO_OFFSET_HOURS * 60 * 60 * 1000); }
+function cairoNow() { return toCairo(new Date().toISOString()); }
+function cairoDateStr(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+}
+function addDays(dateStr, n) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return cairoDateStr(d);
+}
 function formatDateTime(iso) {
   const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
   let h = d.getUTCHours();
@@ -1142,11 +1404,21 @@ function formatDate(iso) {
   const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
   return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth()+1)}-${d.getUTCFullYear()}`;
 }
+function formatDateForExport(iso) {
+  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth()+1)}-${d.getUTCFullYear()}`;
+}
+function formatTimeForExport(iso) {
+  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  let h = d.getUTCHours();
+  const ampm = h >= 12 ? 'مساءً' : 'صباحاً';
+  h = h % 12 || 12;
+  return `${pad(h)}:${pad(d.getUTCMinutes())} ${ampm}`;
+}
 function fmt(n){ return Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function fmtSigned(n){ const v=Number(n); return (v<0?'−':'')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 
 // ── API Helpers ───────────────────────────────────────────────
-// Standard helper (?action=X in URL) — used for Universal D1 Auth + D1 log endpoints
 async function apiPost(action, body = {}) {
   if (!isConfigured()) { openSettings(); throw new Error('الإعدادات غير مكتملة'); }
   const { workerUrl, workerSecret } = getConfig();
@@ -1170,8 +1442,6 @@ async function apiGet(action, params = {}) {
   if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
   return data;
 }
-// Legacy helper — tool-specific actions expect {action, ...} in the POST body
-// (no ?action= query string) — matches the deployed cod-payment-center-worker contract.
 async function apiPostLegacy(action, body = {}) {
   if (!isConfigured()) { openSettings(); throw new Error('الإعدادات غير مكتملة'); }
   const { workerUrl, workerSecret } = getConfig();
@@ -1182,7 +1452,8 @@ async function apiPostLegacy(action, body = {}) {
   });
   return await resp.json();
 }
-
+</script>
+<script>
 // ══════════════════════════════════════════════════════════════
 // §AUTH-JS — Universal D1 Auth (two-step reveal)
 // ══════════════════════════════════════════════════════════════
@@ -1403,10 +1674,8 @@ async function finishLogin(username, displayName) {
   showToast(`أهلاً ${displayName} 👋`, 'success');
   playBeep('success');
 
-  // ── CUSTOMIZE: post-login actions ───────────────────────────
   $('activeUserBtn').textContent = `👤 ${displayName}`;
   setTimeout(() => scannerInput && scannerInput.focus(), 100);
-  // ─────────────────────────────────────────────────────────────
 }
 
 async function doLogout() {
@@ -1422,7 +1691,6 @@ async function doLogout() {
   $('pinSlots').classList.remove('shake');
   renderPinSlots(); renderLoginMode('employee'); clearLoginAlert();
 
-  // ── CUSTOMIZE: tool-specific reset ──────────────────────────
   orders = []; extraEntries = [];
   $('tableWrap').classList.remove('show');
   $('statsBar').classList.remove('show');
@@ -1431,7 +1699,7 @@ async function doLogout() {
   hideResult();
   $('activeUserBtn').textContent = '👤 —';
   switchMainTab('scan');
-  // ─────────────────────────────────────────────────────────────
+  logLoaded = false; logCurrentPage = 1;
 
   $('loginOverlay').classList.remove('hidden');
 }
@@ -1455,7 +1723,7 @@ function switchMainTab(tab) {
   $('panelScan').classList.toggle('active', tab === 'scan');
   $('panelLog').classList.toggle('active', tab === 'log');
   if (tab === 'scan') refocus();
-  if (tab === 'log' && !logLoadedOnce) refreshLog();
+  if (tab === 'log' && !logLoaded) fetchLog();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1463,7 +1731,6 @@ function switchMainTab(tab) {
 // ══════════════════════════════════════════════════════════════
 let orders = [], extraEntries = [], isProcessing = false;
 
-// ── active state للـ input methods بناءً على الـ focus ───────
 function setActiveMethod(methodId) {
   ['methodScanner','methodManual','methodImport'].forEach(id => {
     const el = $(id);
@@ -1499,7 +1766,7 @@ function refocus() {
   }
 }
 document.addEventListener('click', e => {
-  const skip = ['.settings-overlay','.eco-overlay','.confirm-overlay','.import-overlay','.log-toolbar','#logContainer','.pay-methods-card','.table-wrap','.result-box','.manual-row','#settingsBtn','#extraAddPanel'];
+  const skip = ['.settings-overlay','.eco-overlay','.confirm-overlay','.import-overlay','.log-tab-wrap','.pay-methods-card','.table-wrap','.result-box','.manual-row','#settingsBtn','#extraAddPanel'];
   if (skip.some(s => e.target.closest(s))) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
   setTimeout(refocus, 50);
@@ -1537,6 +1804,10 @@ async function handleManualAdd() {
   } catch (e) { showToast('خطأ في الاتصال', 'error'); }
   finally { manualBtn.disabled = false; manualBtn.textContent = 'إضافة'; input.disabled = false; input.value = ''; input.focus(); }
 }
+
+document.getElementById('manualInput').addEventListener('keypress', e => {
+  if (e.key === 'Enter') { e.preventDefault(); handleManualAdd(); }
+});
 
 async function addOrder(numericId) {
   const order = {
@@ -2207,34 +2478,8 @@ async function doBulkPayAndRefund() {
 
   isProcessing = false; updatePayBtn(); updatePayMethodsCard();
 
-  const paidOrders = readyOrders.filter(o => o.status === 'done');
-  const paidTotal = paidOrders.reduce((s,o) => s + o.amount, 0);
-  const refundedOrders = refundOrders.filter(o => o.status === 'refund-done');
-
   const allProcessed = [...readyOrders, ...refundOrders];
   const successfulOrders = allProcessed.filter(o => o.status === 'done' || o.status === 'refund-done');
-  if (successfulOrders.length) {
-    const displayGroup = {
-      date: new Date().toISOString(), batchId, courier: courierName,
-      employee: sessionMeta.employee, employeeDisplayName: sessionMeta.employeeDisplayName,
-      totalOrders: successfulOrders.length, success: successfulOrders.length, errors: failPay+failRefund,
-      totalAmount: paidTotal.toFixed(2),
-      paymentMethods: sessionMeta.paymentMethods,
-      extraShipping: sessionMeta.extraShipping, extraShippingTotal: sessionMeta.extraShippingTotal,
-      orders: successfulOrders.map(o => ({
-        order:o.id, orderName:o.orderName||'', courier:o.courier||'',
-        amount:o.amount!=null?o.amount.toFixed(2):'0.00',
-        lineItems:o.lineItems||[], returnedItems:o.returnedItems||[],
-        orderDiscount:o.orderDiscount??null, preRegistered:o.preRegistered||false,
-        hasReturn:o.hasReturn||false, returnShipping:o.returnShipping||'0.00',
-        isRefund:o.status==='refund-done',
-        refundAmount:o.refundAmount!=null?o.refundAmount.toFixed(2):null,
-        courierCollect:(calcCourierCollect(o)||0).toFixed(2),
-        status:'success', error:null,
-      })),
-    };
-    prependLogGroup(displayGroup);
-  }
 
   orders = orders.filter(o => o.status!=='done' && o.status!=='refund-done');
   extraEntries = [];
@@ -2257,6 +2502,11 @@ async function doBulkPayAndRefund() {
   }
 
   if (anySuccess && !anyFail) { $('pmCash').value=''; $('pmInstapay').value=''; $('pmWallet').value=''; updatePayValidation(); }
+
+  // السجل بيتقرأ من D1 مباشرة (get_logs) — مفيش تحديث محلي للـ cache هنا،
+  // logLoaded بيتصفّر عشان أول فتح لتاب السجل بعد كده يعمل fetchLog() تلقائي
+  if (successfulOrders.length) logLoaded = false;
+
   refocus();
 }
 
@@ -2269,12 +2519,29 @@ function hideResult() { $('resultBox').className = 'result-box'; }
 </script>
 <script>
 // ══════════════════════════════════════════════════════════════
-// §TOOL-JS::import — Courier Import Modal
+// §TOOL-JS::import — Courier Import Modal (v3.0.0 — مصدرين: شوبيفاي / OSU)
 // ══════════════════════════════════════════════════════════════
 let importOrders = [], importLoading = false;
+let importSource = 'shopify'; // 'shopify' (getCourierOrders) | 'osu' (getCourierOrdersToday)
+
+function setImportSource(src) {
+  importSource = src;
+  $('srcShopifyBtn').classList.toggle('active', src === 'shopify');
+  $('srcOsuBtn').classList.toggle('active', src === 'osu');
+  importOrders = [];
+  $('importTableSection').style.display = 'none';
+  $('importEmptyMsg').style.display = 'none';
+  const hasCourier = !!$('importCourierSelect').value;
+  $('importFetchBtn').disabled = !hasCourier;
+  if (!hasCourier) { $('importHint').textContent = 'اختر مندوباً للاستعلام عن أوردراته'; return; }
+  $('importHint').textContent = src === 'osu'
+    ? 'اضغط استعلام لجلب تسليمات/مرتجعات اليوم لهذا المندوب من Order Status Updater'
+    : 'اضغط استعلام لجلب أوردرات هذا المندوب من شوبيفاي مباشرة';
+}
 
 function importReset() {
-  importOrders = []; importLoading = false;
+  importOrders = []; importLoading = false; importSource = 'shopify';
+  $('srcShopifyBtn').classList.add('active'); $('srcOsuBtn').classList.remove('active');
   const sel = $('importCourierSelect');
   if (sel) sel.selectedIndex = 0;
   $('importFetchBtn').disabled = true;
@@ -2313,7 +2580,10 @@ async function importLoadCouriers() {
   } catch { sel.innerHTML = '<option value="">خطأ في التحميل</option>'; hint.textContent = 'خطأ في تحميل قائمة المناديب'; }
 }
 
-$('importCourierSelect').addEventListener('change', () => { $('importFetchBtn').disabled = !$('importCourierSelect').value || importLoading; });
+$('importCourierSelect').addEventListener('change', () => {
+  const hasCourier = !!$('importCourierSelect').value;
+  $('importFetchBtn').disabled = !hasCourier || importLoading;
+});
 
 async function importFetchOrders() {
   const courier = $('importCourierSelect').value;
@@ -2322,17 +2592,22 @@ async function importFetchOrders() {
   importLoading = true;
   const btn = $('importFetchBtn'), txt = $('importFetchBtnTxt');
   btn.disabled = true; txt.innerHTML = '<span class="spinner"></span> جاري...';
-  $('importHint').textContent = `جاري الاستعلام عن أوردرات ${courier}...`;
+  const isOsu = importSource === 'osu';
+  $('importHint').textContent = isOsu
+    ? `جاري جلب تسليمات/مرتجعات ${courier} المسجّلة اليوم...`
+    : `جاري الاستعلام عن أوردرات ${courier}...`;
   $('importTableSection').style.display = 'none'; $('importEmptyMsg').style.display = 'none';
   importOrders = [];
   try {
-    const data = await apiPostLegacy('getCourierOrders', { courier });
+    const action = isOsu ? 'getCourierOrdersToday' : 'getCourierOrders';
+    const data = await apiPostLegacy(action, { courier });
     if (!data.success) { $('importHint').textContent = data.error || 'خطأ في الاستعلام'; }
     else {
       importOrders = data.orders || [];
       if (!importOrders.length) {
-        $('importHint').textContent = `لا توجد أوردرات مؤهلة لـ ${courier}`;
-        $('importEmptyMsg').textContent = `لا توجد أوردرات مؤهلة لـ ${courier}`;
+        const emptyMsg = isOsu ? `لا توجد تسليمات أو مرتجعات مسجّلة اليوم لـ ${courier}` : `لا توجد أوردرات مؤهلة لـ ${courier}`;
+        $('importHint').textContent = emptyMsg;
+        $('importEmptyMsg').textContent = emptyMsg;
         $('importEmptyMsg').style.display = 'block';
       } else {
         const eligible = importOrders.filter(o => !importCalcStatusError(o) && !orders.some(ex => ex.id === o.id));
@@ -2432,370 +2707,528 @@ async function importAddSelected() {
 </script>
 <script>
 // ══════════════════════════════════════════════════════════════
-// §LOG-JS — D1-backed log (get_logs / get_logs_count / get_logs_export)
-// كل صف في D1 = أوردر واحد (payment/refund)، مجمّع هنا حسب extra.batchId
-// عشان يترجع لشكل "كارت الجلسة".
+// §LOG-JS — D1-backed log tab (v3.0.0 — يطابق تصميم order-status-updater)
+// فلاتر اختيار متعدد (نوع/مندوب/موظف) + بحث + فترة تاريخ، Pagination
+// بصفحات (100/صفحة عبر get_logs + get_logs_count)، جدول جلسات قابل للتوسيع
+// (جلسة ← أوردر ← SKUs)، تصدير XLSX للكل أو للمحدد.
 // ══════════════════════════════════════════════════════════════
-let logGroups = [], logOffset = 0, logHasMore = true, logLoadingMore = false, logLoadedOnce = false;
 const LOG_PAGE_SIZE = 100;
+let logCurrentPage = 1;
+let logTotalCount  = 0;
+let logLoaded      = false;
+let logFiltersOpen = true;
+let selectedLogBatches = new Set();
+let logRawEntries  = [];
+window.__logGroups = [];
 
-function groupRowsIntoSessions(rows, into) {
-  const groups = into || {};
-  for (const row of rows) {
-    let extra = {};
-    try { extra = row.extra ? JSON.parse(row.extra) : {}; } catch {}
-    if (row.type === 'extra_shipping') continue;
-    const batchId = extra.batchId || row.type+'-row-'+row.id;
-    if (!groups[batchId]) {
-      groups[batchId] = {
-        date: row.timestamp, batchId, courier: extra.courier || null,
-        employee: extra.employee || row.employee || null,
-        employeeDisplayName: extra.employeeDisplayName || null,
-        totalOrders: 0, success: 0, errors: 0, totalAmount: 0, totalRefund: 0,
-        extraShipping: extra.extraShipping || [], extraShippingTotal: extra.extraShippingTotal || '0.00',
-        paymentMethods: extra.paymentMethods || {}, isPreReg: row.type === 'preregister',
-        orders: [],
-      };
-    }
-    const g = groups[batchId];
-    g.totalOrders++; g.success++;
-    const amt = parseFloat(row.value_after) || 0;
-    if (row.type === 'refund') g.totalRefund += amt; else g.totalAmount += amt;
-    g.orders.push({
-      order: row.order_id, orderName: row.order_name, courier: extra.courier || g.courier,
-      amount: row.value_after, lineItems: extra.lineItems || [], returnedItems: extra.returnedItems || [],
-      orderDiscount: extra.orderDiscount ?? null, preRegistered: extra.preRegistered || false,
-      hasReturn: extra.hasReturn || false, returnShipping: extra.returnShipping || '0.00',
-      isRefund: row.type === 'refund', refundAmount: row.type === 'refund' ? row.value_after : null,
-      courierCollect: extra.courierCollect ?? null,
-      status: 'success', error: null,
-    });
-  }
-  return groups;
-}
-function sortedGroups(map) { return Object.values(map).sort((a,b) => new Date(b.date) - new Date(a.date)); }
-function prependLogGroup(g) { logGroups.unshift(g); renderLog(); }
-
-async function refreshLog() {
-  if (!isConfigured()) { showToast('الأداة غير مضبوطة', 'error'); openSettings(); return; }
-  logGroups = []; logOffset = 0; logHasMore = true; logLoadedOnce = true;
-  setSyncBadge('loading');
-  $('logContainer').innerHTML = '<div class="log-empty" style="display:flex;align-items:center;justify-content:center;gap:8px"><span class="spinner" style="width:14px;height:14px;border-width:2px"></span> جاري التحميل...</div>';
-  await loadMoreLog();
-  loadLogCount();
+function toggleLogFilters() {
+  logFiltersOpen = !logFiltersOpen;
+  $('logFiltersBody').classList.toggle('collapsed', !logFiltersOpen);
+  $('logFiltersToggleIcon').classList.toggle('open', logFiltersOpen);
 }
 
-async function loadMoreLog() {
-  if (logLoadingMore || !logHasMore) return;
-  logLoadingMore = true;
+$('logSearch').addEventListener('input', () => {
+  clearTimeout(window.__logSearchTimer);
+  window.__logSearchTimer = setTimeout(() => { logCurrentPage = 1; fetchLog(); }, 400);
+});
+function toggleSearchActiveState(el) { el.classList.toggle('has-value', el.value.trim().length > 0); }
+
+// ─── §LOG-JS::multi-select filters (نوع العملية / المندوب / الموظف) ───
+const msState = {
+  logType:    { items: [], selected: new Set(), search: '' },
+  logCourier: { items: [], selected: new Set(), search: '' },
+  logEmp:     { items: [], selected: new Set(), search: '' },
+};
+const MS_DEFAULT_LABEL = { logType: 'كل الأنواع', logCourier: 'كل المناديب', logEmp: 'كل الموظفين' };
+
+function msRenderList(key) {
+  const st = msState[key];
+  const listEl = $(`msList-${key}`);
+  const q = st.search.trim().toLowerCase();
+  const visible = q ? st.items.filter(it => it.label.toLowerCase().includes(q)) : st.items;
+
+  listEl.innerHTML = !visible.length
+    ? '<div class="ms-empty">لا توجد نتائج مطابقة للبحث</div>'
+    : visible.map(it => {
+        const checked = st.selected.has(it.value);
+        const labelCls = it.mono ? 'ms-item-label ms-item-mono' : 'ms-item-label';
+        return `<div class="ms-item ${checked ? 'checked' : ''}" onclick="msToggleItem('${key}','${it.value}')">
+          <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation(); msToggleItem('${key}','${it.value}')">
+          <span class="${labelCls}">${it.label}</span>
+        </div>`;
+      }).join('');
+
+  const allVisibleChecked = visible.length > 0 && visible.every(it => st.selected.has(it.value));
+  $(`msSelectAll-${key}`).checked = allVisibleChecked;
+  const selectAllLbl = $(`msSelectAllLabel-${key}`);
+  if (selectAllLbl) selectAllLbl.textContent = q ? `تحديد كل نتائج البحث (${visible.length})` : 'تحديد الكل';
+
+  msUpdateButtonLabel(key);
+  $(`msFtrCount-${key}`).textContent = `${st.selected.size} مختار`;
+}
+
+function msUpdateButtonLabel(key) {
+  const st = msState[key];
+  const btn = $(`msBtn-${key}`), lbl = $(`msBtnLabel-${key}`);
+  const n = st.selected.size;
+  btn.classList.toggle('has-selection', n > 0);
+  if (n === 0)      lbl.textContent = MS_DEFAULT_LABEL[key] || 'الكل';
+  else if (n === 1) lbl.textContent = [...st.selected].map(v => (st.items.find(it=>it.value===v)||{}).label || v)[0];
+  else              lbl.innerHTML   = `${n} محددين <span class="ms-count">${n}</span>`;
+}
+
+function msToggle(key) {
+  const menu = $(`msMenu-${key}`), btn = $(`msBtn-${key}`);
+  const willOpen = !menu.classList.contains('open');
+  Object.keys(msState).forEach(k => { $(`msMenu-${k}`).classList.remove('open'); $(`msBtn-${k}`).classList.remove('open'); });
+  if (willOpen) { menu.classList.add('open'); btn.classList.add('open'); }
+}
+function msToggleItem(key, value) {
+  const st = msState[key];
+  st.selected.has(value) ? st.selected.delete(value) : st.selected.add(value);
+  msRenderList(key); renderChips(); onMsFilterChanged();
+}
+function msToggleSelectAll(key, forceState) {
+  const st = msState[key];
+  const q = st.search.trim().toLowerCase();
+  const visible = q ? st.items.filter(it => it.label.toLowerCase().includes(q)) : st.items;
+  const allVisibleChecked = visible.length > 0 && visible.every(it => st.selected.has(it.value));
+  const shouldCheck = forceState !== undefined ? forceState : !allVisibleChecked;
+  visible.forEach(it => shouldCheck ? st.selected.add(it.value) : st.selected.delete(it.value));
+  msRenderList(key); renderChips(); onMsFilterChanged();
+}
+function msFilterList(key, value) { msState[key].search = value; msRenderList(key); }
+function msClear(key) { msState[key].selected.clear(); msRenderList(key); renderChips(); onMsFilterChanged(); }
+
+document.addEventListener('click', (e) => {
+  Object.keys(msState).forEach(k => {
+    const wrap = $(`msWrap-${k}`);
+    if (wrap && !wrap.contains(e.target)) { $(`msMenu-${k}`).classList.remove('open'); $(`msBtn-${k}`).classList.remove('open'); }
+  });
+});
+
+function renderChips() {
+  Object.keys(msState).forEach(key => {
+    const row = $(`chipsRow-${key}`);
+    if (!row) return;
+    row.innerHTML = [...msState[key].selected].map(val => {
+      const label = (msState[key].items.find(it => it.value === val) || {}).label || val;
+      return `<span class="ms-chip">${label}<button onclick="msToggleItem('${key}','${val.replace(/'/g, "\\'")}')">✕</button></span>`;
+    }).join('');
+  });
+}
+function onMsFilterChanged() { logCurrentPage = 1; fetchLog(); }
+
+function initLogTypeFilter() {
+  msState.logType.items = [
+    { value: 'payment', label: '💵 تحصيل' },
+    { value: 'refund',  label: '💸 استرداد' },
+  ];
+  msRenderList('logType');
+}
+async function loadLogCourierFilter() {
   try {
-    const d = await apiGet('get_logs', { tool: TOOL_NAME, limit: LOG_PAGE_SIZE, offset: logOffset });
-    if (!d.ok) throw new Error(d.error || 'فشل الجلب');
-    const rows = d.entries || [];
-    const map = groupRowsIntoSessions(rows, Object.fromEntries(logGroups.map(g => [g.batchId, g])));
-    logGroups = sortedGroups(map);
-    logOffset += rows.length;
-    logHasMore = rows.length === LOG_PAGE_SIZE;
-    setSyncBadge('synced');
-  } catch (err) { setSyncBadge('local'); showToast('فشل تحميل السجل: '+err.message, 'error'); }
-  logLoadingMore = false;
-  renderLog();
+    const data = await apiPostLegacy('getCourierValues', {});
+    const list = data.success ? (data.values || []) : [];
+    msState.logCourier.items = list.map(c => ({ value: c, label: c }));
+    msRenderList('logCourier');
+  } catch { /* يفضل فاضي لو فشل */ }
+}
+async function loadLogEmployeeFilter() {
+  try {
+    const data = await apiGet('get_employees');
+    msState.logEmp.items = (data.employees || []).map(e => ({ value: e.username, label: e.display_name }));
+    msRenderList('logEmp');
+  } catch { /* يفضل فاضي لو فشل */ }
+}
+
+// ─── §LOG-JS::date-range filter ───
+const RANGE_PRESET_LABELS = {
+  today:'اليوم', yesterday:'أمس', last3:'آخر 3 أيام',
+  last7:'آخر 7 أيام', last30:'آخر 30 يوم', last90:'آخر 90 يوم',
+  thisMonth:'الشهر الحالي', lastMonth:'الشهر السابق', thisQuarter:'الربع الحالي',
+  thisYear:'العام الحالي', lastYear:'العام السابق',
+};
+let activeRangePreset = '';
+let rangeDebounce = null;
+
+function toggleRangePresetMenu(e) {
+  e.stopPropagation();
+  const menu = $('rangePresetMenu'), btn = $('rangePresetBtn');
+  const isOpen = menu.classList.contains('open');
+  menu.classList.toggle('open', !isOpen); btn.classList.toggle('open', !isOpen);
+}
+document.addEventListener('click', () => {
+  $('rangePresetMenu')?.classList.remove('open');
+  $('rangePresetBtn')?.classList.remove('open');
+});
+
+function computePresetRange(preset) {
+  const now = cairoNow();
+  const today = cairoDateStr(now);
+  switch (preset) {
+    case 'today':      return { from: today, to: today };
+    case 'yesterday':  { const y = addDays(today, -1); return { from: y, to: y }; }
+    case 'last3':        return { from: addDays(today, -2),  to: today };
+    case 'last7':        return { from: addDays(today, -6),  to: today };
+    case 'last30':       return { from: addDays(today, -29), to: today };
+    case 'last90':       return { from: addDays(today, -89), to: today };
+    case 'thisMonth': {
+      const from = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}-01`;
+      return { from, to: today };
+    }
+    case 'lastMonth': {
+      const firstThis = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const lastPrev  = new Date(firstThis); lastPrev.setUTCDate(0);
+      const firstPrev = new Date(Date.UTC(lastPrev.getUTCFullYear(), lastPrev.getUTCMonth(), 1));
+      return { from: cairoDateStr(firstPrev), to: cairoDateStr(lastPrev) };
+    }
+    case 'thisQuarter': {
+      const q = Math.floor(now.getUTCMonth() / 3);
+      return { from: cairoDateStr(new Date(Date.UTC(now.getUTCFullYear(), q * 3, 1))), to: today };
+    }
+    case 'thisYear':    return { from: `${now.getUTCFullYear()}-01-01`, to: today };
+    case 'lastYear':  { const y = now.getUTCFullYear() - 1; return { from: `${y}-01-01`, to: `${y}-12-31` }; }
+    default: return null;
+  }
+}
+
+function applyRangePreset(preset) {
+  $('rangePresetMenu').classList.remove('open');
+  $('rangePresetBtn').classList.remove('open');
+  const range = computePresetRange(preset);
+  if (!range) return;
+  activeRangePreset = preset;
+  $('rangeDateFrom').value = range.from;
+  $('rangeDateTo').value   = range.to;
+  document.querySelectorAll('.range-preset-item').forEach(el => el.classList.toggle('active', el.dataset.preset === preset));
+  $('rangePresetLabel').textContent = `⚡ ${RANGE_PRESET_LABELS[preset]}`;
+  $('rangePresetBtn').classList.add('has-preset');
+  logCurrentPage = 1;
+  fetchLog();
+}
+
+function onRangeDateChange() {
+  activeRangePreset = '';
+  document.querySelectorAll('.range-preset-item').forEach(el => el.classList.remove('active'));
+  $('rangePresetLabel').textContent = '⚡ اختار فترة';
+  $('rangePresetBtn').classList.remove('has-preset');
+
+  const fromVal = $('rangeDateFrom').value, toVal = $('rangeDateTo').value;
+  if (!fromVal || !toVal || fromVal > toVal) return;
+
+  clearTimeout(rangeDebounce);
+  rangeDebounce = setTimeout(() => { logCurrentPage = 1; fetchLog(); }, 400);
+}
+
+function clearLogFilters() {
+  $('logSearch').value = '';
+  toggleSearchActiveState($('logSearch'));
+  msState.logType.selected.clear();
+  msState.logCourier.selected.clear();
+  msState.logEmp.selected.clear();
+  msRenderList('logType'); msRenderList('logCourier'); msRenderList('logEmp');
+  renderChips();
+  $('rangeDateFrom').value = '';
+  $('rangeDateTo').value   = '';
+  activeRangePreset = '';
+  document.querySelectorAll('.range-preset-item').forEach(el => el.classList.remove('active'));
+  $('rangePresetLabel').textContent = '⚡ اختار فترة';
+  $('rangePresetBtn').classList.remove('has-preset');
+  logCurrentPage = 1;
+  fetchLog();
+}
+
+// ─── §LOG-JS::buildLogParams — نفس مفاتيح buildLogFilterSQL في الـ Worker ───
+function buildLogParams() {
+  const params = {};
+  if (msState.logType.selected.size)    params.type     = [...msState.logType.selected].join(',');
+  if (msState.logCourier.selected.size) params.courier  = [...msState.logCourier.selected].join(',');
+  if (msState.logEmp.selected.size)     params.employee = [...msState.logEmp.selected].join(',');
+  const search = $('logSearch').value.trim();
+  if (search) params.search = search;
+  const from = $('rangeDateFrom').value, to = $('rangeDateTo').value;
+  if (from) params.dateFrom = from;
+  if (to)   params.dateTo   = to;
+  return params;
+}
+
+// ─── §LOG-JS::fetchLog — صفحة واحدة (100 صف) + العدد الكلي المطابق للفلاتر ───
+async function fetchLog() {
+  if (!isConfigured()) { $('logBody').innerHTML = '<div class="log-empty">الأداة غير مضبوطة</div>'; return; }
+  const body = $('logBody');
+  body.innerHTML = '<div class="log-empty"><div class="spinner" style="width:14px;height:14px;border-width:2px"></div><p style="margin-top:8px;font-size:12px">جاري التحميل...</p></div>';
+
+  const filterParams = buildLogParams();
+  const offset = (logCurrentPage - 1) * LOG_PAGE_SIZE;
+  const params = { limit: LOG_PAGE_SIZE, offset, ...filterParams };
+
+  try {
+    const [pageData, countData] = await Promise.all([
+      apiGet('get_logs',       params),
+      apiGet('get_logs_count', filterParams),
+    ]);
+    logTotalCount = countData.total || 0;
+    logLoaded     = true;
+    $('logFilteredCount').textContent = logTotalCount.toLocaleString('en-US');
+    logRawEntries = pageData.entries || [];
+    renderLog(logRawEntries);
+    renderPagination();
+    loadLogCount();
+  } catch (e) {
+    body.innerHTML = `<div class="log-empty">⚠️ ${e.message}</div>`;
+    $('logFilteredCount').textContent = '—';
+  }
 }
 
 async function loadLogCount() {
-  if (!isConfigured()) return;
   try {
-    const d = await apiGet('get_logs_count', { tool: TOOL_NAME });
+    const d = await apiGet('get_logs_count', {});
     const badge = $('tabBadgeLog');
     if (d.ok && d.total > 0) { badge.style.display = ''; badge.textContent = d.total; } else badge.style.display = 'none';
   } catch {}
 }
 
-function setSyncBadge(state) { const el = $('logSyncBadge'); el.className = `log-sync-badge ${state}`; el.textContent = state==='synced'?'☁ D1':state==='loading'?'⏳ جاري...':'⚠ محلي'; }
-
-function renderLog() {
-  const container = $('logContainer');
-  if (!logGroups.length) { container.innerHTML = logLoadedOnce ? '<div class="log-empty">لا توجد عمليات مسجلة</div>' : '<div class="log-empty">اضغط تحديث لعرض السجل</div>'; return; }
-
-  container.innerHTML = `<div class="log-list">${logGroups.map(entry => {
-    const pm = entry.paymentMethods || {};
-    const pmChips = [];
-    if (parseFloat(pm.cash)>0) pmChips.push(`<span class="log-pm-chip">💵 نقدي <span>${fmt(pm.cash)}</span></span>`);
-    if (parseFloat(pm.instapay)>0) pmChips.push(`<span class="log-pm-chip">📱 انستاباي <span>${fmt(pm.instapay)}</span></span>`);
-    if (parseFloat(pm.wallet)>0) pmChips.push(`<span class="log-pm-chip">👛 محفظة <span>${fmt(pm.wallet)}</span></span>`);
-    if (entry.totalRefund>0) pmChips.push(`<span class="log-pm-chip" style="background:#fff1f2;border-color:#fecdd3;color:var(--red)">💸 استرداد <span>${fmt(entry.totalRefund)}</span></span>`);
-    const extraArr = Array.isArray(entry.extraShipping) ? entry.extraShipping : [];
-    if (parseFloat(entry.extraShippingTotal||0)>0 || extraArr.length>0) {
-      const total = parseFloat(entry.extraShippingTotal) || extraArr.reduce((s,e) => s+(parseFloat(e.amount)||0), 0);
-      pmChips.push(`<span class="log-pm-chip" style="background:var(--orange-light);border-color:var(--orange-border);color:var(--orange)">🚚 شحن إضافي <span>${fmt(total)}</span></span>`);
-    }
-
-    const detailRows = (entry.orders||[]).map(o => {
-      const hasSkus = o.lineItems && o.lineItems.length>0;
-      const hasReturned = o.returnedItems && o.returnedItems.length>0;
-      const hasSub = hasSkus || hasReturned;
-      const skuRows = hasSkus ? o.lineItems.map(li => `<tr><td class="td-sku">${li.sku}</td><td class="td-qty">${li.quantity}</td><td class="td-price">${fmt(li.unitPrice)}</td><td class="td-total">${fmt(li.totalPrice)}</td></tr>`).join('') : '';
-      const retRows = hasReturned ? o.returnedItems.map(ri => `<tr style="background:#fff8f8"><td class="td-sku returned">↩ ${ri.sku}</td><td class="td-qty negative">−${ri.quantity}</td><td class="td-price negative">−${fmt(ri.discountedUnitPrice)}</td><td class="td-total negative">−${fmt(parseFloat(ri.discountedUnitPrice)*ri.quantity)}</td></tr>`).join('') : '';
-      const statusBadge = `<span class="log-detail-ok">✓ ناجح</span>`;
-      const orderLbl = orderLink(o.orderName || ('#'+o.order), o.order);
-      return `<div class="log-detail-item">
-        <div class="log-detail-main" onclick="${hasSub?'toggleLogItem(this)':''}">
-          <span class="log-detail-order">${o.isRefund?'<span style="font-size:10px;margin-left:4px">💸</span>':''}${o.preRegistered?'<span style="font-size:10px;color:var(--purple);margin-left:4px">📋</span>':''}${orderLbl}${o.courier?` <span style="color:var(--purple);font-size:11px">${o.courier}</span>`:''}</span>
-          <span class="log-detail-amount" style="${o.isRefund?'color:var(--red)':''};font-family:var(--font-mono);font-size:11px;color:var(--amber)">${o.isRefund?`−${o.refundAmount||''}`:(o.amount||'')}</span>
-          ${statusBadge}${hasSub?'<span style="color:var(--text-muted);font-size:9px">▶</span>':''}
-        </div>
-        ${hasSub?`<div class="log-detail-sub">
-          ${(hasSkus||hasReturned)?`<div class="log-sub-label">SKUs</div><table class="sku-table"><thead><tr><th>SKU</th><th class="th-center">Qty</th><th class="th-ltr">Unit Price</th><th class="th-ltr">Total</th></tr></thead><tbody>${skuRows}${retRows}</tbody></table>`:''}
-          ${parseFloat(o.returnShipping)>0?`<div class="log-sub-label" style="margin-top:8px">Return Shipping</div><span style="font-family:var(--font-mono);font-size:12px;color:var(--red)">−${fmt(parseFloat(o.returnShipping))} EGP</span>`:''}
-        </div>`:''}
-      </div>`;
-    }).join('');
-
-    const extraDetailRows = extraArr.map(e => `<div class="log-detail-item">
-      <div class="log-detail-main">
-        <span class="log-detail-order">🚚 <span style="color:var(--orange)">${orderLink(e.orderName||('#'+e.orderId), e.orderId)}</span> ${e.courier?`<span style="color:var(--purple);font-size:11px">${e.courier}</span>`:''}</span>
-        <span style="font-family:var(--font-mono);font-size:11px;color:var(--orange)">−${fmt(e.amount)}</span>
-        <span class="log-detail-extra">شحن إضافي</span>
-      </div>
-    </div>`).join('');
-
-    const empTag = entry.employeeDisplayName || entry.employee ? `<span class="log-tag emp">👤 ${entry.employeeDisplayName||entry.employee}</span>` : '';
-
-    return `<div class="log-entry">
-      <div class="log-entry-header" onclick="toggleLogEntry(this)">
-        <input type="checkbox" class="log-check" data-batch="${entry.batchId}" onclick="event.stopPropagation();onCheckChange()">
-        <div class="log-entry-info">
-          <div class="log-entry-date">${formatDateTime(entry.date)}</div>
-          <div class="log-entry-tags">
-            <span class="log-tag courier">🚚 ${entry.courier||'COD'}</span>
-            ${empTag}
-            <span class="log-tag count">${entry.totalOrders} أوردر</span>
-            ${entry.totalAmount?`<span class="log-tag amount">${entry.totalAmount.toLocaleString('en-US',{minimumFractionDigits:2})}</span>`:''}
-          </div>
-          ${pmChips.length?`<div class="log-pay-methods">${pmChips.join('')}</div>`:''}
-        </div>
-        <div class="log-entry-stats"><span class="log-stat-ok">✓${entry.success}</span></div>
-        <span class="log-toggle">▶</span>
-      </div>
-      <div class="log-entry-details">${detailRows}${extraDetailRows}</div>
-    </div>`;
-  }).join('')}</div>
-  ${logHasMore?`<button class="btn-log-more" id="logMoreBtn" onclick="loadMoreLog()" ${logLoadingMore?'disabled':''}>${logLoadingMore?'جاري التحميل...':'⬇ تحميل المزيد'}</button>`:''}`;
+function goPage(dir) {
+  const totalPages = Math.max(1, Math.ceil(logTotalCount / LOG_PAGE_SIZE));
+  const next = logCurrentPage + dir;
+  if (next < 1 || next > totalPages) return;
+  logCurrentPage = next;
+  fetchLog();
+}
+function renderPagination() {
+  const row = $('paginationRow');
+  const totalPages = Math.max(1, Math.ceil(logTotalCount / LOG_PAGE_SIZE));
+  row.style.display = logTotalCount > LOG_PAGE_SIZE ? 'flex' : 'none';
+  $('pageInfo').textContent = `${logCurrentPage} / ${totalPages}`;
+  $('btnPrevPage').disabled = logCurrentPage <= 1;
+  $('btnNextPage').disabled = logCurrentPage >= totalPages;
 }
 
-function toggleLogEntry(el) { el.closest('.log-entry').classList.toggle('open'); }
-function toggleLogItem(el) { el.closest('.log-detail-item').classList.toggle('open'); }
-function onCheckChange() { $('exportSelBtn').classList.toggle('show', document.querySelectorAll('.log-check:checked').length>0); }
+// ─── §LOG-JS::parseExtra + grouping (batchId → جلسة واحدة، أوردر بأوردر) ───
+function parseExtra(raw) {
+  if (!raw) return {};
+  try { return typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return {}; }
+}
 
-// ══════════════════════════════════════════════════════════════
-// §LOG-JS::export — XLSX (ExcelJS 4.3.0)
-// ══════════════════════════════════════════════════════════════
+function groupRowsIntoSessions(rows) {
+  const groups = {};
+  for (const row of rows) {
+    const extra = parseExtra(row.extra);
+    if (row.type === 'extra_shipping') continue; // legacy-only rows (migration)، مش عندها batch مستقل
+    const batchId = extra.batchId || `${row.type}-row-${row.id}`;
+    if (!groups[batchId]) {
+      groups[batchId] = {
+        key: batchId,
+        timestamp: row.timestamp,
+        courier: extra.courier || null,
+        employee: row.employee || null,
+        employeeDisplayName: extra.employeeDisplayName || null,
+        hasPayment: false, hasRefund: false,
+        totalAmount: 0, totalRefund: 0,
+        paymentMethods: extra.paymentMethods || {},
+        extraShipping: Array.isArray(extra.extraShipping) ? extra.extraShipping : [],
+        extraShippingTotal: extra.extraShippingTotal || '0.00',
+        rows: [],
+      };
+    }
+    const g = groups[batchId];
+    if (row.type === 'refund') { g.hasRefund = true; g.totalRefund += parseFloat(row.value_after) || 0; }
+    else                       { g.hasPayment = true; g.totalAmount += parseFloat(row.value_after) || 0; }
+    g.rows.push({ entry: row, extra });
+  }
+  return Object.values(groups).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function renderLog(entries) {
+  const body = $('logBody');
+  if (!entries.length) { body.innerHTML = '<div class="log-empty">لا توجد عمليات مطابقة</div>'; return; }
+
+  const groups = groupRowsIntoSessions(entries);
+  window.__logGroups = groups;
+
+  const knownKeys = new Set(groups.map(g => g.key));
+  [...selectedLogBatches].forEach(k => { if (!knownKeys.has(k)) selectedLogBatches.delete(k); });
+
+  const rowsHtml = groups.map((g, gi) => {
+    const extraArr = g.extraShipping || [];
+    const typeTag = g.hasPayment && g.hasRefund
+      ? `<span class="log-tag type-payment">تحصيل</span> <span class="log-tag type-refund">استرداد</span>`
+      : g.hasRefund ? `<span class="log-tag type-refund">استرداد</span>` : `<span class="log-tag type-payment">تحصيل</span>`;
+    const checked = selectedLogBatches.has(g.key);
+
+    const detailRows = g.rows.map((r, ri) => {
+      const e = r.entry, x = r.extra;
+      const isRefund = e.type === 'refund';
+      const amt = parseFloat(e.value_after) || 0;
+      const hasSub = (x.lineItems && x.lineItems.length) || (x.returnedItems && x.returnedItems.length);
+      const orderTypeLbl = x.hasReturn
+        ? ((x.lineItems && x.lineItems.length) ? 'استبدال' : 'استرجاع')
+        : 'عادي';
+      const subId = `logsub-${gi}-${ri}`;
+      return `<tr class="log-order-row ${hasSub ? 'has-sub' : ''}" ${hasSub ? `onclick="toggleLogSub('${subId}', this)"` : ''}>
+          <td>${orderLink(e.order_name || e.order_id, e.order_id)}${hasSub ? '<span class="lo-arrow">▶</span>' : ''}</td>
+          <td>${orderTypeLbl}${x.preRegistered ? ' <span style="color:var(--purple);font-size:10px">📋</span>' : ''}</td>
+          <td style="color:${isRefund?'var(--red)':'var(--green)'};font-family:var(--font-mono);font-weight:700">${isRefund?'−':''}${fmt(amt)}</td>
+          <td>${e.notes || '—'}</td>
+        </tr>
+        ${hasSub ? `<tr class="log-sub-row hidden" id="${subId}"><td colspan="4"><div class="log-sub-inner"><table class="log-detail-tbl">
+            <thead><tr><th>SKU</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
+            <tbody>
+              ${(x.lineItems||[]).map(li => `<tr><td>${li.sku}</td><td>${li.quantity}</td><td>${fmt(li.unitPrice)}</td><td>${fmt(li.totalPrice)}</td></tr>`).join('')}
+              ${(x.returnedItems||[]).map(ri2 => `<tr style="color:var(--red)"><td>↩ ${ri2.sku}</td><td>−${ri2.quantity}</td><td>−${fmt(ri2.discountedUnitPrice)}</td><td>−${fmt(parseFloat(ri2.discountedUnitPrice)*ri2.quantity)}</td></tr>`).join('')}
+            </tbody>
+          </table></div></td></tr>` : ''}`;
+    }).join('');
+
+    const extraRows = extraArr.filter(e => parseFloat(e.amount) > 0).map(e => `
+      <tr class="log-order-row">
+        <td>${orderLink(e.orderName || ('#'+e.orderId), e.orderId)}</td>
+        <td>شحن إضافي</td>
+        <td style="color:var(--orange);font-family:var(--font-mono);font-weight:700">−${fmt(e.amount)}</td>
+        <td>—</td>
+      </tr>`).join('');
+
+    const pmChips = [];
+    const pm = g.paymentMethods || {};
+    if (parseFloat(pm.cash)>0)     pmChips.push(`💵 ${fmt(pm.cash)}`);
+    if (parseFloat(pm.instapay)>0) pmChips.push(`📱 ${fmt(pm.instapay)}`);
+    if (parseFloat(pm.wallet)>0)   pmChips.push(`👛 ${fmt(pm.wallet)}`);
+
+    return `<tr class="log-batch-row" id="lbr-${gi}" onclick="toggleBatch(${gi})">
+      <td onclick="event.stopPropagation()">
+        <input type="checkbox" class="log-cb" ${checked ? 'checked' : ''}
+          onchange="toggleLogBatchSelect('${g.key}', this.checked)" title="تحديد للتصدير">
+      </td>
+      <td>${formatDateTime(g.timestamp)}</td>
+      <td>${typeTag}</td>
+      <td>${g.courier ? `<span class="log-tag cr">🛵 ${g.courier}</span>` : '—'}</td>
+      <td>${(g.employeeDisplayName || g.employee) ? `<span class="log-tag emp">👤 ${(g.employeeDisplayName || g.employee).replace(/_/g,' ')}</span>` : '—'}</td>
+      <td>${g.rows.length.toLocaleString('en-US')}</td>
+      <td style="color:var(--green);font-family:var(--font-mono);font-weight:700">${g.totalAmount ? fmt(g.totalAmount) : '—'}</td>
+      <td style="color:var(--red);font-family:var(--font-mono);font-weight:700">${g.totalRefund ? '−'+fmt(g.totalRefund) : '—'}</td>
+      <td style="font-size:10.5px">${pmChips.join(' ') || '—'}</td>
+      <td><span class="lb-arrow" id="lba-${gi}">▶</span></td>
+    </tr>
+    <tr class="log-detail-row" id="lbd-${gi}" style="display:none">
+      <td colspan="10">
+        <div class="log-detail-inner">
+          <table class="log-detail-tbl">
+            <thead><tr><th>رقم الأوردر</th><th>النوع</th><th>المبلغ</th><th>ملحوظات</th></tr></thead>
+            <tbody>${detailRows}${extraRows}</tbody>
+          </table>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  body.innerHTML = `<table class="log-otbl">
+    <thead><tr>
+      <th style="width:32px"></th>
+      <th>التاريخ</th><th>النوع</th><th>المندوب</th><th>الموظف</th>
+      <th>عدد</th><th>تحصيل</th><th>استرداد</th><th>طرق الدفع</th><th></th>
+    </tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>`;
+
+  updateExportSelectedUI();
+}
+
+function toggleBatch(i) {
+  const row = $(`lbr-${i}`), detail = $(`lbd-${i}`);
+  const open = detail.style.display !== 'none';
+  detail.style.display = open ? 'none' : 'table-row';
+  row.classList.toggle('open', !open);
+}
+function toggleLogSub(id, rowEl) {
+  const sub = $(id);
+  if (!sub) return;
+  const hidden = sub.classList.contains('hidden');
+  sub.classList.toggle('hidden', !hidden);
+  rowEl.classList.toggle('open', hidden);
+}
+function toggleLogBatchSelect(key, checked) {
+  checked ? selectedLogBatches.add(key) : selectedLogBatches.delete(key);
+  updateExportSelectedUI();
+}
+function updateExportSelectedUI() {
+  const n = selectedLogBatches.size;
+  $('logExportSelCount').textContent = n.toLocaleString('en-US');
+  $('logExportSelectedBtn').style.display = n > 0 ? 'flex' : 'none';
+}
+
+// ─── §LOG-JS::export (XLSX عبر ExcelJS — كل أو المحدد) ───
 async function exportXLSX(selectedOnly) {
   if (!isConfigured()) { showToast('الأداة غير مضبوطة', 'error'); return; }
-  let log;
+  let entries;
   if (selectedOnly) {
-    const batchIds = [...document.querySelectorAll('.log-check:checked')].map(cb => cb.dataset.batch);
-    if (!batchIds.length) { showToast('اختر عمليات أولاً', 'error'); return; }
-    log = logGroups.filter(g => batchIds.includes(g.batchId));
+    const groups = (window.__logGroups || []).filter(g => selectedLogBatches.has(g.key));
+    if (!groups.length) { showToast('اختر عمليات أولاً', 'error'); return; }
+    entries = groups.flatMap(g => g.rows.map(r => r.entry));
   } else {
     showToast('⏳ جاري تجهيز التصدير...');
     try {
-      const d = await apiGet('get_logs_export', { tool: TOOL_NAME });
+      const d = await apiGet('get_logs_export', buildLogParams());
       if (!d.ok) throw new Error(d.error || 'فشل الجلب');
-      log = sortedGroups(groupRowsIntoSessions(d.entries || [], {}));
+      entries = d.entries || [];
     } catch (err) { showToast('فشل التصدير: '+err.message, 'error'); return; }
   }
-  if (!log.length) { showToast('لا توجد عمليات للتصدير', 'error'); return; }
+  if (!entries.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
 
   const wb = new ExcelJS.Workbook();
   wb.views = [{ rightToLeft: true }];
   const ws = wb.addWorksheet('سجل التحصيل', { views: [{ rightToLeft: true }] });
 
   ws.columns = [
-    { header:'التاريخ', key:'date', width:14 },
-    { header:'الموظف', key:'employee', width:16 },
-    { header:'المندوب', key:'courier', width:14 },
-    { header:'رقم الأوردر', key:'order', width:16 },
-    { header:'نوع الأوردر', key:'orderType', width:14 },
-    { header:'SKU', key:'sku', width:26 },
-    { header:'الكمية', key:'qty', width:8 },
-    { header:'سعر الوحدة', key:'unit', width:13 },
-    { header:'خصم الوحدة', key:'unitDiscount', width:13 },
-    { header:'سعر بعد الخصم', key:'collect', width:18 },
-    { header:'خصم إضافي الأوردر', key:'orderDiscount', width:18 },
-    { header:'تحصيل الأوردر كامل (بدون الشحن)', key:'courierCollect', width:24 },
-    { header:'شحن', key:'ship', width:12 },
-    { header:'النتيجة', key:'result', width:9 },
-    { header:'الخطأ', key:'error', width:18 },
-    { header:'مسجل مسبقاً', key:'prereg', width:13 },
+    { header: 'التاريخ', key: 'ts',      width: 14 },
+    { header: 'الوقت',   key: 'tm',      width: 14 },
+    { header: 'الموظف',         key: 'emp',     width: 18 },
+    { header: 'رقم الأوردر',    key: 'name',    width: 14 },
+    { header: 'Order ID',       key: 'id',      width: 18 },
+    { header: 'النوع',          key: 'type',    width: 12 },
+    { header: 'المندوب',        key: 'courier', width: 16 },
+    { header: 'قبل',            key: 'before',  width: 20 },
+    { header: 'المبلغ',         key: 'after',   width: 14 },
+    { header: 'ملحوظات',        key: 'notes',   width: 40 },
   ];
 
-  const HEADER_BG='FFD700', GRAND_BG='1F4E79', NUM_FMT='#,##0';
-  const NUM_COLS=[7,8,9,10,11,12,13];
-  const MED_BORDER={style:'medium',color:{argb:'FF888888'}};
+  ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+  ws.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 22;
 
-  function applyHeader(row) {
-    row.eachCell(cell => {
-      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+HEADER_BG}};
-      cell.font={bold:true,size:11,name:'Arial'};
-      cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'};
-      cell.border={bottom:{style:'medium',color:{argb:'FF000000'}}};
+  entries.forEach(e => {
+    const x = parseExtra(e.extra);
+    ws.addRow({
+      ts:      e.timestamp ? formatDateForExport(e.timestamp) : '',
+      tm:      e.timestamp ? formatTimeForExport(e.timestamp) : '',
+      emp:     (e.employee || '').replace(/_/g, ' '),
+      name:    e.order_name || '',
+      id:      e.order_id   || '',
+      type:    e.type === 'refund' ? 'استرداد' : 'تحصيل',
+      courier: x.courier || '',
+      before:  e.value_before || '',
+      after:   e.value_after  || '',
+      notes:   e.notes || '',
     });
-    const c12 = row.getCell(12);
-    c12.border={bottom:{style:'medium',color:{argb:'FF000000'}},left:MED_BORDER,right:MED_BORDER};
-    row.height=20;
-  }
-  function orderTypeColor(t) {
-    if (t==='استرجاع') return {argb:'FFCC0000'};
-    if (t==='استبدال') return {argb:'FF7030A0'};
-    if (t==='شحن إضافي') return {argb:'FFEA580C'};
-    return {argb:'FF000000'};
-  }
-  function applyData(row, isFailed, qty, isReturnLine, orderType, isExtraShipping) {
-    row.eachCell({includeEmpty:false}, (cell,col) => {
-      cell.font={size:10,name:'Arial',color:{argb:'FF000000'}};
-      cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'};
-      if (NUM_COLS.includes(col) && cell.value!==null && cell.value!=='') { cell.numFmt=NUM_FMT; cell.alignment={horizontal:'center',vertical:'middle'}; }
-      if (col<=4) { cell.fill={type:'pattern',pattern:'none'}; return; }
-      if (col===5) {
-        cell.fill={type:'pattern',pattern:'none'};
-        if (cell.value) { const bold=(cell.value==='استرجاع'||cell.value==='استبدال'||cell.value==='شحن إضافي'); cell.font={size:10,name:'Arial',bold,color:orderTypeColor(cell.value)}; }
-        return;
-      }
-      if (isExtraShipping) { cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF7ED'}}; if (col===13) cell.font={size:10,name:'Arial',bold:true,color:{argb:'FFEA580C'}}; return; }
-      if (isReturnLine) { cell.font={size:10,name:'Arial',color:{argb:'FFCC0000'},italic:true}; cell.fill={type:'pattern',pattern:'none'}; return; }
-      if (isFailed) { cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFCCCC'}}; return; }
-      if (col===9 && cell.value!==null && cell.value!=='') { cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF2CC'}}; cell.font={size:10,name:'Arial',bold:true,color:{argb:'FFC00000'}}; }
-      if (col===11 && cell.value!==null && cell.value!=='') { cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF2CC'}}; cell.font={size:10,name:'Arial',bold:true,color:{argb:'FFC00000'}}; }
-    });
-    const c12 = row.getCell(12);
-    c12.border={top:{style:'thin',color:{argb:'FFD0D0D0'}},bottom:{style:'thin',color:{argb:'FFD0D0D0'}},left:MED_BORDER,right:MED_BORDER};
-    if (isFailed && !isReturnLine) { const rc=row.getCell(14); rc.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFCC0000'}}; rc.font={bold:true,color:{argb:'FFFFFFFF'},size:10,name:'Arial'}; }
-  }
-  function getOrderType(o) {
-    if (o.isExtraShipping) return 'شحن إضافي';
-    if (o.isRefund) return (o.returnedItems&&o.returnedItems.length>0&&o.lineItems&&o.lineItems.length>0) ? 'استبدال' : 'استرجاع';
-    if (o.hasReturn) return (o.lineItems&&o.lineItems.length>0) ? 'استبدال' : 'استرجاع';
-    return 'عادي';
-  }
-
-  applyHeader(ws.getRow(1));
-  let grandCourierNet = 0;
-
-  for (const entry of log) {
-    const date = new Date(entry.date).toLocaleDateString('en-GB');
-    const courier = entry.courier || '';
-    const employee = entry.employeeDisplayName || entry.employee || '';
-    const extraArr = Array.isArray(entry.extraShipping) ? entry.extraShipping : [];
-
-    for (const o of (entry.orders||[])) {
-      const isFailed = o.status!=='success';
-      const isRefundRow = o.isRefund===true;
-      const cc = parseFloat(o.courierCollect)||0;
-      const otype = getOrderType(o);
-      const odv = o.orderDiscount ? parseFloat(o.orderDiscount) : null;
-      grandCourierNet += cc;
-      const shipVal = (o.hasReturn||isRefundRow) ? (parseFloat(o.returnShipping)||0) : 0;
-
-      const writeRow = (item, isFirst, isReturn) => {
-        const qty = isReturn ? -(item.quantity||1) : (parseFloat(item.quantity)||0);
-        const unitP = isReturn ? -(parseFloat(item.discountedUnitPrice)||0) : (parseFloat(item.unitPrice)||0);
-        const unitD = isReturn ? null : ((item.unitDiscount!=null)?parseFloat(item.unitDiscount):null);
-        const total = isReturn ? unitP*(item.quantity||1) : (parseFloat(item.totalPrice)||0);
-        const skuLabel = isReturn ? ('\u21A9 '+(item.sku||'')) : (item.sku||'');
-        const r = ws.addRow({
-          date: isFirst?date:null, employee: isFirst?employee:null, courier,
-          order: isFirst?(o.orderName||''):null, orderType: isFirst?otype:null,
-          sku: skuLabel, qty: qty||null, unit: unitP||null, unitDiscount: unitD||null,
-          collect: total||null, orderDiscount: isFirst?odv:null, courierCollect: isFirst?cc:null,
-          ship: isFirst?shipVal:null, result: isFirst?(isFailed?'فشل':'ناجح'):null,
-          error: isFirst?(o.error||null):null, prereg: isFirst?(o.preRegistered?'نعم':'لا'):null,
-        });
-        applyData(r,isFailed,qty,isReturn,otype,false);
-      };
-
-      if (isFailed) {
-        const r = ws.addRow({date,employee,courier,order:o.orderName||'',orderType:otype,sku:null,qty:null,unit:null,unitDiscount:null,collect:null,orderDiscount:odv,courierCollect:null,ship:shipVal,result:'فشل',error:o.error||null,prereg:o.preRegistered?'نعم':'لا'});
-        applyData(r,true,0,false,otype,false);
-      } else {
-        const allItems = [...(o.lineItems||[]).map(li=>({item:li,isReturn:false})), ...(o.returnedItems||[]).map(ri=>({item:ri,isReturn:true}))];
-        if (!allItems.length) {
-          const r = ws.addRow({date,employee,courier,order:o.orderName||'',orderType:otype,sku:null,qty:null,unit:null,unitDiscount:null,collect:cc||null,orderDiscount:odv,courierCollect:cc,ship:shipVal,result:'ناجح',error:null,prereg:o.preRegistered?'نعم':'لا'});
-          applyData(r,false,0,false,otype,false);
-        } else { allItems.forEach(({item,isReturn},idx) => writeRow(item,idx===0,isReturn)); }
-      }
-    }
-
-    for (const e of extraArr) {
-      const amount = parseFloat(e.amount)||0;
-      if (!amount) continue;
-      grandCourierNet -= amount;
-      const r = ws.addRow({ date, employee, courier: e.courier||courier, order: e.orderName||(e.orderId?('#'+e.orderId):''), orderType:'شحن إضافي', sku:null,qty:null,unit:null,unitDiscount:null,collect:null,orderDiscount:null, courierCollect:-amount, ship:amount, result:'ناجح', error:null, prereg:'لا' });
-      applyData(r,false,0,false,'شحن إضافي',true);
-    }
-  }
-
-  ws.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
-  ws.eachRow((row,rowNum) => {
-    if (rowNum===1) return;
-    const c = row.getCell(12);
-    if (!c.border||!c.border.left) c.border={top:{style:'thin',color:{argb:'FFD0D0D0'}},bottom:{style:'thin',color:{argb:'FFD0D0D0'}},left:{style:'medium',color:{argb:'FF888888'}},right:{style:'medium',color:{argb:'FF888888'}}};
   });
 
-  // ── Sheet 2 — الإجمالي ────────────────────────────────────────
-  const ws2 = wb.addWorksheet('الإجمالي', { views:[{rightToLeft:true}] });
-  ws2.columns = [
-    { header:'المندوب', key:'courier', width:16 },
-    { header:'تحصيل المندوب الصافي بدون شحن', key:'courierNet', width:26 },
-    { header:'نقدي', key:'cash', width:14 },
-    { header:'انستاباي', key:'instapay', width:14 },
-    { header:'محفظة', key:'wallet', width:14 },
-    { header:'شحن إضافي', key:'extra', width:14 },
-    { header:'عدد الأوردرات', key:'orders', width:14 },
-  ];
-  ws2.getRow(1).eachCell(cell => {
-    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+HEADER_BG}};
-    cell.font={bold:true,size:11,name:'Arial'};
-    cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'};
-    cell.border={bottom:{style:'medium',color:{argb:'FF000000'}}};
+  ws.eachRow((row, i) => {
+    if (i === 1) return;
+    row.alignment = { horizontal: 'right', vertical: 'middle' };
+    const t = row.getCell('type');
+    t.font = { bold: true, color: { argb: t.value === 'استرداد' ? 'FFDC2626' : 'FF16A34A' } };
   });
-  ws2.getRow(1).height=20;
 
-  const courierTotals = {};
-  let grandNet2 = 0;
-  for (const entry of log) {
-    const cr = entry.courier || '—';
-    const pm = entry.paymentMethods || {};
-    if (!courierTotals[cr]) courierTotals[cr] = { courierNet:0, cash:0, instapay:0, wallet:0, extra:0, orders:0 };
-    for (const o of (entry.orders||[])) { courierTotals[cr].courierNet += parseFloat(o.courierCollect)||0; grandNet2 += parseFloat(o.courierCollect)||0; }
-    const extraArr = Array.isArray(entry.extraShipping) ? entry.extraShipping : [];
-    for (const e of extraArr) { const amt=parseFloat(e.amount)||0; courierTotals[cr].extra+=amt; courierTotals[cr].courierNet-=amt; grandNet2-=amt; }
-    courierTotals[cr].cash     += parseFloat(pm.cash)||0;
-    courierTotals[cr].instapay += parseFloat(pm.instapay)||0;
-    courierTotals[cr].wallet   += parseFloat(pm.wallet)||0;
-    courierTotals[cr].orders   += entry.totalOrders||0;
-  }
-  const dataStyle = (cell,col) => { cell.font={size:10,name:'Arial'}; cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'}; if (col>=2&&col<=6) cell.numFmt=NUM_FMT; };
-  Object.entries(courierTotals).forEach(([cr,t]) => {
-    const r = ws2.addRow({ courier:cr, courierNet:t.courierNet, cash:t.cash, instapay:t.instapay, wallet:t.wallet, extra:t.extra>0?t.extra:null, orders:t.orders });
-    r.eachCell({includeEmpty:false}, (cell,col) => dataStyle(cell,col));
-  });
-  const grandCash2 = log.reduce((s,e) => s+(parseFloat((e.paymentMethods||{}).cash)||0), 0);
-  const grandInstapay2 = log.reduce((s,e) => s+(parseFloat((e.paymentMethods||{}).instapay)||0), 0);
-  const grandWallet2 = log.reduce((s,e) => s+(parseFloat((e.paymentMethods||{}).wallet)||0), 0);
-  const grandExtra2 = log.reduce((s,e) => s+(parseFloat(e.extraShippingTotal)||0), 0);
-  const grandOrders2 = log.reduce((s,e) => s+(e.totalOrders||0), 0);
-  const gt = ws2.addRow({ courier:'جميع المناديب', courierNet:grandNet2, cash:grandCash2, instapay:grandInstapay2, wallet:grandWallet2, extra:grandExtra2>0?grandExtra2:null, orders:grandOrders2 });
-  gt.eachCell({includeEmpty:true}, cell => { cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+GRAND_BG}}; cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11,name:'Arial'}; cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'}; });
-  [2,3,4,5,6].forEach(c => { gt.getCell(c).numFmt=NUM_FMT; });
-  gt.height=20;
-  ws2.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
-
-  const buffer = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const url = URL.createObjectURL(blob), a = document.createElement('a');
-  a.href = url; a.download = `cod-payment-center-${new Date().toISOString().slice(0,10)}.xlsx`;
-  a.click(); URL.revokeObjectURL(url);
+  const buf  = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `cod-payment-center-${selectedOnly ? 'selected' : 'all'}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✅ تم تصدير ${entries.length} صف`, 'success');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2803,4 +3236,7 @@ async function exportXLSX(selectedOnly) {
 // ══════════════════════════════════════════════════════════════
 updateSettingsButtonsState();
 loadEmployeesList();
+initLogTypeFilter();
+loadLogCourierFilter();
+loadLogEmployeeFilter();
 </script>
