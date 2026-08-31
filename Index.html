@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<!-- skills: html-builder v1.0.0 · worker-builder v1.1.0 · constants v1.2.0 — 31-08-2026 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>COD Payment Center</title>
@@ -704,7 +705,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
     <div class="app-header-btns">
       <button class="hbtn active-user" id="activeUserBtn" onclick="doLogout()">👤 —</button>
       <button class="hbtn" id="aboutBtn" onclick="openAbout()">ℹ️ عن الأداة</button>
-      <button class="hbtn ver-btn" onclick="openChangelog()">v3.1.0 📋</button>
+      <button class="hbtn ver-btn" onclick="openChangelog()">v3.2.0 📋</button>
       <button class="hbtn" id="settingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
     </div>
   </div>
@@ -1023,7 +1024,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
     <div class="import-modal-body">
       <div class="import-source-row" id="importSourceRow">
         <button class="import-source-btn active" id="srcShopifyBtn" onclick="setImportSource('shopify')">🛒 من شوبيفاي مباشرة</button>
-        <button class="import-source-btn" id="srcOsuBtn" onclick="setImportSource('osu')">🚚 من تسليمات ومرتجعات المسجّلة اليوم</button>
+        <button class="import-source-btn" id="srcOsuBtn" onclick="setImportSource('osu')">🚚 من تسليمات اليوم المسجّلة</button>
       </div>
       <div class="import-courier-row">
         <select id="importCourierSelect" class="import-courier-select">
@@ -1106,6 +1107,21 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
       <button class="modal-close-x" onclick="closeChangelog()">✕</button>
     </div>
     <div class="eco-modal-body">
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge">v3.2.0</span>
+          <span class="cl-ver-date">31-08-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>التسجيل المسبق كان معطّل بصمت من 16-08-2026.</strong> الأداة كانت بتنده أداة "التسجيل المسبق" عبر رابط بقى قديم بعد ما اتنقلت لحساب تاني واتغيّر اسمها، وأي فشل كان بيتحوّل لـ"الأوردر مش مسجّل مسبقاً" من غير أي رسالة. النتيجة: الأوردر المسجّل مقدّماً كان بيتعرض بالمستحق المتبقي بس بدل (المسجّل مقدّماً + المتبقي). دلوقتي القراءة بقت من الـ KV مباشرة، وأي فشل بيظهر كرسالة خطأ صريحة مش كنتيجة فاضية.</span></li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span><span>استيراد "تسليمات اليوم" بقى بيقرا سجل تحديث الحالة من D1 مباشرة بدل النداء على أداة تانية — أسرع، وبيشيل نقطة عطل كاملة.</span></li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span><span>الاستيراد بقى <strong>Delivered فقط</strong> — المرتجعات اتشالت من مصدر الاستيراد ده (الأوردر المرتجع مالوش تحصيل، والاسترداد بيمشي في مساره العادي).</span></li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span><span>الأوردر اللي اتسجّل Delivered بنجاح جزئي (تحذير) بقى يظهر في الاستيراد بدل ما يتخفي — الأوردر متسلّم فعلاً وإخفاؤه كان بيمنع تحصيله.</span></li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span>لو فشل مسح التسجيل المسبق بعد التحصيل، الفشل بقى يظهر كتحذير في الرد وفي السجل بدل ما يختفي. وكمان: المسح بقى بيحصل بعد التأكد من نجاح المعاملة مش قبلها (قبل كده معاملة فاشلة كانت بتمسح التسجيل برضه).</span></li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span>ثلاث endpoints للصيانة: <code>diag</code> (فحص ذاتي) · <code>get_config</code> (كشف Promote ناقص) · <code>audit_pending</code> (جرد التسجيلات المعلّقة — مؤقت).</span></li>
+        </ul>
+      </div>
 
       <div class="cl-version-block">
         <div class="cl-version-row">
@@ -1221,7 +1237,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
           <h4>كيف تعمل — Workflow</h4>
           <ol>
             <li>تسجيل الدخول بالـ PIN (Universal D1 Auth).</li>
-            <li>إضافة الأوردرات عبر ماسح الباركود، الإدخال اليدوي، أو نافذة "🔍 البحث عن أوردرات المندوب" — واللي فيها مصدرين: "🛒 من شوبيفاي مباشرة" (بحث حي بحالة Delivered/Returned) أو "🚚 من تسليمات ومرتجعات المسجّلة اليوم" (بيجيب من Order Status Updater كل أوردر اتسجّل Delivered أو Returned النهارده لمندوب معيّن، بدل إعادة كتابته يدوياً).</li>
+            <li>إضافة الأوردرات عبر ماسح الباركود، الإدخال اليدوي، أو نافذة "🔍 البحث عن أوردرات المندوب" — واللي فيها مصدرين: "🛒 من شوبيفاي مباشرة" (بحث حي بحالة Delivered/Returned) أو "🚚 من تسليمات اليوم المسجّلة" (بيقرا سجل تحديث الحالة من D1 مباشرة ويجيب كل أوردر اتسجّل <strong>Delivered</strong> النهارده لمندوب معيّن، بدل إعادة كتابته يدوياً).</li>
             <li>كل أوردر يُستعلَم عنه فوراً من شوبيفاي (<code>preview</code>) لمعرفة حالته: تحصيل عادي / استرجاع / استبدال / استرداد مستحق / ملغي.</li>
             <li>لو فيه أكتر من مندوب في نفس الدفعة، الأداة بتمنع الدفع لحد ما يبقى مندوب واحد فقط.</li>
             <li>إدخال طرق الدفع (نقدي / انستاباي / محفظة) لحد ما المجموع يطابق صافي التحصيل المطلوب.</li>
@@ -1238,9 +1254,12 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <tr><td><code>refund</code></td><td>تنفيذ استرداد على شوبيفاي</td></tr>
             <tr><td><code>getCourierValues</code></td><td>جلب قائمة المناديب من الـ metafield definition</td></tr>
             <tr><td><code>getCourierOrders</code></td><td>جلب أوردرات مندوب مؤهلة للتحصيل من شوبيفاي مباشرة (بحث حي)</td></tr>
-            <tr><td><code>getCourierOrdersToday</code></td><td>جلب أوردرات مندوب اتسجّلت Delivered/Returned اليوم من سجل Order Status Updater (Worker-to-Worker)</td></tr>
+            <tr><td><code>getCourierOrdersToday</code></td><td>جلب أوردرات مندوب اتسجّلت <strong>Delivered</strong> اليوم — قراءة مباشرة من جدول <code>logs</code> في D1 (<code>tool='order_status'</code>)</td></tr>
             <tr><td><code>get_logs</code> / <code>get_logs_count</code> / <code>get_logs_export</code></td><td>سجل العمليات من D1 — يدعم فلاتر نوع/مندوب/موظف/بحث/فترة تاريخ</td></tr>
             <tr><td><code>get_employees</code> / <code>check_employee</code> / <code>verify_employee</code> / <code>register_pin</code> / <code>log_logout</code></td><td>Universal D1 Auth — تسجيل الدخول والخروج</td></tr>
+            <tr><td><code>get_config</code></td><td>يرجّع نسخة الـ Worker — للمقارنة بنسخة الواجهة وكشف Promote ناقص</td></tr>
+            <tr><td><code>diag</code></td><td>فحص ذاتي بدون كتابة: الأسرار (بالاسم والطول فقط) · الـ bindings · صلاحيات شوبيفاي · D1 · KV · الـ Origin</td></tr>
+            <tr><td><code>audit_pending</code> <em>(مؤقت)</em></td><td>جرد <code>PRE_REG_KV</code> قبل تنظيفها — قراءة بحتة. <strong>يُحذف بعد انتهاء التنظيف</strong></td></tr>
           </table>
         </div>
       </details>
@@ -1264,7 +1283,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li><code>TOOL_NAME = 'cod_payment'</code> — قيمة <code>tool</code> في جدول logs بـ D1</li>
             <li><code>orders[]</code> — الأوردرات في الجدول الرئيسي (تحصيل/استرجاع/استبدال)</li>
             <li><code>extraEntries[]</code> — أوردرات الشحن الإضافي (منفصلة عن الجدول الرئيسي)</li>
-            <li><code>importSource</code> — 'shopify' (getCourierOrders) أو 'osu' (getCourierOrdersToday) — بيتصفّر لـ 'shopify' كل ما تتفتح نافذة الاستيراد</li>
+            <li><code>importSource</code> — 'shopify' (getCourierOrders) أو 'osu' (getCourierOrdersToday — تسليمات اليوم Delivered فقط، من D1 مباشرة) — بيتصفّر لـ 'shopify' كل ما تتفتح نافذة الاستيراد</li>
             <li><code>msState</code> — حالة فلاتر الاختيار المتعدد في تاب السجل (logType/logCourier/logEmp)</li>
             <li><code>logCurrentPage</code> / <code>logTotalCount</code> — Pagination بتاع تاب السجل (100 صف/صفحة)</li>
           </ul>
@@ -2532,7 +2551,7 @@ function hideResult() { $('resultBox').className = 'result-box'; }
 // §TOOL-JS::import — Courier Import Modal (v3.0.0 — مصدرين: شوبيفاي / OSU)
 // ══════════════════════════════════════════════════════════════
 let importOrders = [], importLoading = false;
-let importSource = 'shopify'; // 'shopify' (getCourierOrders) | 'osu' (getCourierOrdersToday)
+let importSource = 'shopify'; // 'shopify' (getCourierOrders) | 'osu' (getCourierOrdersToday — تسليمات اليوم من D1)
 
 function setImportSource(src) {
   importSource = src;
@@ -2545,7 +2564,7 @@ function setImportSource(src) {
   $('importFetchBtn').disabled = !hasCourier;
   if (!hasCourier) { $('importHint').textContent = 'اختر مندوباً للاستعلام عن أوردراته'; return; }
   $('importHint').textContent = src === 'osu'
-    ? 'اضغط استعلام لجلب تسليمات/مرتجعات اليوم لهذا المندوب من Order Status Updater'
+    ? 'اضغط استعلام لجلب تسليمات اليوم (Delivered) لهذا المندوب من سجل تحديث الحالة'
     : 'اضغط استعلام لجلب أوردرات هذا المندوب من شوبيفاي مباشرة';
 }
 
