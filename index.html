@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<!-- skills: html-builder v1.0.0 · worker-builder v1.1.0 · constants v1.2.0 — 31-08-2026 -->
+<!-- skills: html-builder v6.6.0 · worker-builder v2.1.0 · constants v1.2.0 — 06-09-2026 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>COD Payment Center</title>
@@ -79,6 +79,8 @@ body {
 .hbtn:disabled { opacity:.5; cursor:not-allowed; }
 .hbtn.ver-btn  { border-color:#bfdbfe; color:#1d4ed8; background:#eff6ff; font-family:var(--font-mono); font-weight:700; }
 .hbtn.ver-btn:hover { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
+.hbtn.warn-ver { border-color:var(--amber); color:var(--amber); background:var(--amber-light); }
+.hbtn.warn-ver:hover { border-color:var(--amber); color:var(--amber); background:var(--amber-light); }
 .hbtn.active-user { border-color:var(--green); color:var(--green); background:var(--green-light); }
 .hbtn.active-user:hover { border-color:var(--red); color:var(--red); background:var(--red-light); }
 .hbtn.settings-configured { border-color:var(--green); color:var(--green); background:var(--green-light); }
@@ -116,6 +118,8 @@ body {
 .cl-items { list-style:none; display:flex; flex-direction:column; gap:5px; padding-bottom:16px; margin-bottom:16px; border-bottom:1px solid var(--border); }
 .cl-version-block:last-child .cl-items { border-bottom:none; padding-bottom:0; margin-bottom:0; }
 .cl-item { display:flex; gap:8px; font-size:13px; align-items:flex-start; }
+.log-miss { display:inline-block; margin-right:5px; padding:1px 6px; border-radius:4px; background:var(--red-light); border:1px solid var(--red-border); color:var(--red); font-size:10px; font-weight:800; white-space:nowrap; }
+.log-miss-banner { margin:0 0 10px; padding:9px 13px; border-radius:var(--radius-sm); background:var(--red-light); border:1.5px solid var(--red-border); color:var(--red); font-size:12px; font-weight:600; line-height:1.8; }
 .cl-tag { font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; white-space:nowrap; flex-shrink:0; align-self:flex-start; margin-top:2px; }
 .cl-tag.new    { background:#f0fdf4; color:#15803d; }
 .cl-tag.fix    { background:#fef2f2; color:#dc2626; }
@@ -340,7 +344,7 @@ tbody tr.order-row { border-bottom:1px solid var(--border); transition:backgroun
 tbody tr.order-row:hover { background:var(--surface-2); }
 tbody tr.order-row.row-new { animation:rowIn .5s ease; }
 tbody tr.order-row.expanded { border-bottom:none; }
-tbody tr.order-row.ready-row    { background:var(--green-row-bg,#f0fdf4); border-right:3px solid var(--green); }
+tbody tr.order-row.ready-row    { background:var(--green-light); border-right:3px solid var(--green); }
 tbody tr.order-row.ready-row:hover { background:#dcfce7; }
 tbody tr.order-row.ready-row.expanded { background:#dcfce7; }
 tbody tr.order-row.refund-row   { background:#fff1f2; border-right:3px solid var(--red); }
@@ -704,8 +708,9 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
     </div>
     <div class="app-header-btns">
       <button class="hbtn active-user" id="activeUserBtn" onclick="doLogout()">👤 —</button>
+      <button class="hbtn warn-ver" id="verStaleBtn" style="display:none" onclick="showWorkerStale()">⚠️ الـ Worker نسخة قديمة</button>
       <button class="hbtn" id="aboutBtn" onclick="openAbout()">ℹ️ عن الأداة</button>
-      <button class="hbtn ver-btn" onclick="openChangelog()">v3.2.0 📋</button>
+      <button class="hbtn ver-btn" id="verBtn" onclick="openChangelog()">v3.3.0 📋</button>
       <button class="hbtn" id="settingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
     </div>
   </div>
@@ -1110,6 +1115,20 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
       <div class="cl-version-block">
         <div class="cl-version-row">
+          <span class="cl-ver-badge" id="clVerBadge">v3.3.0</span>
+          <span class="cl-ver-date">06-09-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>طرق الدفع كانت بتتسجّل كاملة على كل أوردر في الجلسة — فأي أوردر بيفشل كانت فلوسه بتتسجّل على غيره.</strong> حصل فعلاً يوم 05-09-2026 مع المندوب Shady Mostafa: الجلسة كانت أوردرين كل واحد 2,800، والموظف دخّل 2,675 نقدي + 2,925 محفظة. أوردر منهم فشل فماتسجّلش، والأوردر التاني اتسجّل عليه الـ 5,600 كاملة. النتيجة في السجل والإكسيل: تحصيل 2,800 مقابل طرق دفع 5,600، والأوردر الفاشل فضل غير محصّل على شوبيفاي. دلوقتي كل أوردر بياخد <strong>حصته هو بس</strong> من طرق الدفع، فمجموع المسجّل بيساوي المتحصّل فعلاً مهما فشل غيره.</span></li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span><strong>كشف "الجلسة الناقصة" في السجل والتصدير.</strong> كل عملية بقت بتسجّل عدد الأوردرات وقيمة التحصيل اللي الجلسة اتحققت عليها قبل التنفيذ، فأي فرق بين ده وبين المسجّل فعلاً بيظهر لوحده: بادج أحمر في تاب السجل، بانر بيشرح الفرق بالجنيه، صف تنبيه في شيت "سجل التحصيل"، وعمودين جداد في شيت "الإجمالي" (أوردرات ناقصة · فرق غير مفسَّر) بيتلوّنوا أحمر للمندوب اللي عنده فرق. قبل كده الملف كان بيبان متزن وهو مش متزن.</span></li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>الفشل الجزئي كان بيتعرض في صندوق أخضر.</strong> جلسة ضاعت فيها فلوس كانت بتقول "1 نجح ⚠ 1 فشل" بلون النجاح، فالموظف بيكمّل عادي — وده اللي خلّى غلطة 05-09 تاخد يومين لحد ما اتكشفت من ملف الإكسيل. دلوقتي بقى أحمر، بصوت تنبيه، ومعاه <strong>نافذة بتوقف الموظف</strong> بتقوله بالجنيه إيه اللي اتقبض ومش مسجّل، وأنهي أوردرات فشلت وليه، وإن الفلوس سايبة في الخانات عشان يعيد المحاولة.</span></li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>الجدول كان بيفضل حيّ وديالوج التأكيد مفتوح.</strong> التحقق من طرق الدفع كان بيحصل مرة واحدة قبل ما الديالوج يفتح، وبعدها أي تغيير في الجدول كان بيعدّي من غير فحص. دلوقتي التحقق بيتعاد قبل أول عملية (ولو الأرقام اتغيّرت مفيش أي حاجة بتتنفّذ)، والسكانر بقى متوقّف طول ما الديالوج مفتوح.</span></li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span>تحذير في الهيدر لو الـ Worker أقدم من النسخة اللي الواجهة محتاجاها — الـ Worker القديم بيتجاهل الحقول الجديدة <strong>من غير أي رسالة</strong>، يعني العطل يرجع في صمت.</span></li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
           <span class="cl-ver-badge">v3.2.0</span>
           <span class="cl-ver-date">31-08-2026</span>
         </div>
@@ -1250,8 +1269,8 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <tr><th>action</th><th>الوصف</th></tr>
             <tr><td><code>preview</code></td><td>استعلام عن حالة أوردر (تحصيل/استرجاع/استبدال/استرداد) قبل الإضافة للجدول</td></tr>
             <tr><td><code>resolveByName</code></td><td>تحويل رقم أوردر (#1780) إلى الـ ID الرقمي</td></tr>
-            <tr><td><code>pay</code></td><td>تسجيل الدفع على شوبيفاي (Mark as Paid)</td></tr>
-            <tr><td><code>refund</code></td><td>تنفيذ استرداد على شوبيفاي</td></tr>
+            <tr><td><code>pay</code></td><td>تسجيل الدفع على شوبيفاي (Mark as Paid). بياخد <code>orderMeta.paymentSplit</code> (حصة الأوردر من طرق الدفع) و<code>sessionMeta.batchExpected</code> (اللي الجلسة اتحققت عليه) — الاتنين بيتكتبوا في <code>extra</code></td></tr>
+            <tr><td><code>refund</code></td><td>تنفيذ استرداد على شوبيفاي — نفس حقول <code>pay</code> الجديدة</td></tr>
             <tr><td><code>getCourierValues</code></td><td>جلب قائمة المناديب من الـ metafield definition</td></tr>
             <tr><td><code>getCourierOrders</code></td><td>جلب أوردرات مندوب مؤهلة للتحصيل من شوبيفاي مباشرة (بحث حي)</td></tr>
             <tr><td><code>getCourierOrdersToday</code></td><td>جلب أوردرات مندوب اتسجّلت <strong>Delivered</strong> اليوم — قراءة مباشرة من جدول <code>logs</code> في D1 (<code>tool='order_status'</code>)</td></tr>
@@ -1272,6 +1291,8 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li><code>§AUTH-JS</code> — Universal D1 Auth (خطوتين: اختيار الموظف ثم PIN)</li>
             <li><code>§SCAN</code> — ماسح الباركود الرئيسي + ماسح الشحن الإضافي (نفس نمط handleScan)</li>
             <li><code>§TOOL-JS</code> — إضافة/حذف الأوردرات، الحسابات (<code>calcCourierCollect</code>)، جدول العرض، طرق الدفع، التأكيد والتنفيذ الجماعي (pay/refund)</li>
+            <li><code>§TOOL-JS::allocatePaymentSplit</code> — توزيع طرق الدفع على أوردرات الجلسة بالتناسب مع تحصيل كل أوردر. توزيع تراكمي عشان مجموع الحصص يساوي المُدخل بالمليم. الوزن للأوردرات اللي على نفس اتجاه صافي الجلسة بس</li>
+            <li><code>§TOOL-JS::alertPartialFailure</code> — نافذة إقرار بتوقف الموظف لما جلسة تخلص بنجاح جزئي، وبتقوله بالجنيه إيه اللي اتقبض ومش مسجّل</li>
             <li><code>§TOOL-JS::import</code> — نافذة استيراد أوردرات مندوب — مصدرين (<code>importSource</code>: 'shopify' | 'osu') بنفس جدول العرض والـ helpers (importRenderTable/importMakeRow/importCalcStatusError)</li>
             <li><code>§LOG-JS</code> — فلاتر اختيار متعدد (نوع/مندوب/موظف) + بحث + فترة تاريخ، Pagination بصفحات عبر get_logs_count، جدول جلسات قابل للتوسيع (جلسة ← أوردر ← SKUs)، تصدير XLSX عبر ExcelJS</li>
           </ul>
@@ -1284,6 +1305,8 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li><code>orders[]</code> — الأوردرات في الجدول الرئيسي (تحصيل/استرجاع/استبدال)</li>
             <li><code>extraEntries[]</code> — أوردرات الشحن الإضافي (منفصلة عن الجدول الرئيسي)</li>
             <li><code>importSource</code> — 'shopify' (getCourierOrders) أو 'osu' (getCourierOrdersToday — تسليمات اليوم Delivered فقط، من D1 مباشرة) — بيتصفّر لـ 'shopify' كل ما تتفتح نافذة الاستيراد</li>
+            <li><code>TOOL_VERSION</code> — مصدر واحد لرقم نسخة الواجهة (الهيدر + بادج الـ Changelog عبر <code>renderVersionUI()</code>)</li>
+            <li><code>MIN_WORKER_VERSION = '3.4.0'</code> — أقل نسخة Worker الواجهة بتشتغل معاها. Worker أقدم بيتجاهل <code>paymentSplit</code>/<code>batchExpected</code> <strong>في صمت</strong>، فالحارس ده هو اللي بيمنع رجوع العطل بلا رسالة</li>
             <li><code>msState</code> — حالة فلاتر الاختيار المتعدد في تاب السجل (logType/logCourier/logEmp)</li>
             <li><code>logCurrentPage</code> / <code>logTotalCount</code> — Pagination بتاع تاب السجل (100 صف/صفحة)</li>
           </ul>
@@ -1295,6 +1318,9 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li>الشحن الإضافي بيتقبل بس لو S1 ∈ {Returned, Ready, Cancelled} أو S2 ∈ {Returned, Ready}.</li>
             <li>الأوردر العادي (غير شحن إضافي) بيتقبل بس لو S1=Delivered و S2 فارغ أو Returned.</li>
             <li><code>batchId</code> بيتولّد بالـ Frontend (<code>crypto.randomUUID</code>) ويتبعت مع كل نداء <code>pay</code>/<code>refund</code> في نفس الجلسة، عشان تاب السجل يقدر يجمّعهم في كارت واحد.</li>
+            <li><strong>طرق الدفع على مستوى الصف (v3.3.0):</strong> كل صف في D1 بيحمل <strong>حصته</strong> من طرق الدفع، مش إجمالي الجلسة. الصف بيتكتب على النجاح بس، فلو أوردر فشل، قيمته مابتتسجّلش على غيره. <code>extra.pmScope</code> بيفرّق الصفوف الجديدة (<code>'order'</code> — بتتجمع) عن القديمة (<code>'session'</code> — أول صف بس)؛ من غيره جمع الصفوف القديمة بيضرب الإجمالي في عددها.</li>
+            <li><strong>كشف الجلسة الناقصة:</strong> <code>extra.batchExpected</code> بيحفظ عدد الأوردرات وقيمة التحصيل اللي الجلسة اتحققت عليها قبل التنفيذ. تاب السجل والتصدير بيقارنوه بالمسجّل فعلاً — أي فرق = أوردر فشل ومش مسجّل، وبيظهر بادج أحمر وبانر وصف مستقل في الإكسيل. <strong>الفحص بيتعطّل عمداً</strong> لو الجلسة مقصوصة بين صفحتين أو عند سقف التصدير (<code>partialView</code>) — نقص العرض مش نقص فعلي، وإشارة بتولّع غلط أسوأ من مفيش إشارة.</li>
+            <li><strong>إعادة التحقق قبل التنفيذ:</strong> <code>confirmBulkPay()</code> بتتحقق مرة واحدة قبل ما ديالوج التأكيد يفتح، و<code>doBulkPayAndRefund()</code> بتعيد التحقق قبل أول نداء — لأن الجدول بيفضل حيّ والديالوج مفتوح. و<code>refocus()</code> بقت بتستثني <code>confirmOverlay</code> عشان السكانر مايضيفش أوردر بعد التحقق.</li>
             <li><code>getCourierOrdersToday</code> عن قصد من غير فلترة canMarkAsPaid — بترجّع كل أوردر اتسجّل Delivered/Returned اليوم حتى لو مش قابل للتحصيل فعلياً (مثلاً S1=Returned كامل)، عشان الموظف يشوف كل حركة اليوم ويقرر بنفسه؛ importCalcStatusError() في الفرونت إند بيمنع تحديده تلقائياً برضو.</li>
           </ul>
         </div>
@@ -1340,6 +1366,25 @@ const LS_SECRET    = 'cod_payment_center_worker_secret';
 const LS_ADMIN_URL = 'admin_worker_url'; // shared across all tools — never rename
 const TOOL_NAME    = 'cod_payment';      // قيمة tool في جدول logs بـ D1
 
+// مصدر واحد لرقم نسخة الواجهة — الهيدر وبادج الـ Changelog بيتقروا منه
+const TOOL_VERSION = 'v3.3.0';
+
+// 🔴 أقل نسخة Worker الواجهة دي بتشتغل معاها صح.
+//    v3.4.0 هي اللي بتفهم `orderMeta.paymentSplit` و`sessionMeta.batchExpected`.
+//    Worker أقدم **مش هيرجّع خطأ** — هيتجاهل الحقلين ويكتب طرق الدفع كاملة
+//    على كل صف زي الأول، يعني العطل اللي الواجهة دي اتكتبت عشانه يرجع **في
+//    صمت**. عشان كده الحارس ده إلزامي مش تجميل.
+const MIN_WORKER_VERSION = '3.4.0';
+let workerVersion = null;
+
+// مقارنة رقمية — مش نصية. "10" أصغر من "9" لو اتقارنوا كنص.
+function cmpVersion(a, b) {
+  const pa = String(a).replace(/^v/, '').split('.').map(Number);
+  const pb = String(b).replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < 3; i++) { const d = (pa[i]||0) - (pb[i]||0); if (d) return d; }
+  return 0;
+}
+
 function getConfig() {
   return {
     workerUrl:    localStorage.getItem(LS_URL)       || '',
@@ -1384,6 +1429,32 @@ function saveSettings() {
   showToast('تم حفظ الإعدادات ✓', 'success');
   loadEmployeesList();
   logLoaded = false; logCurrentPage = 1;
+}
+
+function renderVersionUI() {
+  const btn = $('verBtn');   if (btn) btn.textContent = `${TOOL_VERSION} \u{1F4CB}`;
+  const bdg = $('clVerBadge'); if (bdg) bdg.textContent = TOOL_VERSION;
+}
+
+// حارس نسخة الـ Worker — **حد أدنى** مش تطابق. الواجهة والـ Worker رقمين
+// مستقلين واختلافهم وضع طبيعي، فالمقارنة بالتطابق بتولّع تحذير كاذب دايم
+// والموظف بيتعوّد يتجاهله. (ecommoda-html-builder Standards #29)
+async function checkWorkerVersion() {
+  if (!isConfigured()) return;   // 🔴 من غيره الإعدادات بتفتح لوحدها فوق شاشة الدخول
+  try {
+    const d = await apiGet('get_config');
+    workerVersion = d.workerVersion || d.version || null;
+    const stale = workerVersion && cmpVersion(workerVersion, MIN_WORKER_VERSION) < 0;
+    const btn = $('verStaleBtn');
+    if (btn) btn.style.display = stale ? '' : 'none';
+  } catch { /* الإعدادات ممكن تكون لسه مش مضبوطة */ }
+}
+function showWorkerStale() {
+  showToast(
+    `الـ Worker نسخته ${workerVersion} والواجهة محتاجة ${MIN_WORKER_VERSION} على الأقل — ` +
+    `طرق الدفع هتتسجّل بالطريقة القديمة (إجمالي الجلسة على كل صف). راجع Deployments و Promote في كلاودفلير.`,
+    'error', 9000
+  );
 }
 
 function updateSettingsBtn()    { $('settingsBtn').classList.toggle('settings-configured', isConfigured()); }
@@ -1787,9 +1858,14 @@ function updateImportBtn() {
 const scannerInput = $('scannerInput');
 let lastKeyTime = 0, scanTimer = null;
 
+// ⚠️ `confirmOverlay` مستثنى زي `importOverlay` بالظبط — من غيره السكانر
+//    بيفضل ماسك الفوكس والديالوج مفتوح، فمسحة واحدة بتضيف أوردر **بعد** ما
+//    الفلوس اتحققت. `doBulkPayAndRefund` بتقرا الجدول من جديد وقت التنفيذ،
+//    فالأوردر الزيادة كان بيتحصّل بفلوس جلسة مش متضمّناه. (الاتجاه المعاكس
+//    لعطل 05-09-2026 — نفس السبب البنيوي.)
 function refocus() {
   if (!currentEmployee) return;
-  if ($('panelScan').classList.contains('active') && !$('extraAddPanel').classList.contains('show') && !$('importOverlay').classList.contains('open')) {
+  if ($('panelScan').classList.contains('active') && !$('extraAddPanel').classList.contains('show') && !$('importOverlay').classList.contains('open') && !$('confirmOverlay').classList.contains('open')) {
     scannerInput.focus();
     setActiveMethod('methodScanner');
   }
@@ -2394,9 +2470,23 @@ function openConfirm(headerHTML, bodyHTML, okLabel, okClass, onConfirm) {
   const okBtn = $('confirmOkBtn'), cancelBtn = $('confirmCancelBtn');
   const newOk = okBtn.cloneNode(true), newCancel = cancelBtn.cloneNode(true);
   okBtn.parentNode.replaceChild(newOk, okBtn); cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+  newCancel.style.display = '';   // openAlert بتخفيه، والـ clone بيورّث الإخفاء
   newOk.textContent = okLabel; newOk.className = 'btn-confirm-ok ' + okClass;
   newOk.addEventListener('click', () => { $('confirmOverlay').classList.remove('open'); onConfirm(); });
   newCancel.addEventListener('click', () => $('confirmOverlay').classList.remove('open'));
+  $('confirmOverlay').classList.add('open');
+}
+
+// نافذة **إقرار** بزرار واحد — نفس شِل الـ confirm من غير "إلغاء". بتستخدم
+// للحالات اللي الموظف لازم يشوفها ويقرّ بيها قبل ما يكمّل، مش يختار فيها.
+function openAlert(headerHTML, bodyHTML, okLabel, okClass, onAck) {
+  $('confirmHeader').innerHTML = headerHTML; $('confirmBody').innerHTML = bodyHTML;
+  const okBtn = $('confirmOkBtn'), cancelBtn = $('confirmCancelBtn');
+  const newOk = okBtn.cloneNode(true), newCancel = cancelBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newOk, okBtn); cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+  newCancel.style.display = 'none';
+  newOk.textContent = okLabel; newOk.className = 'btn-confirm-ok ' + okClass;
+  newOk.addEventListener('click', () => { $('confirmOverlay').classList.remove('open'); if (onAck) onAck(); });
   $('confirmOverlay').classList.add('open');
 }
 function closeConfirm() { $('confirmOverlay').classList.remove('open'); }
@@ -2459,6 +2549,45 @@ async function confirmBulkPay() {
   openConfirm('✅ تأكيد العملية', bodyHTML, btnLabel, 'green-btn', doBulkPayAndRefund);
 }
 
+// ─── §TOOL-JS::allocatePaymentSplit ───
+// بتوزّع إجمالي كل طريقة دفع على أوردرات الجلسة بالتناسب مع تحصيل كل أوردر،
+// عشان كل صف في D1 يحمل **حصته هو بس** بدل إجمالي الجلسة كامل.
+//
+// التوزيع **تراكمي**: كل حصة = (النصيب التراكمي لحد هنا) − (اللي اتوزّع قبله).
+// كده مجموع الحصص بيساوي الإجمالي **بالمليم** مهما كان التقريب — من غير كده
+// التقريب لكل صف على حدة بيسيب فروق قروش بتتراكم على الجلسات الكبيرة.
+//
+// الوزن = الأوردرات اللي على **نفس اتجاه** صافي الجلسة بس:
+//   • جلسة صافيها موجب (المندوب بيدفع لنا) → أوردرات التحصيل هي اللي جابت
+//     الفلوس؛ أوردرات الاسترداد بتقلّل الصافي مش بتجيب كاش، فحصتها صفر.
+//   • جلسة صافيها سالب (إحنا بندفع للمندوب) → العكس بالظبط.
+// كده الحصص كلها بنفس إشارة المدخل، ومفيش صف بيقول "قبضت" وهو دافع.
+// اتجاه الأوردر نفسه محفوظ أصلاً في `type` و`courierCollect` — مش محتاج
+// يتكرر في الإشارة هنا.
+function allocatePaymentSplit(weights, methods) {
+  const n = weights.length;
+  const out = Array.from({ length: n }, () => ({ cash:'0.00', instapay:'0.00', wallet:'0.00' }));
+  if (!n) return out;
+
+  const netSign = weights.reduce((s, w) => s + w, 0) < 0 ? -1 : 1;
+  const w = weights.map(x => Math.max(x * netSign, 0));
+  const W = w.reduce((s, x) => s + x, 0);
+
+  for (const key of ['cash', 'instapay', 'wallet']) {
+    const total = Math.round((parseFloat(methods[key]) || 0) * 100);   // بالقروش
+    if (!total) continue;
+    if (W <= 0) { out[0][key] = (total / 100).toFixed(2); continue; }  // كل الأوزان صفر
+    let cum = 0, running = 0;
+    for (let i = 0; i < n; i++) {
+      cum += w[i];
+      const upto = Math.round(total * cum / W);
+      out[i][key] = ((upto - running) / 100).toFixed(2);
+      running = upto;
+    }
+  }
+  return out;
+}
+
 async function doBulkPayAndRefund() {
   const readyOrders = orders.filter(o => o.status === 'ready');
   const refundOrders = orders.filter(o => o.status === 'refund');
@@ -2466,7 +2595,29 @@ async function doBulkPayAndRefund() {
   const cash = parseFloat($('pmCash').value)||0, instapay = parseFloat($('pmInstapay').value)||0, wallet = parseFloat($('pmWallet').value)||0;
   const extraTotal = getTotalExtraShipping();
 
+  // 🔴 إعادة تحقق قبل أول نداء — `confirmBulkPay()` بتتحقق **مرة واحدة** قبل
+  //    ما ديالوج التأكيد يفتح، وبعدها الجدول بيفضل حيّ: مسحة سكانر، أو
+  //    `preview` متأخر بيغيّر حالة أوردر. والدالة دي بتقرا `orders` وخانات
+  //    الفلوس **من جديد** وقت التنفيذ — يعني أي تغيير بينهم كان بيعدّي بلا
+  //    أي فحص، والفلوس تتسجّل على مجموعة أوردرات مش اللي اتحققت عليها.
+  if (readyOrders.length && !isPayValid()) {
+    playBeep('error');
+    showResult(false, '⛔ الجدول اتغيّر بعد التأكيد — مفيش أي عملية اتنفّذت',
+      `المطلوب دلوقتي ${fmtSigned(getCourierCollectNet())} والمُدخل ${fmt(getPaySum())} — راجع الأرقام واضغط تسجيل الدفع من تاني.`);
+    isProcessing = false; updatePayBtn(); updatePayMethodsCard();
+    return;
+  }
+
+  const readyCollectOnly  = readyOrders.reduce((s,o) => s + (calcCourierCollect(o)||0), 0);
+  const refundCollectOnly = refundOrders.reduce((s,o) => s + (calcCourierCollect(o)||0), 0);
+
   const batchId = (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(36).slice(2)));
+
+  // ترتيب التوزيع = ترتيب تنفيذ اللوبين تحت بالظبط (تحصيل الأول ثم استرداد)
+  const splitOrders = [...readyOrders, ...refundOrders];
+  const splits = allocatePaymentSplit(splitOrders.map(o => calcCourierCollect(o)||0), { cash, instapay, wallet });
+  const splitOf = new Map(splitOrders.map((o, i) => [o, splits[i]]));
+
   const sessionMeta = {
     courier: courierName,
     employee: currentEmployee ? currentEmployee.username : null,
@@ -2474,6 +2625,19 @@ async function doBulkPayAndRefund() {
     paymentMethods: { cash:cash.toFixed(2), instapay:instapay.toFixed(2), wallet:wallet.toFixed(2) },
     extraShipping: extraEntries.filter(e=>e.status==='ok').map(e => ({ orderId:e.id, orderName:e.orderName||(''+e.id), courier:e.courier||courierName||'', amount:(parseFloat(e.amount)||0).toFixed(2) })),
     extraShippingTotal: extraTotal.toFixed(2),
+    // 🆕 اللي الجلسة **اتحققت عليه** قبل التنفيذ. بيتختم على كل صف، فأي جلسة
+    //    ناقصة تتكشف من الصفوف نفسها: مجموع `courierCollect` المكتوب ≠
+    //    `collect` = فيه أوردر فشل ومش مسجّل. معروف وقت الطلب، فمش محتاج
+    //    كتابة لاحقة على صفوف اتكتبت خلاص.
+    batchExpected: {
+      orders:             readyOrders.length + refundOrders.length,
+      payOrders:          readyOrders.length,
+      refundOrders:       refundOrders.length,
+      collect:            (readyCollectOnly + refundCollectOnly).toFixed(2),
+      extraShippingTotal: extraTotal.toFixed(2),
+      net:                (readyCollectOnly + refundCollectOnly - extraTotal).toFixed(2),
+      methods:            { cash:cash.toFixed(2), instapay:instapay.toFixed(2), wallet:wallet.toFixed(2) },
+    },
   };
 
   isProcessing = true; $('payBtn').disabled = true; setProgress(0); hideResult();
@@ -2483,7 +2647,7 @@ async function doBulkPayAndRefund() {
   for (const order of readyOrders) {
     order.status = 'loading'; renderTable();
     try {
-      const orderMeta = { lineItems:order.lineItems, returnedItems:order.returnedItems, orderDiscount:order.orderDiscount, preRegistered:order.preRegistered, hasReturn:order.hasReturn, returnShipping:order.returnShipping, courierCollect:calcCourierCollect(order) };
+      const orderMeta = { lineItems:order.lineItems, returnedItems:order.returnedItems, orderDiscount:order.orderDiscount, preRegistered:order.preRegistered, hasReturn:order.hasReturn, returnShipping:order.returnShipping, courierCollect:calcCourierCollect(order), paymentSplit:splitOf.get(order) };
       const d = await apiPostLegacy('pay', { orderId:order.id, amount:order.amount.toFixed(2), orderName:order.orderName, batchId, sessionMeta, orderMeta, employee: sessionMeta.employee });
       if (d.success) { order.status = 'done'; order.financialStatus = 'PAID'; successPay++; }
       else { order.status = 'error'; order.error = d.error||'فشل'; failPay++; }
@@ -2496,7 +2660,7 @@ async function doBulkPayAndRefund() {
     try {
       if (!order.saleTransactions || !order.saleTransactions.length) { order.status = 'refund-error'; order.error = 'لا يوجد transaction صالح'; failRefund++; }
       else {
-        const orderMeta = { lineItems:order.lineItems, returnedItems:order.returnedItems, orderDiscount:order.orderDiscount, preRegistered:order.preRegistered, hasReturn:order.hasReturn, returnShipping:order.returnShipping, courierCollect:calcCourierCollect(order) };
+        const orderMeta = { lineItems:order.lineItems, returnedItems:order.returnedItems, orderDiscount:order.orderDiscount, preRegistered:order.preRegistered, hasReturn:order.hasReturn, returnShipping:order.returnShipping, courierCollect:calcCourierCollect(order), paymentSplit:splitOf.get(order) };
         const d = await apiPostLegacy('refund', { orderId:order.id, refundAmount:order.refundAmount.toFixed(2), saleTransactions:order.saleTransactions, currency:'EGP', orderName:order.orderName, batchId, sessionMeta, orderMeta, employee: sessionMeta.employee });
         if (d.success) { order.status = 'refund-done'; order.financialStatus = 'REFUNDED'; successRefund++; }
         else { order.status = 'refund-error'; order.error = d.error||'فشل'; failRefund++; }
@@ -2518,6 +2682,11 @@ async function doBulkPayAndRefund() {
 
   const anySuccess = successPay>0 || successRefund>0;
   const anyFail = failPay>0 || failRefund>0;
+
+  // الأوردرات اللي فشلت لسه في `orders` (الناجحة بس هي اللي اتشالت فوق)
+  const failedOrders = [...readyOrders, ...refundOrders].filter(o => o.status === 'error' || o.status === 'refund-error');
+  const failedMoney  = failedOrders.reduce((s,o) => s + Math.abs(calcCourierCollect(o)||0), 0);
+
   if (anySuccess && !anyFail) {
     const parts = [];
     if (successPay>0) parts.push(`✅ تحصيل ${successPay} أوردر`);
@@ -2525,8 +2694,15 @@ async function doBulkPayAndRefund() {
     showResult(true, parts.join(' — '), courierName?`المندوب: ${courierName}`:'');
     setTimeout(hideResult, 5000);
   } else if (anySuccess) {
-    showResult(true, `${successPay+successRefund} نجح ⚠ ${failPay+failRefund} فشل`, 'راجع الجدول');
+    // 🔴 كان `showResult(true, …)` — يعني صندوق **أخضر** على جلسة ضاعت فيها
+    //    فلوس. ده بالظبط اللي خلّى عطل 05-09-2026 يعدّي من غير ما حد ياخد
+    //    باله: الرسالة ظهرت، بلون النجاح، والموظف كمّل شغله عادي.
+    playBeep('error');
+    showResult(false, `⛔ الجلسة ناقصة — ${successPay+successRefund} نجح · ${failPay+failRefund} فشل`,
+      `${fmt(failedMoney)} جنيه محصّلين من المندوب ومش مسجّلين على أي أوردر. راجع الجدول قبل ما تكمّل.`);
+    alertPartialFailure(courierName, failedOrders, failedMoney, { cash, instapay, wallet });
   } else {
+    playBeep('error');
     showResult(false, 'فشلت جميع العمليات', 'راجع الجدول');
   }
 
@@ -2537,6 +2713,49 @@ async function doBulkPayAndRefund() {
   if (successfulOrders.length) logLoaded = false;
 
   refocus();
+}
+
+// ─── §TOOL-JS::alertPartialFailure ───
+// نافذة إقرار **بتوقف الموظف** لما جلسة تخلص بنجاح جزئي.
+//
+// قبل كده كان في سطر نصّي صغير في صندوق **أخضر** (`showResult(true, …)`)،
+// وطبيعة الفشل الجزئي إنه بيسيب الفلوس كاملة في خانات الدفع بينما أوردر أو
+// أكتر مش متسجّلين — يعني الفرق بيتحوّل لعجز في الخزنة من غير أي أثر.
+// في حادثة 05-09-2026 الموظف كمّل شغله، وبعدها بعشر دقايق اتعمل login جديد
+// (الصفحة اترفرشت) والصف الأحمر ضاع مع الجدول. الغلط اتكشف بعد يومين من
+// ملف الإكسيل.
+function alertPartialFailure(courierName, failedOrders, failedMoney, methods) {
+  const rows = failedOrders.map(o => {
+    const amt = Math.abs(calcCourierCollect(o)||0);
+    const kind = (o.status === 'refund-error') ? 'استرداد' : 'تحصيل';
+    return `<div class="confirm-detail-row">
+      <span class="confirm-detail-label">${orderLink(o.orderName || o.id, o.id)} · ${kind}</span>
+      <span class="confirm-detail-val red">${fmt(amt)} جنيه</span>
+    </div>
+    <div style="font-size:11.5px;color:var(--red);margin:-2px 2px 6px;line-height:1.6">${o.error || 'فشل غير معروف'}</div>`;
+  }).join('');
+
+  const entered = (parseFloat(methods.cash)||0) + (parseFloat(methods.instapay)||0) + (parseFloat(methods.wallet)||0);
+
+  const body = `
+    <div class="confirm-detail-row"><span class="confirm-detail-label">المندوب</span><span class="confirm-detail-val">${courierName||'—'}</span></div>
+    <div class="confirm-detail-row"><span class="confirm-detail-label">المستلَم من المندوب</span><span class="confirm-detail-val">${fmt(entered)} جنيه</span></div>
+    <div class="confirm-detail-row"><span class="confirm-detail-label">اللي اتسجّل فعلاً</span><span class="confirm-detail-val green">${fmt(entered - failedMoney)} جنيه</span></div>
+    <div style="background:var(--red-light);border:2px solid var(--red-border);border-radius:var(--radius-sm);padding:8px 14px;margin:6px 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;font-weight:700">فلوس مستلَمة ومش مسجّلة</span>
+      <span style="font-family:var(--font-mono);font-size:18px;font-weight:800;color:var(--red)">${fmt(failedMoney)} جنيه</span>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin:10px 2px 4px">الأوردرات اللي فشلت:</div>
+    ${rows}
+    <div class="confirm-warning">
+      <span class="confirm-warning-icon">⚠️</span>
+      <div><div class="confirm-warning-title">متكملش قبل ما تتصرّف</div>
+      <div class="confirm-warning-text">الأوردرات دي لسه <strong>غير محصّلة على شوبيفاي</strong> وفلوسها اتقبضت من المندوب.
+      خانات الدفع اتسابت زي ما هي عشان تعيد المحاولة على الأوردرات دي لوحدها.
+      لو مش هتعيد المحاولة دلوقتي، <strong>سجّل الأرقام دي</strong> قبل ما تقفل الصفحة أو تبدأ مندوب تاني — لأنها هتضيع من الجدول.</div></div>
+    </div>`;
+
+  openAlert('⛔ الجلسة ناقصة — فلوس مستلَمة ومش مسجّلة', body, 'فهمت — هراجع', 'red-btn');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3040,7 +3259,9 @@ function parseExtra(raw) {
   try { return typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return {}; }
 }
 
-function groupRowsIntoSessions(rows) {
+// `view` بيقول إذا كانت النتايج المعروضة مقصوصة من فوق/تحت (صفحة من
+// pagination، أو تصدير وصل للسقف) — لازم للفحص تحت.
+function groupRowsIntoSessions(rows, view) {
   const groups = {};
   for (const row of rows) {
     const extra = parseExtra(row.extra);
@@ -3055,7 +3276,13 @@ function groupRowsIntoSessions(rows) {
         employeeDisplayName: extra.employeeDisplayName || null,
         hasPayment: false, hasRefund: false,
         totalAmount: 0, totalRefund: 0,
-        paymentMethods: extra.paymentMethods || {},
+        // ⚠️ `pmScope` بيحدد إزاي نجمع طرق الدفع (شوف finalizeGroup تحت)
+        pmScope: extra.pmScope || 'session',
+        sessionPaymentMethods: extra.sessionPaymentMethods || extra.paymentMethods || {},
+        batchExpected: extra.batchExpected || null,
+        firstRowMethods: extra.paymentMethods || {},
+        pmSum: { cash: 0, instapay: 0, wallet: 0 },
+        actualCollect: 0,
         extraShipping: Array.isArray(extra.extraShipping) ? extra.extraShipping : [],
         extraShippingTotal: extra.extraShippingTotal || '0.00',
         rows: [],
@@ -3064,16 +3291,66 @@ function groupRowsIntoSessions(rows) {
     const g = groups[batchId];
     if (row.type === 'refund') { g.hasRefund = true; g.totalRefund += parseFloat(row.value_after) || 0; }
     else                       { g.hasPayment = true; g.totalAmount += parseFloat(row.value_after) || 0; }
+    const pm = extra.paymentMethods || {};
+    g.pmSum.cash     += parseFloat(pm.cash)     || 0;
+    g.pmSum.instapay += parseFloat(pm.instapay) || 0;
+    g.pmSum.wallet   += parseFloat(pm.wallet)   || 0;
+    g.actualCollect  += parseFloat(extra.courierCollect) || 0;
     g.rows.push({ entry: row, extra });
   }
-  return Object.values(groups).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  const list = Object.values(groups).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  // ⚠️ جلسة ممكن تكون متقسّمة بين صفحتين — ساعتها الصفحة دي شايفة جزء منها
+  //    بس، والنقص اللي هيتحسب **نقص وهمي**. الترتيب بالتاريخ، فالجروب الأول
+  //    والأخير بس هما اللي ممكن يكونوا مقصوصين — بيتعلّموا وبيتستثنوا.
+  //    (إشارة بتولّع غلط = حماية وهمية، وأسوأ من مفيش إشارة.)
+  const v = view || {};
+  if (list.length) {
+    if (v.moreAbove) list[0].partialView = true;
+    if (v.moreBelow) list[list.length - 1].partialView = true;
+  }
+  list.forEach(finalizeGroup);
+  return list;
+}
+
+// طرق الدفع المعروضة للجلسة:
+//   pmScope='order'   (v3.3.0+) → كل صف شايل حصته → **الجمع** هو الإجمالي
+//   pmScope='session' (الأقدم)  → كل صف شايل نفس الإجمالي → **أول صف** بس
+// جمع الصفوف القديمة كان هيضرب الإجمالي في عدد الصفوف.
+function finalizeGroup(g) {
+  g.paymentMethods = (g.pmScope === 'order')
+    ? { cash: g.pmSum.cash.toFixed(2), instapay: g.pmSum.instapay.toFixed(2), wallet: g.pmSum.wallet.toFixed(2) }
+    : (g.firstRowMethods || {});
+  g.shortfall = batchShortfall(g);
+}
+
+// نقص الجلسة = الفرق بين اللي الجلسة اتحققت عليه قبل التنفيذ (`batchExpected`)
+// واللي اتسجّل فعلاً. ده اللي بيكشف الأوردر اللي فشل ومسابش أي صف.
+// بترجّع null لما مفيش نقص، **أو لما مش عارفين** — الصفوف الأقدم من v3.3.0
+// مالهاش `batchExpected`، والجلسة المقصوصة بين صفحتين مش مقروءة كاملة.
+function batchShortfall(g) {
+  if (g.partialView) return null;
+  const be = g.batchExpected;
+  if (!be) return null;
+  const expectedOrders  = Number(be.orders);
+  const expectedCollect = parseFloat(be.collect);
+  if (!isFinite(expectedOrders) || !isFinite(expectedCollect)) return null;
+  const missingOrders  = expectedOrders - g.rows.length;
+  const missingCollect = expectedCollect - g.actualCollect;
+  if (missingOrders <= 0 && Math.abs(missingCollect) < 0.01) return null;
+  return { orders: missingOrders, collect: missingCollect };
 }
 
 function renderLog(entries) {
   const body = $('logBody');
   if (!entries.length) { body.innerHTML = '<div class="log-empty">لا توجد عمليات مطابقة</div>'; return; }
 
-  const groups = groupRowsIntoSessions(entries);
+  const totalPages = Math.max(1, Math.ceil(logTotalCount / LOG_PAGE_SIZE));
+  const groups = groupRowsIntoSessions(entries, {
+    moreAbove: logCurrentPage > 1,
+    moreBelow: logCurrentPage < totalPages,
+  });
   window.__logGroups = groups;
 
   const knownKeys = new Set(groups.map(g => g.key));
@@ -3133,7 +3410,7 @@ function renderLog(entries) {
       <td>${typeTag}</td>
       <td>${g.courier ? `<span class="log-tag cr">🛵 ${g.courier}</span>` : '—'}</td>
       <td>${(g.employeeDisplayName || g.employee) ? `<span class="log-tag emp">👤 ${(g.employeeDisplayName || g.employee).replace(/_/g,' ')}</span>` : '—'}</td>
-      <td>${g.rows.length.toLocaleString('en-US')}</td>
+      <td>${g.rows.length.toLocaleString('en-US')}${g.shortfall ? `<span class="log-miss" title="جلسة ناقصة">⚠ ${g.shortfall.orders > 0 ? '−'+g.shortfall.orders : 'فرق'}</span>` : ''}</td>
       <td style="color:var(--green);font-family:var(--font-mono);font-weight:700">${g.totalAmount ? fmt(g.totalAmount) : '—'}</td>
       <td style="color:var(--red);font-family:var(--font-mono);font-weight:700">${g.totalRefund ? '−'+fmt(g.totalRefund) : '—'}</td>
       <td style="font-size:10.5px">${pmChips.join(' ') || '—'}</td>
@@ -3142,6 +3419,12 @@ function renderLog(entries) {
     <tr class="log-detail-row" id="lbd-${gi}" style="display:none">
       <td colspan="10">
         <div class="log-detail-inner">
+          ${g.shortfall ? `<div class="log-miss-banner">⛔ <strong>جلسة ناقصة.</strong>
+            الجلسة اتحققت على <strong>${Number(g.batchExpected.orders).toLocaleString('en-US')}</strong> أوردر بقيمة تحصيل
+            <strong>${fmtSigned(parseFloat(g.batchExpected.collect))}</strong> جنيه، والمسجّل فعلاً
+            <strong>${g.rows.length.toLocaleString('en-US')}</strong> أوردر بقيمة <strong>${fmtSigned(g.actualCollect)}</strong> جنيه —
+            فرق <strong>${fmtSigned(g.shortfall.collect)}</strong> جنيه مستلَم من المندوب ومش مسجّل على أي أوردر.
+            الأوردر (أو الأوردرات) اللي فشل وقتها لسه <strong>غير محصّل على شوبيفاي</strong>.</div>` : ''}
           <table class="log-detail-tbl">
             <thead><tr><th>رقم الأوردر</th><th>النوع</th><th>المبلغ</th><th>ملحوظات</th></tr></thead>
             <tbody>${detailRows}${extraRows}</tbody>
@@ -3196,6 +3479,9 @@ function toExportGroups(groups) {
     employee: g.employee || null,
     employeeDisplayName: g.employeeDisplayName || null,
     paymentMethods: g.paymentMethods || {},
+    shortfall: g.shortfall || null,
+    batchExpected: g.batchExpected || null,
+    actualCollect: g.actualCollect || 0,
     extraShipping: Array.isArray(g.extraShipping) ? g.extraShipping : [],
     extraShippingTotal: g.extraShippingTotal || '0.00',
     orders: (g.rows || []).map(r => {
@@ -3236,7 +3522,10 @@ async function exportXLSX(selectedOnly) {
     try {
       const d = await apiGet('get_logs_export', buildLogParams());
       if (!d.ok) throw new Error(d.error || 'فشل الجلب');
-      const groups = groupRowsIntoSessions(d.entries || []);
+      // التصدير المقصوص عند سقف الـ Worker = آخر جلسة فيه ممكن تكون ناقصة
+      // في العرض بس، مش ناقصة فعليًا — نفس منطق حدود الصفحات.
+      const truncated = d.truncated === true || (d.cap && (d.entries||[]).length >= d.cap);
+      const groups = groupRowsIntoSessions(d.entries || [], { moreBelow: !!truncated });
       log = toExportGroups(groups);
     } catch (err) { showToast('فشل التصدير: '+err.message, 'error'); return; }
   }
@@ -3368,6 +3657,30 @@ async function exportXLSX(selectedOnly) {
       const r = ws.addRow({ date, employee, courier: e.courier||courier, order: e.orderName||(e.orderId?('#'+e.orderId):''), orderType:'شحن إضافي', sku:null,qty:null,unit:null,unitDiscount:null,collect:null,orderDiscount:null, courierCollect:-amount, ship:amount, result:'ناجح', error:null, prereg:'لا' });
       applyData(r,false,0,false,'شحن إضافي',true);
     }
+
+    // ⛔ صف تنبيه لأي جلسة ناقصة — الأوردر اللي فشل مسابش صف في D1، فمن غير
+    //    السطر ده الملف بيبان متزن وهو مش متزن. ده اللي خلّى فرق 05-09-2026
+    //    ياخد يومين لحد ما اتكشف.
+    if (entry.shortfall) {
+      const sf = entry.shortfall;
+      const r = ws.addRow({
+        date, employee, courier,
+        order: '⛔ جلسة ناقصة',
+        orderType: `${sf.orders > 0 ? sf.orders + ' أوردر' : 'فرق'} فشل ومش مسجّل`,
+        sku: null, qty: null, unit: null, unitDiscount: null, collect: null, orderDiscount: null,
+        courierCollect: sf.collect,
+        ship: null, result: 'فشل',
+        error: `اتحقق على ${entry.batchExpected.orders} أوردر بقيمة ${entry.batchExpected.collect} — اتسجّل ${(entry.orders||[]).length} بقيمة ${entry.actualCollect}`,
+        prereg: null,
+      });
+      r.eachCell({ includeEmpty:false }, cell => {
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFCCCC' } };
+        cell.font = { size:10, name:'Arial', bold:true, color:{ argb:'FFCC0000' } };
+        cell.alignment = { horizontal:'center', vertical:'middle', readingOrder:'rightToLeft' };
+      });
+      const cc = r.getCell(12); cc.numFmt = NUM_FMT;
+      cc.border = { top:{style:'thin',color:{argb:'FFD0D0D0'}}, bottom:{style:'thin',color:{argb:'FFD0D0D0'}}, left:MED_BORDER, right:MED_BORDER };
+    }
   }
 
   ws.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
@@ -3387,6 +3700,8 @@ async function exportXLSX(selectedOnly) {
     { header:'محفظة', key:'wallet', width:14 },
     { header:'شحن إضافي', key:'extra', width:14 },
     { header:'عدد الأوردرات', key:'orders', width:14 },
+    { header:'أوردرات ناقصة', key:'missOrders', width:14 },
+    { header:'فرق غير مفسَّر', key:'missCollect', width:16 },
   ];
   ws2.getRow(1).eachCell(cell => {
     cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+HEADER_BG}};
@@ -3401,7 +3716,7 @@ async function exportXLSX(selectedOnly) {
   for (const entry of log) {
     const cr = entry.courier || '—';
     const pm = entry.paymentMethods || {};
-    if (!courierTotals[cr]) courierTotals[cr] = { courierNet:0, cash:0, instapay:0, wallet:0, extra:0, orders:0 };
+    if (!courierTotals[cr]) courierTotals[cr] = { courierNet:0, cash:0, instapay:0, wallet:0, extra:0, orders:0, missOrders:0, missCollect:0 };
     for (const o of (entry.orders||[])) { courierTotals[cr].courierNet += parseFloat(o.courierCollect)||0; grandNet2 += parseFloat(o.courierCollect)||0; }
     const extraArr = Array.isArray(entry.extraShipping) ? entry.extraShipping : [];
     for (const e of extraArr) { const amt=parseFloat(e.amount)||0; courierTotals[cr].extra+=amt; courierTotals[cr].courierNet-=amt; grandNet2-=amt; }
@@ -3409,20 +3724,38 @@ async function exportXLSX(selectedOnly) {
     courierTotals[cr].instapay += parseFloat(pm.instapay)||0;
     courierTotals[cr].wallet   += parseFloat(pm.wallet)||0;
     courierTotals[cr].orders   += (entry.orders||[]).length||0;
+    if (entry.shortfall) {
+      courierTotals[cr].missOrders  += Math.max(entry.shortfall.orders, 0);
+      courierTotals[cr].missCollect += entry.shortfall.collect;
+    }
   }
-  const dataStyle = (cell,col) => { cell.font={size:10,name:'Arial'}; cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'}; if (col>=2&&col<=6) cell.numFmt=NUM_FMT; };
+  const dataStyle = (cell,col) => { cell.font={size:10,name:'Arial'}; cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'}; if ((col>=2&&col<=6)||col===9) cell.numFmt=NUM_FMT; };
   Object.entries(courierTotals).forEach(([cr,t]) => {
-    const r = ws2.addRow({ courier:cr, courierNet:t.courierNet, cash:t.cash, instapay:t.instapay, wallet:t.wallet, extra:t.extra>0?t.extra:null, orders:t.orders });
+    const hasGap = t.missOrders > 0 || Math.abs(t.missCollect) >= 0.01;
+    const r = ws2.addRow({ courier:cr, courierNet:t.courierNet, cash:t.cash, instapay:t.instapay, wallet:t.wallet, extra:t.extra>0?t.extra:null, orders:t.orders,
+                           missOrders: t.missOrders||null, missCollect: hasGap ? t.missCollect : null });
     r.eachCell({includeEmpty:false}, (cell,col) => dataStyle(cell,col));
+    // ⛔ المندوب اللي عنده فرق غير مفسَّر يتلوّن — عمود ساكت في ملف طويل
+    //    مش إشارة، والسطر ده هو اللي بيخلي المراجعة المالية تشوفه فورًا.
+    if (hasGap) {
+      [8,9].forEach(col => {
+        const c = r.getCell(col);
+        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFCCCC'}};
+        c.font={size:10,name:'Arial',bold:true,color:{argb:'FFCC0000'}};
+      });
+    }
   });
   const grandCash2 = log.reduce((s,e) => s+(parseFloat((e.paymentMethods||{}).cash)||0), 0);
   const grandInstapay2 = log.reduce((s,e) => s+(parseFloat((e.paymentMethods||{}).instapay)||0), 0);
   const grandWallet2 = log.reduce((s,e) => s+(parseFloat((e.paymentMethods||{}).wallet)||0), 0);
   const grandExtra2 = log.reduce((s,e) => s+(parseFloat(e.extraShippingTotal)||0), 0);
   const grandOrders2 = log.reduce((s,e) => s+((e.orders||[]).length||0), 0);
-  const gt = ws2.addRow({ courier:'جميع المناديب', courierNet:grandNet2, cash:grandCash2, instapay:grandInstapay2, wallet:grandWallet2, extra:grandExtra2>0?grandExtra2:null, orders:grandOrders2 });
+  const grandMissOrders = log.reduce((s,e) => s + (e.shortfall ? Math.max(e.shortfall.orders,0) : 0), 0);
+  const grandMissCollect = log.reduce((s,e) => s + (e.shortfall ? e.shortfall.collect : 0), 0);
+  const gt = ws2.addRow({ courier:'جميع المناديب', courierNet:grandNet2, cash:grandCash2, instapay:grandInstapay2, wallet:grandWallet2, extra:grandExtra2>0?grandExtra2:null, orders:grandOrders2,
+                          missOrders: grandMissOrders||null, missCollect: (grandMissOrders||Math.abs(grandMissCollect)>=0.01) ? grandMissCollect : null });
   gt.eachCell({includeEmpty:true}, cell => { cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+GRAND_BG}}; cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11,name:'Arial'}; cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'}; });
-  [2,3,4,5,6].forEach(c => { gt.getCell(c).numFmt=NUM_FMT; });
+  [2,3,4,5,6,9].forEach(c => { gt.getCell(c).numFmt=NUM_FMT; });
   gt.height=20;
   ws2.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
 
@@ -3437,7 +3770,9 @@ async function exportXLSX(selectedOnly) {
 // ══════════════════════════════════════════════════════════════
 // §SHELL-JS — Init
 // ══════════════════════════════════════════════════════════════
+renderVersionUI();
 updateSettingsButtonsState();
+checkWorkerVersion();
 loadEmployeesList();
 initLogTypeFilter();
 loadLogCourierFilter();
