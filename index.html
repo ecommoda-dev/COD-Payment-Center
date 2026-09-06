@@ -1391,8 +1391,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li><code>orders[]</code> — الأوردرات في الجدول الرئيسي (تحصيل/استرجاع/استبدال)</li>
             <li><code>extraEntries[]</code> — أوردرات الشحن الإضافي (منفصلة عن الجدول الرئيسي)</li>
             <li><code>importSource</code> — 'shopify' (getCourierOrders) أو 'osu' (getCourierOrdersToday — تسليمات اليوم Delivered فقط، من D1 مباشرة) — بيتصفّر لـ 'shopify' كل ما تتفتح نافذة الاستيراد</li>
-            <li><code>TOOL_VERSION</code> — مصدر واحد لرقم نسخة الواجهة (الهيدر + بادج الـ Changelog عبر <code>renderVersionUI()</code>)</li>
-            <li><code>MIN_WORKER_VERSION = '3.4.0'</code> — أقل نسخة Worker الواجهة بتشتغل معاها. Worker أقدم بيتجاهل <code>paymentSplit</code>/<code>batchExpected</code> <strong>في صمت</strong>، فالحارس ده هو اللي بيمنع رجوع العطل بلا رسالة</li>
+            <li><code>TOOL_VERSION</code> — مصدر واحد لرقم نسخة الواجهة: زرار الهيدر + بادج الـ Changelog + نص شاشة الدخول (<code>#loginVersionText</code>)، كلهم عبر <code>renderVersionUI()</code></li>
             <li><code>msState</code> — حالة فلاتر الاختيار المتعدد في تاب السجل (logType/logCourier/logEmp)</li>
             <li><code>logCurrentPage</code> / <code>logTotalCount</code> — Pagination بتاع تاب السجل (100 صف/صفحة)</li>
           </ul>
