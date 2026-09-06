@@ -1,6 +1,33 @@
 /**
- * cod-payment-center-worker  (v3.3.0)
- * skills: worker-builder v1.1.0 · constants v1.2.0 — 31-08-2026
+ * cod-payment-center-worker  (v3.4.0)
+ * skills: worker-builder v2.1.0 · constants v1.2.0 — 06-09-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.4.0 — طرق الدفع بقت على مستوى **الصف** مش الجلسة (06-09-2026):
+ *   🔴 العطل اللي البند ده بيقفله — جلسة `e1600f6c` بتاريخ 05-09-2026،
+ *      المندوب Shady Mostafa: الجلسة كانت **أوردرين** كل واحد تحصيله 2,800،
+ *      والموظف دخّل 2,675 نقدي + 2,925 محفظة = 5,600. أوردر منهم (#53322)
+ *      فشل فماكتبش صف، والصف الناجح الوحيد (#53222) اتختم عليه **إجمالي
+ *      الجلسة كامل**. النتيجة في D1 وفي تصدير الإكسيل: تحصيل 2,800 مقابل
+ *      طرق دفع 5,600، من غير أي علامة إن الجلسة ناقصة. #53322 فضل PENDING
+ *      على شوبيفاي والفلوس بتاعته اتسجّلت كأنها اتحصّلت.
+ *   - 🔄 `buildPayExtra` بقى بياخد `orderMeta.paymentSplit` — حصة الأوردر ده
+ *     هو بس من طرق الدفع — ويكتبها في `paymentMethods`. مجموع الصفوف
+ *     المكتوبة بقى بيساوي المتحصَّل فعلاً مهما فشل غيره.
+ *   - 🆕 `pmScope` في `extra` — `'order'` للصفوف الجديدة، `'session'` للقديمة.
+ *     من غيره التجميع بيتكسر: الصفوف الأقدم كلها بتحمل **نفس** إجمالي
+ *     الجلسة، فجمعها = مضروبة في عدد الصفوف.
+ *   - 🆕 `sessionPaymentMethods` — إجمالي الجلسة كما دخّله الموظف، محفوظ زي
+ *     ما هو. الفلوس اللي اتقبضت فعليًا مابتضيعش، بس بقت متميّزة عن المنسوب
+ *     للصفوف المسجّلة.
+ *   - 🆕 `batchExpected` — عدد الأوردرات وقيمة التحصيل اللي الجلسة **اتحققت
+ *     عليها** قبل التنفيذ. ده اللي بيخلي أي جلسة ناقصة تتكشف من الصفوف
+ *     نفسها: `Σ courierCollect` المكتوب ≠ `batchExpected.collect` = فشل
+ *     مخفي. معروف وقت الطلب فبيتختم على كل صف من غير كتابة لاحقة.
+ *   ⚠️ واجهة قديمة + Worker جديد = `paymentSplit` مش مبعوت → السلوك القديم
+ *      بالظبط. الاتجاه التاني (واجهة جديدة + Worker قديم) بيتجاهل الحقول
+ *      الجديدة **في صمت**، وده اللي `MIN_WORKER_VERSION` في الواجهة اتحطّ
+ *      عشانه (worker-builder Step 4 — «الفشل الصامت بيحتاج حارس نسخة»).
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.3.0 — حذف endpointين بلا وظيفة كانوا بيكتبوا في D1 (31-08-2026):
@@ -117,7 +144,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.3.0';
+const WORKER_VERSION = 'v3.4.0';
 
 // Cairo = UTC+3 (DST active). ⚠️ Egypt DST ends 29-10-2026 → change to 2
 // (نفس التغيير المطلوب في order-status-updater-worker — تغيير على مستوى الحزمة).
@@ -484,13 +511,32 @@ async function fetchTodayDeliveredOrderIds(env, courier) {
 // orderMeta: تفاصيل خاصة بالأوردر نفسه (lineItems/returnedItems/...) — بتيجي من
 // الفرونت إند لأنه أصلاً عنده البيانات دي من نداء preview قبل كده؛ الـ Worker
 // معملش استعلام تاني لشوبيفاي هنا عشان ميكررش نداء GraphQL تقيل من غير داعي.
+// 🔴 v3.4.0 — `paymentMethods` بقى **حصة الصف** مش إجمالي الجلسة.
+// السبب الكامل والحادثة في بلوك الرأس (§HEADER · v3.4.0). باختصار: الصف
+// بيتكتب على النجاح بس، وطرق الدفع كانت بتتختم كاملة على كل صف — فأول ما
+// أوردر يفشل، قيمته بتفضل في الصف الناجي كأنها اتحصّلت عليه.
+//
+// ⚠️ `pmScope` مش رفاهية — من غيره التجميع بيتكسر: كل الصفوف الأقدم من
+//    v3.4.0 بتحمل **نفس** إجمالي الجلسة، فجمعها = مضروبة في عدد الصفوف.
+//    المستهلك بيجمع الصفوف لما تكون 'order'، وبياخد أول صف لما تكون 'session'.
+//
+// ⚠️ `sessionPaymentMethods` بيحفظ إجمالي الجلسة كما دخّله الموظف. الفلوس
+//    اللي اتقبضت فعليًا من المندوب مابتضيعش من السجل — بس بقت **متميّزة**
+//    عن المنسوب للصفوف المسجّلة، والفرق بينهم هو الجلسة الناقصة نفسها.
+//
+// ⚠️ واجهة قديمة (بلا `paymentSplit`) → `pmScope:'session'` = السلوك القديم
+//    بالظبط. الحماية في الاتجاه التاني عند الواجهة (`MIN_WORKER_VERSION`).
 function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, refundAmount }) {
-  const sm = sessionMeta || {};
-  const om = orderMeta   || {};
+  const sm    = sessionMeta || {};
+  const om    = orderMeta   || {};
+  const split = om.paymentSplit || null;
   return {
     batchId:            batchId || null,
     courier:            courier || sm.courier || null,
-    paymentMethods:     sm.paymentMethods || null,
+    paymentMethods:        split || sm.paymentMethods || null,
+    pmScope:               split ? 'order' : 'session',
+    sessionPaymentMethods: sm.paymentMethods || null,
+    batchExpected:         sm.batchExpected  || null,
     extraShipping:      sm.extraShipping || null,
     extraShippingTotal: sm.extraShippingTotal || null,
     isRefund:           !!isRefund,
