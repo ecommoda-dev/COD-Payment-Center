@@ -1,6 +1,47 @@
 /**
- * cod-payment-center-worker  (v3.4.0)
- * skills: worker-builder v2.1.0 · constants v1.2.0 — 06-09-2026
+ * cod-payment-center-worker  (v3.5.0)
+ * skills: worker-builder v2.1.0 · constants v1.8.0 — 06-09-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.5.0 — عقد النداءات الخارجية اتطبّق بالكامل (06-09-2026):
+ *   مراجعة كاملة مقابل ecommoda-worker-builder v2.1.0. الأداة كانت مطبّقة
+ *   بنود §PREREG (5A ⑥) و§DIAG (5A ⑨) بس — الباقي كان ناقص.
+ *
+ *   🔴 §SHOPIFY::shopifyGQL — اتضافت ودخلت على **كل** نداء GraphQL في الملف
+ *      (7 مواضع كانت `await res.json()` خام بلا أي فحص). بترمي على: فشل شبكة ·
+ *      HTTP status · رد مش JSON · `data.errors` · `data` فاضية، ومعاها backoff
+ *      على THROTTLED. (Step 5A ①)
+ *      **العطل اللي البند ده بيقفله — أخطر سطر كان في الملف:**
+ *      `getOrderOutstanding` كانت `parseFloat(undefined || '0')` = **صفر** عند
+ *      أي فشل. والصفر في مسار الأوردر المسجّل مسبقًا معناه "مفيش مستحق إضافي"،
+ *      فالكود كان بيتخطّى `createTransaction` تمامًا، **يمسح مفتاح PRE_REG_KV**
+ *      (خطوة لا رجعة فيها)، يكتب صف D1 بـ `valueAfter: 0`، ويرجّع
+ *      `success: true`. يعني THROTTLE واحدة من شوبيفاي = فلوس اتقبضت من
+ *      المندوب، الأوردر فاضل غير محصّل على شوبيفاي، والتسجيل المسبق ضاع —
+ *      من غير أي رسالة. الدالة دلوقتي **بترمي** ومابترجّعش صفر أبدًا.
+ *
+ *   🔴 §SHARED::safeWriteLog + `logged`/`logError` في رد pay/refund. الكتابة
+ *      في D1 بتحصل **بعد** ما الفلوس اتقبضت على شوبيفاي، و`await writeLog`
+ *      المكشوف كان بيطلّع الاستثناء للـ catch الخارجي = **500**. فالموظف كان
+ *      هيشوف "فشل" على تحصيل اتنفّذ فعلًا ويعيده. (Step 5A ⑦)
+ *
+ *   🔴 get_logs_export بقى يرجّع `{ entries, cap, total, truncated }`. السقف
+ *      (LOG_EXPORT_MAX) بقى ثابت مسمّى وبيترجع للواجهة — من غيره التصدير
+ *      المقصوص بيعدّي بعلامة صح خضرا. (html-builder Standards #30)
+ *
+ *   🆕 نتيجة العملية **تلات حالات** — `status` ∈ success|warning|error في الرد،
+ *      و`extra.result` + `extra.actions` في D1. `warning` = الفعل الأساسي تم
+ *      بس فيه حاجة ما اتأكدتش (مسح PRE_REG_KV فشل مثلاً) — **ممنوع تتحسب
+ *      نجاح**. الصفوف الأقدم من v3.5.0 مالهاش `result` والواجهة بتعرض "—"
+ *      عليها مش "✓". (Step 5A ④ + ⑤)
+ *
+ *   🆕 `assertEnv()` — متغير ناقص بيوقف العملية **برسالة باسمه** بدل
+ *      `"error code: 1003" is not valid JSON`. (Step 5A ⑧)
+ *   🔄 `diag.checks[]` المفتاح بقى `label` بدل `check` — المُطبِّع الرسمي بيقرا
+ *      `c.label || c.name`، فالقديم كان بيعرض `undefined` في أي مستهلك موحّد.
+ *   🔄 getCourierOrders: سقف 40 صفحة بدل حلقة مفتوحة، والوصول للسقف بيرجّع
+ *      `truncated: true` + `warning` بدل ما يتعرض كأنه نتيجة كاملة.
+ *   🔄 createTransaction: رد مش JSON بقى رسالة واضحة مش استثناء غامض.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.4.0 — طرق الدفع بقت على مستوى **الصف** مش الجلسة (06-09-2026):
@@ -144,12 +185,16 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.4.0';
+const WORKER_VERSION = 'v3.5.0';
 
 // Cairo = UTC+3 (DST active). ⚠️ Egypt DST ends 29-10-2026 → change to 2
 // (نفس التغيير المطلوب في order-status-updater-worker — تغيير على مستوى الحزمة).
 // مستخدم في: فلتر تاريخ تاب السجل (dateFrom/dateTo) + "اليوم" في §TODAY-IMPORT.
 const CAIRO_OFFSET_HOURS = 3;
+
+// سقف تصدير السجل — بيترجع للواجهة كـ `cap` جنب `total` و`truncated` عشان
+// التصدير المقصوص يبان كتحذير بدل علامة صح خضرا (html-builder Standards #30).
+const LOG_EXPORT_MAX = 2000;
 
 // ══════════════════════════════════════════════════════
 // §CORS — Option B (أداة مالية: دفع + استرداد)
@@ -245,6 +290,17 @@ async function writeLog(db, entry) {
   ).run();
 }
 
+// ─── §SHARED::safeWriteLog — worker-builder Step 5A ⑦ (v3.5.0) ───
+// 🔴 العملية المالية بتحصل على شوبيفاي **قبل** الكتابة في D1. `await writeLog`
+//    مكشوف كان معناه إن فشل D1 يطلع للـ catch الخارجي ويرجّع 500 — فالموظف
+//    يشوف "فشل" على تحصيل **اتنفّذ فعلًا**، ويعيده. الفلوس اتقبضت مرتين.
+//    القاعدة: العملية حصلت — بس مفيش سجل. يترجع `logged:false` والواجهة تحذّر.
+//    ⛔ وممنوع `.catch(() => {})` — ده بيخفي الفشل بدل ما يبلّغ عنه.
+async function safeWriteLog(db, entry) {
+  try { await writeLog(db, entry); return { logged: true, logError: null }; }
+  catch (e) { console.error('writeLog failed:', e.message); return { logged: false, logError: e.message }; }
+}
+
 // ─── §SHARED::logFilters — shared WHERE-clause builder (v3.0.0) ───
 // ⚠️ EXCEPTION عن قصد (زي نفس الاستثناء الموثّق في order-status-updater-worker):
 // getLogs/getLogsCount/getLogsExport في الأداة دي بالذات اتعدّلوا لدعم فلاتر
@@ -321,12 +377,19 @@ async function getLogsCount(db, {
   return row?.total ?? 0;
 }
 
+// 🔴 بيرجّع `{ entries, cap, total, truncated }` مش الصفوف بس — html-builder
+//    Standards #30. من غير التلاتة دول الواجهة بتقول "تم التصدير ✓" على ملف
+//    مقصوص، والموظف فاكره كامل. الحقيقة بتيجي من هنا — ممنوع الواجهة تكتب
+//    السقف عندها (يتغيّر هنا ويفضل قديم هناك).
 async function getLogsExport(db, {
   tool = null, employee = null, type = null, courier = null, search = null, dateFrom = null, dateTo = null,
 } = {}) {
-  const { sql: whereSql, binds } = buildLogFilterSQL({ tool, employee, type, courier, search, dateFrom, dateTo });
-  const sql = `SELECT * ${whereSql} ORDER BY timestamp DESC LIMIT 2000`;
-  return (await db.prepare(sql).bind(...binds).all()).results;
+  const args = { tool, employee, type, courier, search, dateFrom, dateTo };
+  const { sql: whereSql, binds } = buildLogFilterSQL(args);
+  const sql = `SELECT * ${whereSql} ORDER BY timestamp DESC LIMIT ${LOG_EXPORT_MAX}`;
+  const entries = (await db.prepare(sql).bind(...binds).all()).results || [];
+  const total   = await getLogsCount(db, args);
+  return { entries, cap: LOG_EXPORT_MAX, total, truncated: entries.length >= LOG_EXPORT_MAX };
 }
 
 // ══════════════════════════════════════════════════════
@@ -526,11 +589,18 @@ async function fetchTodayDeliveredOrderIds(env, courier) {
 //
 // ⚠️ واجهة قديمة (بلا `paymentSplit`) → `pmScope:'session'` = السلوك القديم
 //    بالظبط. الحماية في الاتجاه التاني عند الواجهة (`MIN_WORKER_VERSION`).
-function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, refundAmount }) {
+// 🆕 v3.5.0 — `result` و`actions` في `extra` (worker-builder Step 5A ④ + ⑤).
+//    `result` ∈ 'success' | 'warning' | 'error' — الصفوف الأقدم من v3.5.0
+//    مالهاش الحقل ده، والواجهة بتعرض "—" مش "✓" عليها: إحنا فعليًا مش عارفين
+//    إن الفعل اتأكد وقتها. و`actions` بيتملى **أول بأول** من بره مش بيترجع من
+//    دالة في الآخر — عشان استثناء في النص مايخليش السجل يقول "ما حصلش حاجة".
+function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, refundAmount, result, actions }) {
   const sm    = sessionMeta || {};
   const om    = orderMeta   || {};
   const split = om.paymentSplit || null;
   return {
+    result:             result || null,
+    actions:            Array.isArray(actions) ? actions : [],
     batchId:            batchId || null,
     courier:            courier || sm.courier || null,
     paymentMethods:        split || sm.paymentMethods || null,
@@ -555,8 +625,84 @@ function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, ref
 // §SHOPIFY
 // ══════════════════════════════════════════════════════
 
+// ─── §SHOPIFY::sleep ───
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── §SHOPIFY::assertEnv ───
+// worker-builder Step 5A ⑧ — متغير ناقص يوقف العملية **برسالة باسمه** بدل ما
+// يتحوّل لفشل غامض (`SHOP_DOMAIN` الناقص بيدّي: "error code: 1003" is not valid JSON).
+function assertEnv(env, keys) {
+  const missing = keys.filter(k => !env[k]);
+  if (missing.length) throw new Error(`متغيرات ناقصة في إعدادات الـ Worker: ${missing.join(' · ')} — راجع Settings → Variables and Secrets ثم Promote`);
+}
+
+// ─── §SHOPIFY::shopifyGQL ───
+// 🔴 worker-builder Step 5A ① — النسخة الكاملة. بترمي على: فشل شبكة · HTTP
+//    status · رد مش JSON · data.errors · data فاضية. + إعادة محاولة على THROTTLED.
+//
+// 📛 ليه ده اتضاف في v3.5.0 — الأداة كانت بتنادي شوبيفاي بـ 7 نداءات خام
+//    (`await res.json()` من غير أي فحص). النتيجة على كل واحد منهم كانت
+//    **رسالة كاذبة مش خطأ**:
+//      • getOrderOutstanding  → `parseFloat(undefined || '0')` = **صفر**
+//      • getOrderDataById     → null = "الأوردر مش موجود"
+//      • getCourierValues     → قايمة مناديب فاضية
+//      • getCourierOrdersToday→ الدفعة كلها بتتاكل في صمت
+//    الأخطر كان الأول: صفر في مسار الأوردر المسجّل مسبقًا معناه "مفيش مستحق
+//    إضافي" — فالكود كان **بيتخطّى التحصيل**، **يمسح مفتاح PRE_REG_KV**،
+//    ويرجّع `success: true`. يعني THROTTLE واحدة من شوبيفاي = فلوس اتقبضت من
+//    المندوب والأوردر فاضل غير محصّل، ومفيش أي أثر. نفس عيلة عطل §PREREG
+//    (v3.2.0) بالظبط — بس في المسار المالي المباشر.
+const GQL_RETRY_DELAYS_MS = [400, 900, 1800];
+
+async function shopifyGQL(env, token, query, variables = {}, opName = 'shopify') {
+  assertEnv(env, ['SHOP_DOMAIN']);
+  const url = `https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`.replace(/\/$/, '');
+
+  for (let attempt = 0; ; attempt++) {
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
+        body:    JSON.stringify({ query, variables }),
+      });
+    } catch (e) {
+      throw new Error(`${opName}: فشل الاتصال بشوبيفاي — ${e.message}`);
+    }
+
+    const raw = await resp.text();
+    if (!resp.ok) {
+      // 429/5xx قابلة لإعادة المحاولة؛ 401/403 لأ (سر أو صلاحية غلط)
+      if ((resp.status === 429 || resp.status >= 500) && attempt < GQL_RETRY_DELAYS_MS.length) {
+        await sleep(GQL_RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+      throw new Error(`${opName}: شوبيفاي ردّت HTTP ${resp.status} — ${raw.slice(0, 300)}`);
+    }
+
+    let data;
+    try { data = JSON.parse(raw); }
+    catch { throw new Error(`${opName}: رد شوبيفاي مش JSON — ${raw.slice(0, 300)}`); }
+
+    if (Array.isArray(data.errors) && data.errors.length) {
+      const throttled = data.errors.some(e => e?.extensions?.code === 'THROTTLED');
+      if (throttled && attempt < GQL_RETRY_DELAYS_MS.length) {
+        await sleep(GQL_RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+      throw new Error(`${opName}: ${data.errors.map(e => e.message).join(' | ')}`);
+    }
+
+    // `data` فاضية مع userErrors: [] = العطل اللي بيعدّي كأنه نجاح
+    if (!data.data) throw new Error(`${opName}: شوبيفاي ردّت من غير data`);
+
+    return data;
+  }
+}
+
 async function getAccessToken(env) {
-  const res = await fetch(`https://${env.SHOP_DOMAIN}/admin/oauth/access_token`, {
+  assertEnv(env, ['SHOP_DOMAIN', 'CLIENT_ID', 'CLIENT_SECRET']);
+  const res = await fetch(`https://${env.SHOP_DOMAIN}/admin/oauth/access_token`.replace(/\/$/, ''), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -565,7 +711,11 @@ async function getAccessToken(env) {
       client_secret: env.CLIENT_SECRET,
     }),
   });
-  const data = await res.json();
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`OAuth: شوبيفاي ردّت HTTP ${res.status} — ${raw.slice(0, 200)}`);
+  let data;
+  try { data = JSON.parse(raw); }
+  catch { throw new Error(`OAuth: رد شوبيفاي مش JSON — ${raw.slice(0, 200)}`); }
   return data.access_token || null;
 }
 
@@ -666,13 +816,9 @@ async function getOrderDataById(env, numericId) {
     }
   `;
 
-  const res = await fetch(`https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-    body:    JSON.stringify({ query, variables: { id: `gid://shopify/Order/${numericId}` } }),
-  });
-
-  const data  = await res.json();
+  const data  = await shopifyGQL(env, token, query, { id: `gid://shopify/Order/${numericId}` }, 'getOrderById');
+  // ⚠️ هنا `null` معناها الأوردر مش موجود فعلاً — أي فشل استعلام بيترمي من
+  //    shopifyGQL قبل ما يوصل هنا. الخلط بين الاتنين هو العطل نفسه (Step 5A ⑥).
   const order = data?.data?.order;
   if (!order) return null;
 
@@ -775,19 +921,22 @@ async function getOrderDataById(env, numericId) {
   };
 }
 
+// 🔴 الدالة دي **بترمي** ومابترجّعش صفر عند الفشل. كانت أخطر سطر في الملف:
+//    `parseFloat(undefined || '0')` = 0، والصفر في مسار الأوردر المسجّل مسبقًا
+//    معناه "مفيش مستحق إضافي" → تخطّي التحصيل + مسح مفتاح PRE_REG_KV + رد
+//    `success:true`. تفاصيل كاملة في تعليق §SHOPIFY::shopifyGQL فوق.
 async function getOrderOutstanding(token, env, numericId) {
   const query = `
     query getOutstanding($id: ID!) {
       order(id: $id) { totalOutstandingSet { shopMoney { amount } } }
     }
   `;
-  const res  = await fetch(`https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-    body:    JSON.stringify({ query, variables: { id: `gid://shopify/Order/${numericId}` } }),
-  });
-  const data = await res.json();
-  return parseFloat(data?.data?.order?.totalOutstandingSet?.shopMoney?.amount || '0');
+  const data  = await shopifyGQL(env, token, query, { id: `gid://shopify/Order/${numericId}` }, 'getOutstanding');
+  const order = data?.data?.order;
+  if (!order) throw new Error(`الأوردر ${numericId} مش موجود على شوبيفاي — التحصيل اتوقف`);
+  const amt = order.totalOutstandingSet?.shopMoney?.amount;
+  if (amt == null) throw new Error(`شوبيفاي ما رجّعتش المستحق للأوردر ${numericId} — التحصيل اتوقف`);
+  return parseFloat(amt);
 }
 
 async function getOrderIdByName(env, orderNumber) {
@@ -799,12 +948,7 @@ async function getOrderIdByName(env, orderNumber) {
       orders(first: 1, query: $query) { nodes { id name } }
     }
   `;
-  const res  = await fetch(`https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-    body:    JSON.stringify({ query, variables: { query: `name:#${orderNumber}` } }),
-  });
-  const data   = await res.json();
+  const data   = await shopifyGQL(env, token, query, { query: `name:#${orderNumber}` }, 'getOrderByNumber');
   const orders = data?.data?.orders?.nodes;
   if (!orders || orders.length === 0) return null;
   return orders[0].id.replace('gid://shopify/Order/', '');
@@ -821,9 +965,12 @@ async function createTransaction(token, env, numericOrderId, amount) {
       }),
     }
   );
-  const data = await res.json();
-  if (res.ok && data.transaction?.id) return { success: true, transactionId: data.transaction.id };
-  return { success: false, error: data.errors ? JSON.stringify(data.errors) : `HTTP ${res.status}` };
+  const raw = await res.text();
+  let data = null;
+  try { data = JSON.parse(raw); } catch { /* رد مش JSON — بيتعامل معاه كفشل برسالة واضحة تحت */ }
+  if (res.ok && data?.transaction?.id) return { success: true, transactionId: data.transaction.id };
+  if (data?.errors) return { success: false, error: JSON.stringify(data.errors) };
+  return { success: false, error: `شوبيفاي ردّت HTTP ${res.status} — ${raw.slice(0, 200)}` };
 }
 
 // ─── §SHOPIFY::allocateRefundTransactions ───
@@ -877,13 +1024,8 @@ async function createRefund(token, env, numericOrderId, saleTransactions, amount
     },
   };
 
-  const res = await fetch(`https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-    body:    JSON.stringify({ query: mutation, variables }),
-  });
-
-  const data    = await res.json();
+  // ① فحص top-level جوّه shopifyGQL · ② userErrors · ③ تأكيد الـ payload — تحت
+  const data    = await shopifyGQL(env, token, mutation, variables, 'refundCreate');
   const payload = data?.data?.refundCreate;
 
   if (payload?.userErrors?.length > 0)
@@ -1058,9 +1200,15 @@ export default {
         const pending = await checkPendingPreReg(env, numericId);
         if (pending) {
           const token = await getAccessToken(env);
-          if (!token) return json({ success: false, error: 'Failed to get Shopify access token' }, 200, request);
+          if (!token) return json({ success: false, status: 'error', error: 'Failed to get Shopify access token' }, 200, request);
 
+          // ⚠️ بترمي عند أي فشل استعلام (v3.5.0) — قبل كده كانت بترجّع صفر،
+          //    والصفر هنا معناه "مفيش مستحق" فالفرع التاني كان بيمسح التسجيل
+          //    المسبق ويرجّع نجاح من غير ما يحصّل حاجة.
           const outstanding = await getOrderOutstanding(token, env, numericId);
+
+          // Step 5A ⑤ — بتتملى أول بأول، مش بترجع من دالة في الآخر
+          const actions = [];
 
           if (outstanding > 0) {
             const txResult = await createTransaction(token, env, numericId, outstanding.toFixed(2));
@@ -1069,55 +1217,63 @@ export default {
             // كان بيتنفّذ قبلها، يعني معاملة فاشلة كانت بتمسح التسجيل المسبق
             // برضه = ضياع بيانات (الأوردر يفضل غير محصّل، والمبلغ المسجّل
             // مقدّمًا يختفي من KV خالص).
-            if (!txResult.success) return json({ success: false, error: txResult.error }, 200, request);
+            if (!txResult.success) return json({ success: false, status: 'error', error: txResult.error, actions }, 200, request);
+            actions.push(`تحصيل ${outstanding.toFixed(2)} ج على شوبيفاي`);
 
             const cleared = await clearPendingPreReg(env, numericId);
+            if (cleared) actions.push('مسح التسجيل المسبق من PRE_REG_KV');
             const warning = cleared ? null : 'التحصيل تم على شوبيفاي، لكن مسح التسجيل المسبق من PRE_REG_KV فشل — الأوردر ممكن يظهر تاني كـ"مسجل مسبقاً". امسح المفتاح يدويًا.';
+            const status  = warning ? 'warning' : 'success';
 
-            await writeLog(env.DB, {
+            const { logged, logError } = await safeWriteLog(env.DB, {
               tool: TOOL_NAME, type: 'payment', employee: employee || null,
               orderId: numericId, orderName: orderName || pending.orderName || null,
               valueAfter: outstanding,
               notes: 'تحصيل (كان مسجل مسبقاً)' + (warning ? ` — ⚠ ${warning}` : ''),
-              extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: pending.courier, isRefund: false }),
+              extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: pending.courier, isRefund: false, result: status, actions }),
             });
             return json({
-              success: true, orderId: numericId, preRegistered: true,
+              success: true, status, actions, logged, logError, orderId: numericId, preRegistered: true,
               amount: outstanding.toFixed(2), transactionId: txResult.transactionId,
               ...(warning ? { warning } : {}),
             }, 200, request);
           }
 
           const cleared = await clearPendingPreReg(env, numericId);
+          if (cleared) actions.push('مسح التسجيل المسبق من PRE_REG_KV');
           const warning = cleared ? null : 'التحصيل تم على شوبيفاي، لكن مسح التسجيل المسبق من PRE_REG_KV فشل — الأوردر ممكن يظهر تاني كـ"مسجل مسبقاً". امسح المفتاح يدويًا.';
+          const status  = warning ? 'warning' : 'success';
 
-          await writeLog(env.DB, {
+          const { logged, logError } = await safeWriteLog(env.DB, {
             tool: TOOL_NAME, type: 'payment', employee: employee || null,
             orderId: numericId, orderName: orderName || pending.orderName || null,
             valueAfter: 0,
             notes: 'مسجل مسبقاً — مفيش مستحق إضافي' + (warning ? ` — ⚠ ${warning}` : ''),
-            extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: pending.courier, isRefund: false }),
+            extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: pending.courier, isRefund: false, result: status, actions }),
           });
           return json({
-            success: true, orderId: numericId, preRegistered: true, amount: '0.00',
+            success: true, status, actions, logged, logError,
+            orderId: numericId, preRegistered: true, amount: '0.00',
             ...(warning ? { warning } : {}),
           }, 200, request);
         }
 
         const token = await getAccessToken(env);
-        if (!token) return json({ success: false, error: 'Failed to get Shopify access token' }, 200, request);
+        if (!token) return json({ success: false, status: 'error', error: 'Failed to get Shopify access token' }, 200, request);
 
+        const actions  = [];
         const txResult = await createTransaction(token, env, numericId, parsedAmount.toFixed(2));
         if (txResult.success) {
-          await writeLog(env.DB, {
+          actions.push(`تحصيل ${parsedAmount.toFixed(2)} ج على شوبيفاي`);
+          const { logged, logError } = await safeWriteLog(env.DB, {
             tool: TOOL_NAME, type: 'payment', employee: employee || null,
             orderId: numericId, orderName: orderName || null,
             valueAfter: parsedAmount, notes: null,
-            extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: sessionMeta?.courier, isRefund: false }),
+            extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: sessionMeta?.courier, isRefund: false, result: 'success', actions }),
           });
-          return json({ success: true, orderId: numericId, transactionId: txResult.transactionId, amount: parsedAmount.toFixed(2) }, 200, request);
+          return json({ success: true, status: 'success', actions, logged, logError, orderId: numericId, transactionId: txResult.transactionId, amount: parsedAmount.toFixed(2) }, 200, request);
         }
-        return json({ success: false, error: txResult.error }, 200, request);
+        return json({ success: false, status: 'error', error: txResult.error, actions }, 200, request);
       }
 
       // ── ACTION: refund ────────────────────────────────────────────
@@ -1131,20 +1287,22 @@ export default {
         if (isNaN(parsedAmount) || parsedAmount <= 0) return json({ error: 'Invalid refundAmount' }, 400, request);
 
         const token = await getAccessToken(env);
-        if (!token) return json({ success: false, error: 'Failed to get Shopify access token' }, 200, request);
+        if (!token) return json({ success: false, status: 'error', error: 'Failed to get Shopify access token' }, 200, request);
 
+        const actions      = [];
         const refundResult = await createRefund(token, env, numericId, saleTransactions, parsedAmount.toFixed(2), currency || 'EGP');
 
         if (refundResult.success) {
-          await writeLog(env.DB, {
+          actions.push(`استرداد ${parsedAmount.toFixed(2)} ج على شوبيفاي`);
+          const { logged, logError } = await safeWriteLog(env.DB, {
             tool: TOOL_NAME, type: 'refund', employee: employee || null,
             orderId: numericId, orderName: orderName || null,
             valueAfter: parsedAmount, notes: null,
-            extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: sessionMeta?.courier, isRefund: true, refundAmount: parsedAmount }),
+            extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: sessionMeta?.courier, isRefund: true, refundAmount: parsedAmount, result: 'success', actions }),
           });
-          return json({ success: true, orderId: numericId, refundId: refundResult.refundId, amount: parsedAmount.toFixed(2) }, 200, request);
+          return json({ success: true, status: 'success', actions, logged, logError, orderId: numericId, refundId: refundResult.refundId, amount: parsedAmount.toFixed(2) }, 200, request);
         }
-        return json({ success: false, error: refundResult.error }, 200, request);
+        return json({ success: false, status: 'error', error: refundResult.error, actions }, 200, request);
       }
 
       // ── ACTION: getCourierValues ──────────────────────────────────
@@ -1159,12 +1317,7 @@ export default {
         const token = await getAccessToken(env);
         if (!token) return json({ success: false, error: 'Failed to get Shopify access token' }, 200, request);
 
-        const res  = await fetch(`https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-          body: JSON.stringify({ query }),
-        });
-        const data = await res.json();
+        const data = await shopifyGQL(env, token, query, {}, 'metafieldDefinitions');
         const defs = data?.data?.metafieldDefinitions?.nodes || [];
         const courierDef = defs.find(d => d.namespace === 'custom' && d.key === 'courier');
         if (!courierDef) return json({ success: true, values: [] }, 200, request);
@@ -1192,8 +1345,12 @@ export default {
         let fetchedOrders = [];
         let cursor = null;
         let hasNextPage = true;
+        // سقف حماية — الحلقة كانت مفتوحة بلا حد (بينما listPendingPreReg
+        // جنبها عندها سقف 20 صفحة). 40 صفحة × 50 = 2000 أوردر لمندوب واحد.
+        let pages = 0;
+        const MAX_PAGES = 40;
 
-        while (hasNextPage) {
+        while (hasNextPage && pages++ < MAX_PAGES) {
           const gqlQuery = `
             query getOrders($query: String!, $after: String) {
               orders(first: 50, query: $query, after: $after) {
@@ -1220,14 +1377,9 @@ export default {
               }
             }
           `;
-          const res  = await fetch(`https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-            body: JSON.stringify({ query: gqlQuery, variables: { query: queryStr, after: cursor } }),
-          });
-          const data = await res.json();
+          const data = await shopifyGQL(env, token, gqlQuery, { query: queryStr, after: cursor }, 'getCourierOrders');
           const ordersData = data?.data?.orders;
-          if (!ordersData) return json({ success: false, error: 'Shopify query failed' }, 200, request);
+          if (!ordersData) throw new Error('getCourierOrders: شوبيفاي ما رجّعتش أوردرات — الاستعلام فشل');
 
           for (const edge of ordersData.edges) {
             const node        = edge.node;
@@ -1279,6 +1431,14 @@ export default {
 
           hasNextPage = ordersData.pageInfo.hasNextPage;
           cursor      = ordersData.pageInfo.endCursor;
+        }
+
+        // الوصول للسقف والصفحات لسه فيها كمان = نتيجة **ناقصة**، متتعرضش كأنها كاملة
+        if (hasNextPage) {
+          return json({
+            success: true, orders: fetchedOrders, count: fetchedOrders.length, truncated: true,
+            warning: `النتيجة اتقصّت عند ${fetchedOrders.length} أوردر (سقف ${MAX_PAGES} صفحة) — فيه أوردرات تانية للمندوب ده مش معروضة.`,
+          }, 200, request);
         }
 
         return json({ success: true, orders: fetchedOrders, count: fetchedOrders.length }, 200, request);
@@ -1344,12 +1504,9 @@ export default {
         // في باقي الأداة، وكفاية جداً لحجم أوردرات مندوب واحد في يوم واحد.
         for (let i = 0; i < orderIds.length; i += 50) {
           const chunk = orderIds.slice(i, i + 50).map(id => `gid://shopify/Order/${id}`);
-          const res   = await fetch(`https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-            body: JSON.stringify({ query: gqlQuery, variables: { ids: chunk } }),
-          });
-          const data  = await res.json();
+          // ⚠️ `|| []` هنا آمنة دلوقتي — أي فشل استعلام بيترمي من shopifyGQL.
+          //    قبل v3.5.0 كانت بتاكل الدفعة كلها في صمت = أوردرات مش بتتحصّل.
+          const data  = await shopifyGQL(env, token, gqlQuery, { ids: chunk }, 'getOrdersByIds');
           const nodes = data?.data?.nodes || [];
 
           for (const node of nodes) {
@@ -1414,23 +1571,26 @@ export default {
       // فحص ذاتي بدون أي كتابة. ⚠️ ممنوع يرجّع قيمة أي سر — الأسماء
       // والأطوال بس (الطول بيكشف المسافة المخفية في القيمة).
       if (action === 'diag') {
+        // الشكل المعتمد: مصفوفة [{ ok, label, detail }] بـ `ok` صريحة
+        // (worker-builder § توحيد شكل checks). المفتاح كان `check` لحد v3.4.0،
+        // والمُطبِّع الرسمي بيقرا `c.label || c.name` فكان بيعرض undefined.
         const checks = [];
 
         for (const k of ['WORKER_SECRET', 'CLIENT_ID', 'CLIENT_SECRET']) {
           const v = env[k];
-          checks.push({ check: `env.${k}`, ok: !!v, detail: v ? `موجود (${String(v).length} حرف)` : 'ناقص' });
+          checks.push({ label: `env.${k}`, ok: !!v, detail: v ? `موجود (${String(v).length} حرف)` : 'ناقص' });
         }
         for (const k of ['SHOP_DOMAIN']) {
           const v = env[k];
-          checks.push({ check: `env.${k}`, ok: !!v, detail: v ? String(v) : 'ناقص' });
+          checks.push({ label: `env.${k}`, ok: !!v, detail: v ? String(v) : 'ناقص' });
         }
 
         checks.push({
-          check: 'DB binding (D1)', ok: !!env.DB,
+          label: 'DB binding (D1)', ok: !!env.DB,
           detail: env.DB ? 'موجود' : 'ناقص — تسجيل الدخول وتاب السجل هيفشلوا',
         });
         checks.push({
-          check: 'PRE_REG_KV binding (KV)', ok: !!env.PRE_REG_KV,
+          label: 'PRE_REG_KV binding (KV)', ok: !!env.PRE_REG_KV,
           detail: env.PRE_REG_KV ? 'موجود' : 'ناقص — التسجيل المسبق هيفشل (namespace: pre-register-payment-cod-KV)',
         });
 
@@ -1438,48 +1598,43 @@ export default {
         // وجودها معناه تنظيف ناقص، وبيلخبط أي جرد مستقبلي.
         for (const k of ['PREREG_WORKER_URL', 'PREREG_WORKER_SECRET', 'OSU_WORKER_URL', 'OSU_WORKER_SECRET']) {
           if (env[k] !== undefined) {
-            checks.push({ check: `env.${k} — ملغى`, ok: false, detail: 'موجود في الداشبورد لكن الكود مش بيستخدمه — امسحه' });
+            checks.push({ label: `env.${k} — ملغى`, ok: false, detail: 'موجود في الداشبورد لكن الكود مش بيستخدمه — امسحه' });
           }
         }
         if (env.OSU_SERVICE) {
-          checks.push({ check: 'Service binding OSU_SERVICE — ملغى', ok: false, detail: 'موجود لكن الكود مش بيستخدمه من v3.1.0 — امسحه من تاب Bindings' });
+          checks.push({ label: 'Service binding OSU_SERVICE — ملغى', ok: false, detail: 'موجود لكن الكود مش بيستخدمه من v3.1.0 — امسحه من تاب Bindings' });
         }
 
         try {
           const token = await getAccessToken(env);
           if (!token) throw new Error('OAuth رجّع من غير access_token');
-          const res = await fetch(`https://${env.SHOP_DOMAIN}/admin/api/2026-01/graphql.json`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
-            body: JSON.stringify({ query: '{ currentAppInstallation { accessScopes { handle } } }' }),
-          });
-          const data = await res.json();
+          const data = await shopifyGQL(env, token, '{ currentAppInstallation { accessScopes { handle } } }', {}, 'accessScopes');
           const scopes = (data?.data?.currentAppInstallation?.accessScopes || []).map(s => s.handle);
-          checks.push({ check: 'Shopify OAuth + صلاحيات التطبيق', ok: true, detail: scopes.join(', ') || 'مفيش scopes' });
+          checks.push({ label: 'Shopify OAuth + صلاحيات التطبيق', ok: true, detail: scopes.join(', ') || 'مفيش scopes' });
         } catch (e) {
-          checks.push({ check: 'Shopify OAuth + صلاحيات التطبيق', ok: false, detail: e.message });
+          checks.push({ label: 'Shopify OAuth + صلاحيات التطبيق', ok: false, detail: e.message });
         }
 
         try {
           await env.DB.prepare('SELECT 1').first();
-          checks.push({ check: 'D1 query', ok: true, detail: 'تم' });
+          checks.push({ label: 'D1 query', ok: true, detail: 'تم' });
         } catch (e) {
-          checks.push({ check: 'D1 query', ok: false, detail: e.message });
+          checks.push({ label: 'D1 query', ok: false, detail: e.message });
         }
 
         try {
           assertPreRegKV(env);
           const probe = await env.PRE_REG_KV.list({ prefix: PREREG_PREFIX, limit: 10 });
           checks.push({
-            check: 'KV read (PRE_REG_KV)', ok: true,
+            label: 'KV read (PRE_REG_KV)', ok: true,
             detail: `تم — ${(probe.keys || []).length} مفتاح في أول صفحة${probe.list_complete ? ' (وده الإجمالي)' : ' (فيه أكتر)'}`,
           });
         } catch (e) {
-          checks.push({ check: 'KV read (PRE_REG_KV)', ok: false, detail: e.message });
+          checks.push({ label: 'KV read (PRE_REG_KV)', ok: false, detail: e.message });
         }
 
-        checks.push({ check: 'Origin', ok: true, detail: request.headers.get('Origin') || '(بدون)' });
-        checks.push({ check: 'ALLOWED_ORIGINS', ok: true, detail: ALLOWED_ORIGINS.join(', ') });
+        checks.push({ label: 'Origin', ok: true, detail: request.headers.get('Origin') || '(بدون)' });
+        checks.push({ label: 'ALLOWED_ORIGINS', ok: true, detail: ALLOWED_ORIGINS.join(', ') });
 
         return json({ ok: checks.every(c => c.ok), workerVersion: WORKER_VERSION, checks }, 200, request);
       }
@@ -1560,7 +1715,7 @@ export default {
       }
 
       if (action === 'get_logs_export') {
-        const entries = await getLogsExport(env.DB, {
+        const out = await getLogsExport(env.DB, {
           tool:     url.searchParams.get('tool')     || TOOL_NAME,
           employee: url.searchParams.get('employee') || null,
           type:     url.searchParams.get('type')     || null,
@@ -1569,7 +1724,9 @@ export default {
           dateFrom: url.searchParams.get('dateFrom')  || null,
           dateTo:   url.searchParams.get('dateTo')    || null,
         });
-        return json({ ok: true, entries }, 200, request);
+        // cap/total/truncated إلزاميين — من غيرهم الواجهة بتقول "تم التصدير ✓"
+        // على ملف مقصوص (html-builder Standards #30)
+        return json({ ok: true, ...out }, 200, request);
       }
 
       // ── 🗑️ اتشالوا في v3.3.0 (31-08-2026) — متضيفهمش تاني ──────────
