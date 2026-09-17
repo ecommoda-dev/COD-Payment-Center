@@ -3789,6 +3789,21 @@ function toExportGroups(groups) {
 // ─── §LOG-JS::export (XLSX عبر ExcelJS — كل أو المحدد) — شيتين + تنسيق كامل (زي v2.0) ───
 async function exportXLSX(selectedOnly) {
   if (!isConfigured()) { showToast('الأداة غير مضبوطة', 'error'); return; }
+
+  // 🔴 **محروس بـ`typeof ExcelJS`** — المكتبة من CDN، وCDN محجوب أو شبكة
+  //    واقعة كانت بتخلّي `new ExcelJS.Workbook()` تحت يرمي `ReferenceError`.
+  //    والدالة دي `async` ومتندّهة من `onclick`، فالرمي بيتحوّل **رفض غير
+  //    ممسوك**: الموظف مايشوفش أي حاجة.
+  //    ⛔ **وفي مسار «تصدير الكل» أسوأ من الصمت** — آخر حاجة كانت بتتعرض
+  //       «⏳ جاري تجهيز التصدير...» وبعدها سكوت، فالموظف يفضل مستني ملف
+  //       **مش جاي**.
+  // ⚠️ **والحارس فوق قبل أي نداء شبكة عن قصد** — الفشل معروف من دلوقتي،
+  //    فمفيش لازمة نجيب السجل من الـ Worker الأول وبعدين نقع.
+  if (typeof ExcelJS === 'undefined') {
+    showToast('مكتبة التصدير ما اتحمّلتش — راجع الاتصال وحدّث الصفحة', 'error', 6000);
+    return;
+  }
+
   let log;
   if (selectedOnly) {
     if (!selectedLogBatches.size) { showToast('اختر عمليات أولاً', 'error'); return; }
