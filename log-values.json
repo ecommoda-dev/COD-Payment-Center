@@ -1,0 +1,29 @@
+{
+  "tool": "cod_payment",
+  "since": null,
+  "types": {
+    "login": {
+      "result": null,
+      "stage": null,
+      "desc": "دخول موظف"
+    },
+    "logout": {
+      "result": null,
+      "stage": null,
+      "desc": "خروج موظف"
+    },
+    "payment": {
+      "result": [
+        "success",
+        null
+      ],
+      "stage": null,
+      "desc": "تحصيل COD على الأوردر"
+    },
+    "refund": {
+      "result": "success",
+      "stage": null,
+      "desc": "استرجاع مبلغ COD"
+    }
+  }
+}
