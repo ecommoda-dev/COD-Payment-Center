@@ -220,11 +220,12 @@ git show 505f84b:3.0.html
 
 | المهارة | الإصدار وقت آخر تعديل |
 |---|---|
-| ecommoda-worker-builder | v2.1.0 |
+| ecommoda-worker-builder | v3.7.0 |
 | ecommoda-html-builder | v6.6.0 |
-| ecommoda-constants | v1.8.0 |
+| ecommoda-constants | v3.1.0 |
 
-آخر مطابقة: 06-09-2026 · `index.js` v3.5.0 · `index.html` v3.4.0
+آخر مطابقة: 22-09-2026 (`index.js` بس — الطبقة ٥/`check-log-values.mjs`) ·
+`index.js` v3.5.1 · `index.html` v3.4.0
 🔴 **معلّقة من 16-09-2026 — تدوير `WORKER_SECRET` لمجموعة `delivery_cod_ops`**
 (قرار الدمج تحت مركز الشحن والتحصيل · القسم 🔗 فوق). من غيره `cod-payment.html`
 في المركز بترجّع `401` على كل نداء.
