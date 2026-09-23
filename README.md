@@ -21,7 +21,7 @@
 index.js       ← كود الـ Worker (Cloudflare Workers)
 wrangler.toml  ← الاسم + الـ bindings + الـ vars
 index.html     ← الواجهة (GitHub Pages)
-Index.html     ← صفحة تحويل للروابط القديمة فقط
+(اتشالت Index.html — 23-09-2026، قرار أحمد. الرابط الوحيد: https://ecommoda-dev.github.io/COD-Payment-Center/)
 CLAUDE.md      ← قواعد الأداة · خط الأساس · الفخاخ · المسائل المفتوحة
 ```
 
