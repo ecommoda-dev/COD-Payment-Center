@@ -10,7 +10,7 @@
 |---|---|
 | **الواجهة** | https://ecommoda-dev.github.io/COD-Payment-Center/ |
 | **الـ Worker** | https://cod-payment-center-worker.ecommoda-dev.workers.dev |
-| **الإصدار** | Worker `v3.5.0` · الواجهة `v3.4.0` |
+| **الإصدار** | Worker `v3.6.0` · الواجهة `v3.5.0` |
 
 > الرقمين **مستقلين بالتصميم** واختلافهم وضع طبيعي. اللي بيتفحص هو الحد الأدنى
 > (`MIN_WORKER_VERSION` في الواجهة)، مش التطابق.
