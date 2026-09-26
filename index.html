@@ -1179,7 +1179,18 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
       <div class="cl-version-block">
         <div class="cl-version-row">
-          <span class="cl-ver-badge" id="clVerBadge">v3.4.0</span>
+          <span class="cl-ver-badge" id="clVerBadge">v3.5.0</span>
+          <span class="cl-ver-date">26-09-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>الأوردر المسجّل مسبقًا كان بيتسجّل عليه تحصيل تاني على شوبيفاي.</strong> لو خدمة العملاء عملت استبدال بعد التسجيل المسبق، الأداة كانت بتسجّل <strong>فرق الاستبدال (S2)</strong> على شوبيفاي في جلسة S1، والشحنة لسه ما خرجتش. حصل على #55851 (1,425 بدل 3,525) و13 أوردر تاني. دلوقتي الأوردر المسجّل مسبقًا <strong>مابيتسجّلش عليه أي حاجة على شوبيفاي</strong>، والسجل بيكتب مبلغ التسجيل المسبق نفسه (اللي المندوب سلّمه)، ومتبقي S2 بيفضل على شوبيفاي لحد جلسة S2 وبيتعرض تحت رقم الأوردر.</span></li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span><strong>وقف الجلسة كلها</strong> لو أوردر مسجّل مسبقًا عليه متبقي على شوبيفاي من غير أي استبدال/مرتجع (يعني الأوردر اتعدّل بعد التسجيل المسبق) — زرار التسجيل بيتقفل والسبب مكتوب تحت الأوردر. ونفس الفحص بيتعاد قبل أول عملية في الجلسة، فلو الأوردر اتغيّر بعد إضافته مفيش أي حاجة بتتنفّذ.</span></li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.4.0</span>
           <span class="cl-ver-date">06-09-2026</span>
         </div>
         <ul class="cl-items">
@@ -1386,7 +1397,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
             <li><code>currentEmployee</code> — { username, displayName } في الذاكرة فقط، أبداً في localStorage</li>
             <li><code>WORKER_URL</code> · <code>ADMIN_WORKER_URL</code> — <strong>ثوابت</strong> في §CONFIG مش حقول إعدادات ولا localStorage (Standards #28). الرابط مش سر — الحماية في <code>WORKER_SECRET</code> + CORS allowlist</li>
             <li><code>LS_SECRET = 'cod_payment_center_worker_secret'</code> — المفتاح الوحيد في localStorage. المفتاح القديم <code>..._worker_url</code> اتساب في مكانه ومابيتقراش</li>
-            <li><code>MIN_WORKER_VERSION = '3.5.0'</code> — أقل نسخة Worker الواجهة بتشتغل معاها. Worker أقدم بيسيب <code>status</code>/<code>logged</code>/<code>truncated</code> فاضيين <strong>في صمت</strong>، فالواجهة تعرض «تم» على كل حاجة — عشان كده الحارس ده إلزامي</li>
+            <li><code>MIN_WORKER_VERSION = '3.6.0'</code> — أقل نسخة Worker الواجهة بتشتغل معاها. Worker أقدم بيسيب <code>status</code>/<code>logged</code>/<code>truncated</code> فاضيين <strong>في صمت</strong>، فالواجهة تعرض «تم» على كل حاجة — عشان كده الحارس ده إلزامي</li>
             <li><code>TOOL_NAME = 'cod_payment'</code> — قيمة <code>tool</code> في جدول logs بـ D1</li>
             <li><code>orders[]</code> — الأوردرات في الجدول الرئيسي (تحصيل/استرجاع/استبدال)</li>
             <li><code>extraEntries[]</code> — أوردرات الشحن الإضافي (منفصلة عن الجدول الرئيسي)</li>
@@ -1462,7 +1473,7 @@ const TOOL_NAME    = 'cod_payment';      // قيمة tool في جدول logs ب�
 //    في تاب تاني عند نفس المستخدم.
 
 // مصدر واحد لرقم نسخة الواجهة — الهيدر وبادج الـ Changelog ونص شاشة الدخول
-const TOOL_VERSION = 'v3.4.0';
+const TOOL_VERSION = 'v3.5.0';
 
 // 🔴 أقل نسخة Worker الواجهة دي بتشتغل معاها صح.
 //    v3.5.0 هي اللي بترجّع `status`/`actions`/`logged` و`cap`/`total`/`truncated`
@@ -1470,7 +1481,10 @@ const TOOL_VERSION = 'v3.4.0';
 //    فالواجهة هتعرض "تم" على كل حاجة وتقول "تم التصدير ✓" على ملف مقصوص:
 //    نفس عيلة الفشل الصامت اللي الحارس ده اتكتب عشانها. (وقبلها v3.4.0 كانت
 //    بتفهم `orderMeta.paymentSplit` و`sessionMeta.batchExpected`.)
-const MIN_WORKER_VERSION = '3.5.0';
+// 🔴 v3.6.0 — Worker أقدم **بيسجّل المتبقي على شوبيفاي** لأي أوردر مسجّل مسبقًا
+//    (فرق استبدال S2 اتعلّم مدفوع من غير ما يتقبض — ١٤ أوردر لحد 26-09-2026)،
+//    ومابيرجّعش `preRegBlock`/`s2Due`. فالحارس لازم يمسك الـ Worker ده بالاسم.
+const MIN_WORKER_VERSION = '3.6.0';
 let workerVersion = null;
 
 // مقارنة رقمية — مش نصية. "10" أصغر من "9" لو اتقارنوا كنص.
@@ -2086,6 +2100,7 @@ async function addOrder(numericId) {
     refundAmount: null, saleTransactions: [], orderDiscount: null,
     isExtraShipping: false,
     s1: null, s2: null, statusError: null,
+    s2Due: null, preRegBlock: null,
   };
   orders.unshift(order);
   showTable(); updateStats(); renderTable();
@@ -2115,7 +2130,14 @@ async function addOrder(numericId) {
         order.returnedItems   = d.returnedItems || [];
         order.s1              = d.s1 || null;
         order.s2              = d.s2 || null;
-        order.statusError     = calcStatusError(order, false);
+        // 🔴 v3.6.0 — أوردر مسجّل مسبقًا عليه متبقي مالوش تفسير (مفيش S2 ولا
+        //    return) → `preRegBlock` من الـ Worker. بيتحط في `statusError` عن
+        //    قصد: ده اللي بيقفل زرار التسجيل للجلسة **كلها** (`updatePayBtn`)
+        //    وبيكتب السبب بالأحمر تحت الأوردر — قرار أحمد: وقف مش تخطّي.
+        order.s2Due           = d.s2Due != null ? parseFloat(d.s2Due) : null;
+        order.preRegBlock     = d.preRegBlock || null;
+        order.statusError     = order.preRegBlock || calcStatusError(order, false);
+        if (order.preRegBlock) { playBeep('error'); showToast('⛔ أوردر مسجّل مسبقًا محتاج مراجعة — الجلسة متوقفة', 'error'); }
         if (d.skipReason === 'مستحق استرداد') { order.status = 'refund'; order.refundAmount = Math.abs(order.amount); }
         else { order.status = d.canMarkAsPaid ? 'ready' : 'skipped'; }
       }
@@ -2400,6 +2422,7 @@ function renderTable() {
       <td class="cell-order" onclick="${hasDetails?`toggleRow(${i})`:''}" style="${hasDetails?'cursor:pointer':''}">
         ${expandIcon}${nameDisplay}
         ${o.statusError?`<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:3px">⚠ ${o.statusError}</div>`:''}
+        ${(o.preRegistered && o.s2Due && !o.preRegBlock)?`<div style="font-size:10px;color:var(--purple);font-weight:700;margin-top:3px">متبقي S2: ${fmt(o.s2Due)} — مش في تحصيل الجلسة دي، بيتحصّل مع شحنة الاستبدال</div>`:''}
       </td>
       <td class="cell-courier">${courierDisplay}</td>
       <td class="cell-money">${courierCollect!=null?moneyCell(courierCollect,courierCollect<0?'var(--red)':null):`<span style="color:var(--text-muted)">—</span>`}</td>
@@ -2770,6 +2793,34 @@ async function doBulkPayAndRefund() {
     return;
   }
 
+  // ⛔ v3.5.0 — فحص مسبق للأوردرات المسجّلة مسبقًا **قبل أي كتابة**. الأوردر
+  //    ممكن يتعدّل بعد ما اتضاف للجدول (خدمة العملاء بتعمل استبدال في نفس
+  //    الساعة)، والـ `preview` اللي اتعمل وقت الإضافة بقى قديم. أي أوردر اتقفل
+  //    (`preRegBlock`) أو مبلغه اتغيّر → **الجلسة كلها بتقف** ومفيش ولا عملية
+  //    بتتنفّذ — مش الأوردر ده بس (قرار أحمد 26-09-2026). الـ Worker عنده نفس
+  //    الحارس، بس هناك بيقف بعد ما أوردرات قبله اتسجّلت.
+  const preRegReady = readyOrders.filter(o => o.preRegistered);
+  if (preRegReady.length) {
+    isProcessing = true; $('payBtn').disabled = true;
+    const problems = [];
+    for (const o of preRegReady) {
+      try {
+        const d = await apiPostLegacy('preview', { orderId: o.id });
+        if (!d.success) { problems.push(`${o.orderName || '#'+o.id}: تعذّر التحقق (${d.error || 'خطأ'})`); continue; }
+        if (d.preRegBlock) { o.preRegBlock = d.preRegBlock; o.statusError = d.preRegBlock; problems.push(`${o.orderName}: ${d.preRegBlock}`); continue; }
+        if (!d.preRegistered) { problems.push(`${o.orderName}: التسجيل المسبق مابقاش موجود — احذف الأوردر وضيفه تاني`); continue; }
+        if (Math.abs(parseFloat(d.amount) - (o.amount || 0)) > 0.005) { problems.push(`${o.orderName}: المبلغ اتغيّر (${fmt(o.amount)} → ${fmt(d.amount)}) — احذف الأوردر وضيفه تاني`); continue; }
+        o.s2Due = d.s2Due != null ? parseFloat(d.s2Due) : null;
+      } catch (e) { problems.push(`${o.orderName || '#'+o.id}: تعذّر التحقق (خطأ في الاتصال)`); }
+    }
+    isProcessing = false;
+    if (problems.length) {
+      playBeep('error'); renderTable(); updatePayBtn(); updatePayMethodsCard();
+      showResult(false, '⛔ الجلسة اتوقفت — مفيش أي عملية اتنفّذت', problems.join(' • '));
+      return;
+    }
+  }
+
   const readyCollectOnly  = readyOrders.reduce((s,o) => s + (calcCourierCollect(o)||0), 0);
   const refundCollectOnly = refundOrders.reduce((s,o) => s + (calcCourierCollect(o)||0), 0);
 
@@ -2810,6 +2861,9 @@ async function doBulkPayAndRefund() {
   //    و`logged:false` = العملية حصلت على شوبيفاي بس ما اتسجّلتش في D1.
   let warnCount=0, unloggedCount=0;
   const warnNotes = [];
+  // ⛔ v3.5.0 — `blocked` من الـ Worker = حالة مش متوقعة على أوردر مسجّل مسبقًا.
+  //    اللوب بيقف فورًا، والأوردرات اللي بعده بتفضل «جاهز» من غير ما تتلمس.
+  let blockedStop = null;
 
   // بتقرا الحالة من الـ Worker **كما هي** — مش مشتقّة من `success ? … : …`
   function absorbResult(order, d) {
@@ -2827,12 +2881,13 @@ async function doBulkPayAndRefund() {
       const orderMeta = { lineItems:order.lineItems, returnedItems:order.returnedItems, orderDiscount:order.orderDiscount, preRegistered:order.preRegistered, hasReturn:order.hasReturn, returnShipping:order.returnShipping, courierCollect:calcCourierCollect(order), paymentSplit:splitOf.get(order) };
       const d = await apiPostLegacy('pay', { orderId:order.id, amount:order.amount.toFixed(2), orderName:order.orderName, batchId, sessionMeta, orderMeta, employee: sessionMeta.employee });
       if (d.success) { order.status = 'done'; order.financialStatus = 'PAID'; successPay++; absorbResult(order, d); }
-      else { order.status = 'error'; order.result = 'error'; order.error = d.error||'فشل'; failPay++; }
+      else { order.status = 'error'; order.result = 'error'; order.error = d.error||'فشل'; failPay++; if (d.blocked) blockedStop = `${order.orderName || '#'+order.id}: ${d.error||''}`; }
     } catch (e) { order.status = 'error'; order.error = 'خطأ في الاتصال'; failPay++; }
     done++; setProgress(done/total*100); updateStats(); renderTable();
+    if (blockedStop) break;
   }
 
-  for (const order of refundOrders) {
+  for (const order of (blockedStop ? [] : refundOrders)) {
     order.status = 'loading'; renderTable();
     try {
       if (!order.saleTransactions || !order.saleTransactions.length) { order.status = 'refund-error'; order.error = 'لا يوجد transaction صالح'; failRefund++; }
@@ -2864,7 +2919,19 @@ async function doBulkPayAndRefund() {
   const failedOrders = [...readyOrders, ...refundOrders].filter(o => o.status === 'error' || o.status === 'refund-error');
   const failedMoney  = failedOrders.reduce((s,o) => s + Math.abs(calcCourierCollect(o)||0), 0);
 
-  if (anySuccess && !anyFail && (warnCount || unloggedCount)) {
+  if (blockedStop) {
+    // ⛔ الجلسة وقفت في النص على أوردر مسجّل مسبقًا. اللي قبله اتسجّل فعلاً،
+    //    واللي بعده ما اتلمسش — فالرسالة لازم تقول الاتنين، والفلوس بتفضل في
+    //    الخانات لأن الجلسة مش كاملة.
+    playBeep('error');
+    const notRunOrders = [...readyOrders, ...refundOrders].filter(o => o.status === 'ready' || o.status === 'refund');
+    notRunOrders.forEach(o => { o.error = 'ما اتنفّذش — الجلسة اتوقفت قبله'; });
+    const unrecorded   = [...failedOrders, ...notRunOrders];
+    const unrecMoney   = unrecorded.reduce((s,o) => s + Math.abs(calcCourierCollect(o)||0), 0);
+    showResult(false, `⛔ الجلسة اتوقفت — ${successPay+successRefund} اتسجّل · ${unrecorded.length} ما اتسجّلش`,
+      `${blockedStop} — الأوردرات اللي ما اتسجّلتش لسه في الجدول (${fmt(unrecMoney)} جنيه). راجع الأوردر قبل ما تكمّل.`);
+    if (successPay+successRefund > 0) alertPartialFailure(courierName, unrecorded, unrecMoney, { cash, instapay, wallet });
+  } else if (anySuccess && !anyFail && (warnCount || unloggedCount)) {
     // ⚠️ حالة صفرا — الفعل الأساسي تم بس فيه حاجة ما اتأكدتش. قبل كده كانت
     //    بتتعرض **خضرا** لأن الواجهة كانت بتقرا `d.success` بس وبترمي
     //    `d.warning` الجاي من الـ Worker. نفس عيلة عطل 05-09-2026.

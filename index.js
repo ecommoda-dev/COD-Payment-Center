@@ -1,6 +1,21 @@
 /**
- * cod-payment-center-worker  (v3.5.1)
- * skills: worker-builder v3.7.0 · constants v3.1.0 — 22-09-2026
+ * cod-payment-center-worker  (v3.6.0)
+ * skills: worker-builder v3.7.0 · constants v3.1.0 — 26-09-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.6.0 — الأوردر المسجّل مسبقًا مابيتسجّلش عليه أي تحصيل على شوبيفاي (26-09-2026):
+ *   🔴 `pay` كان بيسجّل `totalOutstanding` كله على شوبيفاي لأي أوردر مسجّل
+ *      مسبقًا عليه متبقي. المتبقي ده طلع **فرق استبدال S2** اتعمل بعد التسجيل
+ *      المسبق وشحنته لسه ما خرجتش — فاتعلّم مدفوع من غير ما يتقبض، ولما S2
+ *      اتسلّمت الأداة رفضت تحصّله. ١٤ أوردر (٤٬٨٠٠ ج) من 31-08 لـ 26-09.
+ *   ✅ `classifyPreReg` (§PREREG) — دالة واحدة لـ `preview` و`pay`:
+ *      · صفر نداء `createTransaction` في مسار التسجيل المسبق.
+ *      · المتبقي مع S2/return → بيفضل على شوبيفاي (`s2Due`) لجلسة S2.
+ *      · المتبقي من غير S2 ولا return → ⛔ `blocked` والعملية كلها بتقف
+ *        (قرار أحمد 26-09-2026) — قبل أي كتابة.
+ *      · حارس اتفاق: `amount` من الواجهة لازم == مبلغ التسجيل المسبق.
+ *   ✅ `valueAfter` في السجل = مبلغ التسجيل المسبق (اللي المندوب سلّمه)، مش
+ *      صفر ولا المتبقي — و`extra.shopifyCaptured = 0` صريحة.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.5.1 — الحارس الديناميكي لقيم اللوج (الطبقة ٥ · worker-builder Step 7-ج)
@@ -199,7 +214,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.5.1';
+const WORKER_VERSION = 'v3.6.0';
 
 // Cairo = UTC+3 (DST active). ⚠️ Egypt DST ends 29-10-2026 → change to 2
 // (نفس التغيير المطلوب في order-status-updater-worker — تغيير على مستوى الحزمة).
@@ -997,20 +1012,72 @@ async function getOrderDataById(env, numericId) {
 
 // 🔴 الدالة دي **بترمي** ومابترجّعش صفر عند الفشل. كانت أخطر سطر في الملف:
 //    `parseFloat(undefined || '0')` = 0، والصفر في مسار الأوردر المسجّل مسبقًا
-//    معناه "مفيش مستحق إضافي" → تخطّي التحصيل + مسح مفتاح PRE_REG_KV + رد
-//    `success:true`. تفاصيل كاملة في تعليق §SHOPIFY::shopifyGQL فوق.
-async function getOrderOutstanding(token, env, numericId) {
+//    كان معناه "مفيش مستحق إضافي". تفاصيل كاملة في تعليق §SHOPIFY::shopifyGQL فوق.
+// 🆕 v3.6.0 — بقت بترجّع كمان `s2` و`hasReturn`: `classifyPreReg` محتاجاهم عشان
+//    تفرّق «متبقي بتاع شحنة S2» عن «متبقي مالوش تفسير» (راجع التعليق تحتها).
+async function getPreRegPayState(token, env, numericId) {
   const query = `
-    query getOutstanding($id: ID!) {
-      order(id: $id) { totalOutstandingSet { shopMoney { amount } } }
+    query getPreRegPayState($id: ID!) {
+      order(id: $id) {
+        totalOutstandingSet { shopMoney { amount } }
+        s2Meta: metafield(namespace: "custom", key: "status_2_r_e") { value }
+        returns(first: 1) { nodes { id } }
+      }
     }
   `;
-  const data  = await shopifyGQL(env, token, query, { id: `gid://shopify/Order/${numericId}` }, 'getOutstanding');
+  const data  = await shopifyGQL(env, token, query, { id: `gid://shopify/Order/${numericId}` }, 'getPreRegPayState');
   const order = data?.data?.order;
   if (!order) throw new Error(`الأوردر ${numericId} مش موجود على شوبيفاي — التحصيل اتوقف`);
   const amt = order.totalOutstandingSet?.shopMoney?.amount;
   if (amt == null) throw new Error(`شوبيفاي ما رجّعتش المستحق للأوردر ${numericId} — التحصيل اتوقف`);
-  return parseFloat(amt);
+  return {
+    outstanding: parseFloat(amt),
+    s2:          order.s2Meta?.value || null,
+    hasReturn:   (order.returns?.nodes || []).length > 0,
+  };
+}
+
+// ─── §PREREG::classifyPreReg (v3.6.0) ───
+// 🔴 القاعدة: الأوردر المسجّل مسبقًا **مابيتسجّلش عليه أي تحصيل على شوبيفاي**
+//    في جلسة المندوب — فلوسه اتسجّلت خلاص في `cod-pre-register-payment`.
+//    المندوب بيسلّم **مبلغ التسجيل المسبق** (`pending.amount`) وده اللي بيتكتب.
+//
+// **العطل اللي البند ده بيقفله (اتكشف 26-09-2026 على #55851):** الكود القديم
+//    كان بيسجّل `totalOutstanding` كله على شوبيفاي لو أكبر من صفر، على افتراض
+//    إن أي متبقي المندوب جابه **في الجلسة دي**. لكن خدمة العملاء بتعمل
+//    استبدال بعد التسجيل المسبق، فالمتبقي بيبقى **فرق الاستبدال (S2)** —
+//    وشحنة S2 لسه ما خرجتش. النتيجة: فلوس S2 اتعلّمت مدفوعة على شوبيفاي من
+//    غير ما حد يقبضها، ولما S2 اتسلّمت الأداة رفضت تحصّلها («مدفوع بالكامل»).
+//    ١٤ أوردر من 31-08 لـ 26-09 (٤٬٨٠٠ ج). وكمان الـ preview كان بيعرض مبلغ
+//    والـ pay بيسجّل مبلغ تاني، ومفيش أي نقطة بتقارن الاتنين.
+//
+// الحالات:
+//   • متبقي ≤ 0                        → عادي. مفيش حاجة على شوبيفاي.
+//   • متبقي > 0 + فيه S2 أو return     → المتبقي **بتاع S2** ويفضل على شوبيفاي
+//                                         لحد ما شحنة S2 تتحصّل بالمسار العادي.
+//   • متبقي > 0 من غير S2 ولا return   → ⛔ **حالة مش متوقعة** (قرار أحمد
+//                                         26-09-2026): الأوردر اتعدّل بعد
+//                                         التسجيل المسبق. **العملية كلها بتقف**
+//                                         لحد ما حد يراجعه — مفيش تخمين.
+function classifyPreReg(pending, state) {
+  const preRegAmount = parseFloat(pending.amount);
+  // ⚠️ مبلغ تالف في KV = `NaN`، وأي مقارنة مع `NaN` بترجّع false — فحارس
+  //    الاتفاق في `pay` كان هيعدّيه ويكتب `NaN` في السجل. وقف صريح بدل كده.
+  if (!Number.isFinite(preRegAmount) || preRegAmount <= 0) {
+    return { preRegAmount: 0, s2Due: null, block: `⛔ مبلغ التسجيل المسبق في PRE_REG_KV تالف («${pending.amount}») — العملية اتوقفت. راجع التسجيل المسبق.` };
+  }
+  const hasS2 = !!state.s2 || !!state.hasReturn;
+  if (state.outstanding > 0.005 && !hasS2) {
+    return {
+      preRegAmount, s2Due: null,
+      block: `⛔ أوردر مسجّل مسبقًا (${preRegAmount.toFixed(2)} ج) وعليه متبقي ${state.outstanding.toFixed(2)} ج على شوبيفاي من غير أي استبدال/مرتجع — الأوردر اتعدّل بعد التسجيل المسبق. العملية اتوقفت: راجع الأوردر قبل التحصيل.`,
+    };
+  }
+  return {
+    preRegAmount,
+    s2Due: state.outstanding > 0.005 ? state.outstanding : null,
+    block: null,
+  };
 }
 
 async function getOrderIdByName(env, orderNumber) {
@@ -1199,31 +1266,25 @@ export default {
         }
 
         if (pending) {
-          const preRegAmount = parseFloat(pending.amount);
-
-          if (orderData.hasReturn) {
-            return json({
-              success: true, orderId: numericId, orderName: orderData.orderName || pending.orderName,
-              amount: pending.amount, subtotal: pending.subtotal, shippingAmount: pending.shippingAmount,
-              canMarkAsPaid: true, skipReason: null, financialStatus: orderData.financialStatus,
-              courier: orderData.courier || pending.courier, lineItems: pending.lineItems,
-              orderDiscount: orderData.orderDiscount, preRegistered: true, registeredAt: pending.preRegisteredAt,
-              cancelled: false, hasReturn: false, returnShipping: '0.00', returnedItems: [],
-              saleTransactions: [], s1: orderData.s1, s2: null,
-            }, 200, request);
-          }
-
-          const outstanding   = parseFloat(orderData.outstanding);
-          const displayAmount = outstanding > 0 ? (preRegAmount + outstanding).toFixed(2) : pending.amount;
-
+          // 🔴 v3.6.0 — نفس `classifyPreReg` اللي `pay` بيستخدمها بالحرف، فالمبلغ
+          //    المعروض == المبلغ اللي هيتكتب. قبل كده الفرع ده كان بيعرض
+          //    «التسجيل المسبق + المتبقي» (أو التسجيل بس لو فيه return)، و`pay`
+          //    بيسجّل المتبقي على شوبيفاي — رقمين مختلفين لنفس الأوردر.
+          //    الـ S2 بيفضل `null` في الرد عن قصد: الصف ده تحصيل S1، وحالة S2
+          //    (Confirmed + EXCHANGE مثلاً) مش خطأ فيه — المتبقي بتاعها في `s2Due`.
+          const cls = classifyPreReg(pending, {
+            outstanding: parseFloat(orderData.outstanding), s2: orderData.s2, hasReturn: orderData.hasReturn,
+          });
           return json({
             success: true, orderId: numericId, orderName: orderData.orderName || pending.orderName,
-            amount: displayAmount, subtotal: pending.subtotal, shippingAmount: pending.shippingAmount,
+            amount: pending.amount, subtotal: pending.subtotal, shippingAmount: pending.shippingAmount,
             canMarkAsPaid: true, skipReason: null, financialStatus: orderData.financialStatus,
             courier: orderData.courier || pending.courier, lineItems: pending.lineItems,
             orderDiscount: orderData.orderDiscount, preRegistered: true, registeredAt: pending.preRegisteredAt,
             cancelled: false, hasReturn: false, returnShipping: '0.00', returnedItems: [],
-            saleTransactions: [], s1: orderData.s1, s2: orderData.s2,
+            saleTransactions: [], s1: orderData.s1, s2: null,
+            s2Due: cls.s2Due != null ? cls.s2Due.toFixed(2) : null,
+            preRegBlock: cls.block,
           }, 200, request);
         }
 
@@ -1276,58 +1337,57 @@ export default {
           const token = await getAccessToken(env);
           if (!token) return json({ success: false, status: 'error', error: 'Failed to get Shopify access token' }, 200, request);
 
-          // ⚠️ بترمي عند أي فشل استعلام (v3.5.0) — قبل كده كانت بترجّع صفر،
-          //    والصفر هنا معناه "مفيش مستحق" فالفرع التاني كان بيمسح التسجيل
-          //    المسبق ويرجّع نجاح من غير ما يحصّل حاجة.
-          const outstanding = await getOrderOutstanding(token, env, numericId);
+          // ⚠️ بترمي عند أي فشل استعلام — مفيش أي قيمة افتراضية هنا.
+          const state = await getPreRegPayState(token, env, numericId);
+          const cls   = classifyPreReg(pending, state);
 
-          // Step 5A ⑤ — بتتملى أول بأول، مش بترجع من دالة في الآخر
-          const actions = [];
+          // ⛔ v3.6.0 — حالة مش متوقعة: بنوقف **قبل** أي كتابة (KV · D1 · شوبيفاي).
+          //    `blocked:true` بيخلّي الواجهة توقف الجلسة كلها مش الأوردر ده بس.
+          if (cls.block) {
+            return json({ success: false, status: 'error', blocked: true, error: cls.block, actions: [] }, 200, request);
+          }
 
-          if (outstanding > 0) {
-            const txResult = await createTransaction(token, env, numericId, outstanding.toFixed(2));
-
-            // 🐛 v3.2.0 — إصلاح: المسح اتنقل لبعد فحص نجاح المعاملة. قبل كده
-            // كان بيتنفّذ قبلها، يعني معاملة فاشلة كانت بتمسح التسجيل المسبق
-            // برضه = ضياع بيانات (الأوردر يفضل غير محصّل، والمبلغ المسجّل
-            // مقدّمًا يختفي من KV خالص).
-            if (!txResult.success) return json({ success: false, status: 'error', error: txResult.error, actions }, 200, request);
-            actions.push(`تحصيل ${outstanding.toFixed(2)} ج على شوبيفاي`);
-
-            const cleared = await clearPendingPreReg(env, numericId);
-            if (cleared) actions.push('مسح التسجيل المسبق من PRE_REG_KV');
-            const warning = cleared ? null : 'التحصيل تم على شوبيفاي، لكن مسح التسجيل المسبق من PRE_REG_KV فشل — الأوردر ممكن يظهر تاني كـ"مسجل مسبقاً". امسح المفتاح يدويًا.';
-            const status  = warning ? 'warning' : 'success';
-
-            const { logged, logError } = await safeWriteLog(env.DB, {
-              tool: TOOL_NAME, type: 'payment', employee: employee || null,
-              orderId: numericId, orderName: orderName || pending.orderName || null,
-              valueAfter: outstanding,
-              notes: 'تحصيل (كان مسجل مسبقاً)' + (warning ? ` — ⚠ ${warning}` : ''),
-              extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: pending.courier, isRefund: false, result: status, actions }),
-            });
+          // 🔴 v3.6.0 — حارس اتفاق: المبلغ اللي الواجهة عرضته واتقسمت عليه طرق
+          //    الدفع لازم يساوي مبلغ التسجيل المسبق. أي فرق = الواجهة والـ Worker
+          //    شايفين أوردر مختلف (ده بالظبط اللي حصل في #55851) → وقف من غير كتابة.
+          if (Math.abs(parsedAmount - cls.preRegAmount) > 0.005) {
             return json({
-              success: true, status, actions, logged, logError, orderId: numericId, preRegistered: true,
-              amount: outstanding.toFixed(2), transactionId: txResult.transactionId,
-              ...(warning ? { warning } : {}),
+              success: false, status: 'error', blocked: true, actions: [],
+              error: `⛔ المبلغ المعروض (${parsedAmount.toFixed(2)} ج) ≠ مبلغ التسجيل المسبق (${cls.preRegAmount.toFixed(2)} ج) — العملية اتوقفت. احذف الأوردر من الجدول وضيفه تاني.`,
             }, 200, request);
           }
 
+          // Step 5A ⑤ — بتتملى أول بأول، مش بترجع من دالة في الآخر
+          const actions = [`بدون أي تسجيل على شوبيفاي — المبلغ مسجّل مسبقًا (${cls.preRegAmount.toFixed(2)} ج)`];
+          if (cls.s2Due) actions.push(`متبقي S2 ${cls.s2Due.toFixed(2)} ج فاضل على شوبيفاي — بيتحصّل مع شحنة S2`);
+
           const cleared = await clearPendingPreReg(env, numericId);
           if (cleared) actions.push('مسح التسجيل المسبق من PRE_REG_KV');
-          const warning = cleared ? null : 'التحصيل تم على شوبيفاي، لكن مسح التسجيل المسبق من PRE_REG_KV فشل — الأوردر ممكن يظهر تاني كـ"مسجل مسبقاً". امسح المفتاح يدويًا.';
+          const warning = cleared ? null : 'مسح التسجيل المسبق من PRE_REG_KV فشل — الأوردر ممكن يظهر تاني كـ"مسجل مسبقاً". امسح المفتاح يدويًا.';
           const status  = warning ? 'warning' : 'success';
 
+          // 🔴 v3.6.0 — `valueAfter` = اللي المندوب سلّمه للأوردر ده (مبلغ التسجيل
+          //    المسبق) — مش اللي اتسجّل على شوبيفاي. قبل كده كان صفر أو المتبقي،
+          //    فمجموع «تحصيل» الجلسة في السجل ماكانش بيطابق طرق الدفع.
           const { logged, logError } = await safeWriteLog(env.DB, {
             tool: TOOL_NAME, type: 'payment', employee: employee || null,
             orderId: numericId, orderName: orderName || pending.orderName || null,
-            valueAfter: 0,
-            notes: 'مسجل مسبقاً — مفيش مستحق إضافي' + (warning ? ` — ⚠ ${warning}` : ''),
-            extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: pending.courier, isRefund: false, result: status, actions }),
+            valueAfter: cls.preRegAmount,
+            notes: 'تحصيل (كان مسجل مسبقاً)'
+              + (cls.s2Due ? ` — متبقي S2 ${cls.s2Due.toFixed(2)} ج على شوبيفاي` : '')
+              + (warning ? ` — ⚠ ${warning}` : ''),
+            extra: {
+              ...buildPayExtra({ batchId, sessionMeta, orderMeta, courier: pending.courier, isRefund: false, result: status, actions }),
+              shopifyCaptured: 0,
+              preRegAmount:    cls.preRegAmount,
+              s2Due:           cls.s2Due,
+            },
           });
           return json({
             success: true, status, actions, logged, logError,
-            orderId: numericId, preRegistered: true, amount: '0.00',
+            orderId: numericId, preRegistered: true,
+            amount: cls.preRegAmount.toFixed(2), shopifyCaptured: '0.00',
+            s2Due: cls.s2Due != null ? cls.s2Due.toFixed(2) : null,
             ...(warning ? { warning } : {}),
           }, 200, request);
         }
