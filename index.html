@@ -1179,7 +1179,19 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
       <div class="cl-version-block">
         <div class="cl-version-row">
-          <span class="cl-ver-badge" id="clVerBadge">v3.5.0</span>
+          <span class="cl-ver-badge" id="clVerBadge">v3.6.0</span>
+          <span class="cl-ver-date">07-10-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>طرق الدفع في الاسترداد بقت بالسالب.</strong> كاش/انستاباي/محفظة كانت بتتجمع موجبة حتى في جلسات الاسترداد، فشيت «الإجمالي» كان بيطلع كاش 2,600 + انستاباي 999 = 3,599 جنب صافي 1,601. دلوقتي الاسترداد بيتقلب سالب (999−) في الصفحة والتصدير، والمجموع بيقفل على الصافي. الصفوف القديمة في D1 ما اتغيّرتش — التعديل في العرض والتصدير بس.</span></li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>عمود «شحن» في الإكسيل بقى بيظهر في التحصيل العادي كمان.</strong> كان بيتقرا من شحن المرتجع بس، فأوردر زي #58482 (2,675 على شوبيفاي مقابل 2,600 للمندوب) كان بيظهر شحنه صفر. دلوقتي الشحن = المسجّل على شوبيفاي − فلوس المندوب. المسجّل مسبقًا والمرتجع/الاستبدال لسه على شحن المرتجع.</span></li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span>شيت «الإجمالي»: عمود «فرق طرق الدفع عن الصافي» (المفروض صفر، وبيتلوّن أحمر لو لأ) — وأي رقم سالب في الشيت بقى <strong>أحمر</strong> زي شيت «سجل التحصيل».</span></li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.5.0</span>
           <span class="cl-ver-date">26-09-2026</span>
         </div>
         <ul class="cl-items">
@@ -1473,7 +1485,7 @@ const TOOL_NAME    = 'cod_payment';      // قيمة tool في جدول logs ب�
 //    في تاب تاني عند نفس المستخدم.
 
 // مصدر واحد لرقم نسخة الواجهة — الهيدر وبادج الـ Changelog ونص شاشة الدخول
-const TOOL_VERSION = 'v3.5.0';
+const TOOL_VERSION = 'v3.6.0';
 
 // 🔴 أقل نسخة Worker الواجهة دي بتشتغل معاها صح.
 //    v3.5.0 هي اللي بترجّع `status`/`actions`/`logged` و`cap`/`total`/`truncated`
@@ -4166,6 +4178,17 @@ async function exportXLSX(selectedOnly) {
   [2,3,4,5,6,9,10].forEach(c => { gt.getCell(c).numFmt=NUM_FMT; });
   gt.height=20;
   ws2.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
+
+  // أي رقم سالب في شيت «الإجمالي» أحمر زي «سجل التحصيل». صف الإجمالي الكلي
+  // خلفيته كحلي فبياخد أحمر فاتح عشان يتقري.
+  ws2.eachRow((row, rowNum) => {
+    if (rowNum === 1) return;
+    const onDark = rowNum === ws2.rowCount;
+    row.eachCell({ includeEmpty:false }, cell => {
+      if (typeof cell.value !== 'number' || cell.value >= 0) return;
+      cell.font = { ...(cell.font || {}), color:{ argb: onDark ? 'FFFF8A8A' : 'FFCC0000' } };
+    });
+  });
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
