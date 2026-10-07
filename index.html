@@ -3579,10 +3579,15 @@ function groupRowsIntoSessions(rows, view) {
     const g = groups[batchId];
     if (row.type === 'refund') { g.hasRefund = true; g.totalRefund += parseFloat(row.value_after) || 0; }
     else                       { g.hasPayment = true; g.totalAmount += parseFloat(row.value_after) || 0; }
+    // 🔴 طرق الدفع بتتخزّن **موجبة** حتى في الاسترداد (المبلغ اللي اتدفع للعميل).
+    //    فلازم الجمع يقلب إشارة صفوف الاسترداد، وإلا «كاش + انستاباي + محفظة»
+    //    مابتقفلش على الصافي (2,600 + 999 بدل 2,600 − 999). القلب على
+    //    **مستوى الصف** عشان الجلسة المختلطة (تحصيل + استرداد) تتحسب صح.
     const pm = extra.paymentMethods || {};
-    g.pmSum.cash     += parseFloat(pm.cash)     || 0;
-    g.pmSum.instapay += parseFloat(pm.instapay) || 0;
-    g.pmSum.wallet   += parseFloat(pm.wallet)   || 0;
+    const pmSign = row.type === 'refund' ? -1 : 1;
+    g.pmSum.cash     += pmSign * (parseFloat(pm.cash)     || 0);
+    g.pmSum.instapay += pmSign * (parseFloat(pm.instapay) || 0);
+    g.pmSum.wallet   += pmSign * (parseFloat(pm.wallet)   || 0);
     g.actualCollect  += parseFloat(extra.courierCollect) || 0;
     g.rows.push({ entry: row, extra });
   }
@@ -3606,10 +3611,19 @@ function groupRowsIntoSessions(rows, view) {
 //   pmScope='order'   (v3.3.0+) → كل صف شايل حصته → **الجمع** هو الإجمالي
 //   pmScope='session' (الأقدم)  → كل صف شايل نفس الإجمالي → **أول صف** بس
 // جمع الصفوف القديمة كان هيضرب الإجمالي في عدد الصفوف.
+// الصفوف الأقدم (pmScope='session'): الإجمالي مختوم على أول صف بس بموجب. الإشارة
+// بتتحدد من الجلسة كلها — استرداد بس → سالب. الجلسة المختلطة القديمة مالهاش
+// تقسيم لكل أوردر، فبتفضل زي ما هي بدل تخمين.
+function signedSessionMethods(g) {
+  const pm = g.firstRowMethods || {};
+  if (!(g.hasRefund && !g.hasPayment)) return pm;
+  const neg = v => (-(parseFloat(v) || 0)).toFixed(2);
+  return { cash: neg(pm.cash), instapay: neg(pm.instapay), wallet: neg(pm.wallet) };
+}
 function finalizeGroup(g) {
   g.paymentMethods = (g.pmScope === 'order')
     ? { cash: g.pmSum.cash.toFixed(2), instapay: g.pmSum.instapay.toFixed(2), wallet: g.pmSum.wallet.toFixed(2) }
-    : (g.firstRowMethods || {});
+    : signedSessionMethods(g);
   g.shortfall = batchShortfall(g);
 }
 
@@ -3740,9 +3754,13 @@ function renderLog(entries) {
 
     const pmChips = [];
     const pm = g.paymentMethods || {};
-    if (parseFloat(pm.cash)>0)     pmChips.push(`💵 ${fmt(pm.cash)}`);
-    if (parseFloat(pm.instapay)>0) pmChips.push(`📱 ${fmt(pm.instapay)}`);
-    if (parseFloat(pm.wallet)>0)   pmChips.push(`👛 ${fmt(pm.wallet)}`);
+    // سالب (استرداد) بيتعرض بعلامة − وباللون الأحمر زي عمود «استرداد»
+    const pmChip = (ico, v) => {
+      const n = parseFloat(v) || 0;
+      if (!n) return;
+      pmChips.push(n < 0 ? `<span style="color:var(--red);font-weight:700">${ico} ${fmtSigned(n)}</span>` : `${ico} ${fmt(n)}`);
+    };
+    pmChip('💵', pm.cash); pmChip('📱', pm.instapay); pmChip('👛', pm.wallet);
 
     return `<tr class="log-batch-row" id="lbr-${gi}" onclick="toggleBatch(${gi})">
       <td onclick="event.stopPropagation()">
@@ -3843,6 +3861,8 @@ function toExportGroups(groups) {
         preRegistered: x.preRegistered || false,
         hasReturn: x.hasReturn || false,
         returnShipping: x.returnShipping || '0.00',
+        valueAfter: e.value_after,
+        shopifyCaptured: x.shopifyCaptured ?? null,
         isRefund,
         refundAmount: isRefund ? e.value_after : null,
         courierCollect: x.courierCollect ?? null,
@@ -3984,7 +4004,20 @@ async function exportXLSX(selectedOnly) {
       const otype = getOrderType(o);
       const odv = o.orderDiscount ? parseFloat(o.orderDiscount) : null;
       grandCourierNet += cc;
-      const shipVal = (o.hasReturn||isRefundRow) ? (parseFloat(o.returnShipping)||0) : 0;
+      // 🔴 الشحن = اللي اتسجّل على شوبيفاي − فلوس المندوب. ده نفس تعريف
+      //    `calcCourierCollect` (عادي: amount − shippingAmount). قبل كده كان
+      //    بيتقرا من `returnShipping` بس، فالتحصيل العادي كان بيطلع «0»
+      //    والـ75 جنيه شحن مالهاش أثر في الصف (#58482: 2,675 مقابل 2,600).
+      //    ⚠️ المسجّل مسبقًا (`value_after` فيه مبلغ التسجيل المسبق) والمرتجع/
+      //    الاستبدال بيفضلوا على `returnShipping`.
+      let shipVal;
+      const va = parseFloat(o.valueAfter);
+      if (!o.hasReturn && !isRefundRow && !o.preRegistered && o.shopifyCaptured !== 0 && !isNaN(va) && o.courierCollect != null) {
+        shipVal = Math.round((va - cc) * 100) / 100;
+        if (!(shipVal >= 0)) shipVal = 0;
+      } else {
+        shipVal = (o.hasReturn||isRefundRow) ? (parseFloat(o.returnShipping)||0) : 0;
+      }
 
       const writeRow = (item, isFirst, isReturn) => {
         const qty = isReturn ? -(item.quantity||1) : (parseFloat(item.quantity)||0);
@@ -4067,6 +4100,7 @@ async function exportXLSX(selectedOnly) {
     { header:'عدد الأوردرات', key:'orders', width:14 },
     { header:'أوردرات ناقصة', key:'missOrders', width:14 },
     { header:'فرق غير مفسَّر', key:'missCollect', width:16 },
+    { header:'فرق طرق الدفع عن الصافي', key:'pmGap', width:22 },
   ];
   ws2.getRow(1).eachCell(cell => {
     cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+HEADER_BG}};
@@ -4094,11 +4128,14 @@ async function exportXLSX(selectedOnly) {
       courierTotals[cr].missCollect += entry.shortfall.collect;
     }
   }
-  const dataStyle = (cell,col) => { cell.font={size:10,name:'Arial'}; cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'}; if ((col>=2&&col<=6)||col===9) cell.numFmt=NUM_FMT; };
+  const dataStyle = (cell,col) => { cell.font={size:10,name:'Arial'}; cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'}; if ((col>=2&&col<=6)||col===9||col===10) cell.numFmt=NUM_FMT; };
   Object.entries(courierTotals).forEach(([cr,t]) => {
     const hasGap = t.missOrders > 0 || Math.abs(t.missCollect) >= 0.01;
+    // طرق الدفع (بعد قلب إشارة الاسترداد) لازم تساوي الصافي — أي رقم غير الصفر يتلوّن.
+    const pmGap = Math.round((t.cash + t.instapay + t.wallet - t.courierNet) * 100) / 100;
+    const hasPmGap = Math.abs(pmGap) >= 0.01;
     const r = ws2.addRow({ courier:cr, courierNet:t.courierNet, cash:t.cash, instapay:t.instapay, wallet:t.wallet, extra:t.extra>0?t.extra:null, orders:t.orders,
-                           missOrders: t.missOrders||null, missCollect: hasGap ? t.missCollect : null });
+                           missOrders: t.missOrders||null, missCollect: hasGap ? t.missCollect : null, pmGap });
     r.eachCell({includeEmpty:false}, (cell,col) => dataStyle(cell,col));
     // ⛔ المندوب اللي عنده فرق غير مفسَّر يتلوّن — عمود ساكت في ملف طويل
     //    مش إشارة، والسطر ده هو اللي بيخلي المراجعة المالية تشوفه فورًا.
@@ -4109,6 +4146,11 @@ async function exportXLSX(selectedOnly) {
         c.font={size:10,name:'Arial',bold:true,color:{argb:'FFCC0000'}};
       });
     }
+    if (hasPmGap) {
+      const c = r.getCell(10);
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFCCCC'}};
+      c.font={size:10,name:'Arial',bold:true,color:{argb:'FFCC0000'}};
+    }
   });
   const grandCash2 = log.reduce((s,e) => s+(parseFloat((e.paymentMethods||{}).cash)||0), 0);
   const grandInstapay2 = log.reduce((s,e) => s+(parseFloat((e.paymentMethods||{}).instapay)||0), 0);
@@ -4118,9 +4160,10 @@ async function exportXLSX(selectedOnly) {
   const grandMissOrders = log.reduce((s,e) => s + (e.shortfall ? Math.max(e.shortfall.orders,0) : 0), 0);
   const grandMissCollect = log.reduce((s,e) => s + (e.shortfall ? e.shortfall.collect : 0), 0);
   const gt = ws2.addRow({ courier:'جميع المناديب', courierNet:grandNet2, cash:grandCash2, instapay:grandInstapay2, wallet:grandWallet2, extra:grandExtra2>0?grandExtra2:null, orders:grandOrders2,
-                          missOrders: grandMissOrders||null, missCollect: (grandMissOrders||Math.abs(grandMissCollect)>=0.01) ? grandMissCollect : null });
+                          missOrders: grandMissOrders||null, missCollect: (grandMissOrders||Math.abs(grandMissCollect)>=0.01) ? grandMissCollect : null,
+                          pmGap: Math.round((grandCash2 + grandInstapay2 + grandWallet2 - grandNet2) * 100) / 100 });
   gt.eachCell({includeEmpty:true}, cell => { cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+GRAND_BG}}; cell.font={bold:true,color:{argb:'FFFFFFFF'},size:11,name:'Arial'}; cell.alignment={horizontal:'center',vertical:'middle',readingOrder:'rightToLeft'}; });
-  [2,3,4,5,6,9].forEach(c => { gt.getCell(c).numFmt=NUM_FMT; });
+  [2,3,4,5,6,9,10].forEach(c => { gt.getCell(c).numFmt=NUM_FMT; });
   gt.height=20;
   ws2.views = [{ state:'frozen', ySplit:1, rightToLeft:true }];
 
