@@ -3813,8 +3813,10 @@ function renderLog(entries) {
   body.innerHTML = `<table class="log-otbl">
     <thead><tr>
       <th style="width:32px"></th>
-      <th>التاريخ</th><th>النوع</th><th>المندوب</th><th>الموظف</th>
-      <th>عدد</th><th>تحصيل</th><th>استرداد</th><th>طرق الدفع</th><th></th>
+      ${sortableTh('date', 'التاريخ')}${sortableTh('time', 'الوقت')}<th>النوع</th>
+      ${sortableTh('courier', 'المندوب')}${sortableTh('employee', 'الموظف')}
+      ${sortableTh('count', 'عدد')}${sortableTh('collect', 'تحصيل')}${sortableTh('refund', 'استرداد')}
+      <th>طرق الدفع</th>${sortableTh('result', 'النتيجة')}<th></th>
     </tr></thead>
     <tbody>${rowsHtml}</tbody>
   </table>`;
