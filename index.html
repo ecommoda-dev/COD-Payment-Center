@@ -2894,7 +2894,8 @@ async function doBulkPayAndRefund() {
       const d = await apiPostLegacy('pay', { orderId:order.id, amount:order.amount.toFixed(2), orderName:order.orderName, batchId, sessionMeta, orderMeta, employee: sessionMeta.employee });
       if (d.success) { order.status = 'done'; order.financialStatus = 'PAID'; successPay++; absorbResult(order, d); }
       else { order.status = 'error'; order.result = 'error'; order.error = d.error||'فشل'; failPay++; if (d.blocked) blockedStop = `${order.orderName || '#'+order.id}: ${d.error||''}`; }
-    } catch (e) { order.status = 'error'; order.error = 'خطأ في الاتصال'; failPay++; }
+    // 🔴 فشل شبكة/مهلة بعد ما النداء ممكن يكون وصل = «معرفناش» مش «فشل» — الكتابة ممكن تكون تمّت.
+    } catch (e) { order.status = 'error'; order.error = 'ما اتأكدناش إن التحصيل اتسجّل (انقطع الاتصال) — راجع تاب السجل قبل ما تعيد المحاولة'; failPay++; }
     done++; setProgress(done/total*100); updateStats(); renderTable();
     if (blockedStop) break;
   }
@@ -2909,7 +2910,7 @@ async function doBulkPayAndRefund() {
         if (d.success) { order.status = 'refund-done'; order.financialStatus = 'REFUNDED'; successRefund++; absorbResult(order, d); }
         else { order.status = 'refund-error'; order.result = 'error'; order.error = d.error||'فشل'; failRefund++; }
       }
-    } catch (e) { order.status = 'refund-error'; order.error = 'خطأ في الاتصال'; failRefund++; }
+    } catch (e) { order.status = 'refund-error'; order.error = 'ما اتأكدناش إن الاسترداد اتسجّل (انقطع الاتصال) — راجع تاب السجل قبل ما تعيد المحاولة'; failRefund++; }
     done++; setProgress(done/total*100); updateStats(); renderTable();
   }
 
