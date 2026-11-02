@@ -241,6 +241,46 @@ body {
 .card-body { padding:0 16px 16px; }
 
 .input-methods { display:flex; flex-direction:column; gap:6px; }
+/* ── §ENTRY-BAR — مربع إدخال موحّد (unified-entry-box.md) ── */
+.entry-bar { display: flex; flex-direction: column; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 6px; transition: border-color .15s; }
+.entry-bar[data-view=manual] { border-top-color: var(--border-strong); }
+.entry-chips { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.entry-segs { display: inline-flex; flex-wrap: nowrap; gap: 1px; max-width: 100%; background: var(--border-strong); border: 1.5px solid var(--border-strong); border-radius: 10px; overflow: hidden; }
+.entry-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 0; border-radius: 0; background: var(--surface); color: var(--text-secondary); font-family: var(--font-body); font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
+.entry-chip:hover { background: var(--surface-2); }
+.entry-chip:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.entry-chip[data-m=shopify].is-on { background: var(--accent); color: var(--on-accent); }
+.entry-chip[data-m=manual].is-on { background: var(--text-secondary); color: var(--on-accent); }
+.entry-hint { display: inline-flex; align-items: center; gap: 7px; padding: 3px 14px; border-radius: 20px; border: 1.5px solid; margin-inline-start: auto; font-size: 12.5px; font-weight: 800; pointer-events: none; user-select: none; }
+.entry-hint[data-m=shopify] { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); }
+.entry-hint[data-m=manual] { background: var(--surface-2); border-color: var(--text-secondary); color: var(--text-secondary); }
+@media (max-width: 520px) { .entry-chip { padding: 7px 9px; font-size: 12px; gap: 4px; } .entry-hint { margin-inline-start: 0; } }
+.entry-chip-auto { padding: 0 7px; line-height: 17px; border-radius: 20px; font-size: 10px; font-weight: 800; background: var(--on-accent); color: var(--accent); }
+.entry-chip[data-m=manual] .entry-chip-auto { color: var(--text-secondary); }
+.entry-input-wrap { display: flex; gap: 8px; align-items: stretch; }
+.entry-input { flex: 1; min-width: 0; min-height: 52px; padding: 0 14px; border: 2px solid var(--accent); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-primary); font-family: var(--font-mono); font-size: 17px; font-weight: 700; outline: none; direction: ltr; text-align: left; transition: border-color .15s, box-shadow .15s; }
+.entry-input:focus { box-shadow: 0 0 0 3px rgba(37,99,235,.18); }
+.entry-bar[data-view=manual] .entry-input { border-color: var(--border-strong); }
+.entry-bar[data-view=manual] .entry-input:focus { box-shadow: 0 0 0 3px rgba(100,116,139,.2); }
+.entry-input:disabled { opacity: .55; cursor: not-allowed; }
+.btn-entry { min-width: 96px; padding: 0 18px; border: 1px solid var(--accent); border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font-family: var(--font-body); font-size: 15px; font-weight: 800; cursor: pointer; }
+.entry-bar[data-view=manual] .btn-entry { background: var(--text-secondary); border-color: var(--text-secondary); }
+.btn-entry:disabled { opacity: .55; cursor: not-allowed; }
+.bc-fails { margin: 6px 0 4px; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--red-light); border: 1px solid var(--red-border); color: var(--red-dark); font-size: 12.5px; font-weight: 700; line-height: 1.8; }
+.bc-fails[hidden] { display: none; }
+.bc-fail-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bc-fail-row + .bc-fail-row { margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--red-border); }
+.bc-fail-lbl { font-family: var(--font-mono); font-weight: 800; direction: ltr; }
+.bc-fail-why { flex: 1; min-width: 140px; }
+.bc-fail-x { margin-inline-start: auto; border: none; background: transparent; cursor: pointer; font-size: 15px; font-weight: 900; color: inherit; line-height: 1; padding: 2px 6px; border-radius: 6px; opacity: .7; }
+.bc-fail-x:hover { opacity: 1; background: var(--red-border); }
+.bc-fail-x:disabled { opacity: .3; cursor: not-allowed; }
+.bc-fails-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.toast-dup { background: var(--amber); }
+.toast .ti { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-inline-end: 8px; border-radius: 50%; background: rgba(255,255,255,.25); font-size: 12px; font-weight: 900; }
+.row-flash td { animation: rowFlash 1s ease; }
+@keyframes rowFlash { 0%, 60% { background: var(--amber-light); } 100% { background: transparent; } }
+
 .input-method { border:0.5px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); transition:all .2s; overflow:hidden; }
 .input-method.active { border-color:var(--accent); background:var(--accent-light); }
 .input-method-header { display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:default; user-select:none; }
@@ -792,32 +832,21 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
       <div class="card-body" style="padding-bottom:16px">
         <div class="input-methods">
 
-          <div class="input-method active" id="methodScanner">
-            <div class="input-method-header">
-              <span class="input-method-icon">🔫</span>
-              <span class="input-method-label">ماسح الباركود</span>
-            </div>
-            <div class="input-method-body">
-              <div class="scanner-wrap">
-                <span class="scanner-icon-wrap">🔫</span>
-                <input type="text" id="scannerInput" class="scanner-input" placeholder="امسح الباركود هنا..." autocomplete="off" spellcheck="false" inputmode="none">
+          <!-- §ENTRY-BAR — مربع واحد: الأداة بتعرف النوع من الطول، والإضافة بـ Enter أو «إضافة» بس -->
+          <div class="entry-bar" id="entryBar" data-view="shopify">
+            <div class="entry-chips" id="entryChips" role="group" aria-label="مصدر الإدخال">
+              <div class="entry-segs">
+                <button type="button" class="entry-chip is-on" data-m="shopify" aria-pressed="true">🔫 فاتورة شوبيفاي</button>
+                <button type="button" class="entry-chip" data-m="manual" aria-pressed="false">⌨️ رقم الأوردر</button>
               </div>
-              <div class="scanner-hint">💡 Scanner Gun: امسح وسيتم الاستعلام تلقائياً</div>
+              <span class="entry-hint" id="entryHint" data-m="shopify" aria-hidden="true"></span>
+            </div>
+            <div class="entry-input-wrap">
+              <input type="text" class="entry-input" id="entryInput" dir="auto" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="مربع إضافة الأوردرات" autofocus>
+              <button type="button" class="btn-entry" id="entryAddBtn">إضافة</button>
             </div>
           </div>
-
-          <div class="input-method" id="methodManual">
-            <div class="input-method-header">
-              <span class="input-method-icon">⌨️</span>
-              <span class="input-method-label">إدخال يدوي</span>
-            </div>
-            <div class="input-method-body">
-              <div class="manual-row">
-                <input type="text" id="manualInput" class="manual-input" placeholder="أدخل رقم الأوردر..." autocomplete="off" spellcheck="false" inputmode="numeric">
-                <button class="btn-manual" id="manualBtn" onclick="handleManualAdd()">إضافة</button>
-              </div>
-            </div>
-          </div>
+          <div class="bc-fails" id="entryFails" hidden></div>
 
           <div class="input-method" id="methodImport">
             <div class="input-method-header">
@@ -867,23 +896,18 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
               <span class="extra-add-panel-title">إضافة أوردر شحن إضافي</span>
               <button class="btn-extra-cancel" onclick="hideExtraScanner()">✕ إلغاء</button>
             </div>
-            <div class="extra-scanner-row">
-              <span class="extra-row-label orange">🔫 سكانر</span>
-              <input type="text" id="extraScanInput" class="extra-scan-input" placeholder="امسح الباركود هنا..." autocomplete="off" spellcheck="false" inputmode="none">
-            </div>
             <div class="extra-manual-row">
-              <span class="extra-row-label">✏️ يدوي</span>
-              <input type="text" id="extraManualInput" class="extra-manual-input" placeholder="12345 أو #12345" autocomplete="off" spellcheck="false" inputmode="numeric">
-              <button class="btn-extra-action" id="extraManualBtn" onclick="handleExtraManualAdd()">إضافة</button>
+              <input type="text" id="extraEntryInput" class="extra-manual-input" dir="auto" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="رقم الأوردر أو باركود الفاتورة">
+              <button class="btn-extra-action" id="extraEntryBtn" type="button">إضافة</button>
             </div>
           </div>
           <div class="extra-entries-list" id="extraEntriesList"></div>
         </div>
 
         <div class="pay-grid">
-          <div class="pay-method-item"><div class="pay-method-label">💵 نقدي</div><input type="number" id="pmCash" class="pay-method-input" placeholder="0.00" min="0" step="0.01" oninput="updatePayValidation()"></div>
-          <div class="pay-method-item"><div class="pay-method-label">📱 انستاباي</div><input type="number" id="pmInstapay" class="pay-method-input" placeholder="0.00" min="0" step="0.01" oninput="updatePayValidation()"></div>
-          <div class="pay-method-item"><div class="pay-method-label">👛 محفظة</div><input type="number" id="pmWallet" class="pay-method-input" placeholder="0.00" min="0" step="0.01" oninput="updatePayValidation()"></div>
+          <div class="pay-method-item"><div class="pay-method-label">💵 نقدي</div><input type="number" id="pmCash" class="pay-method-input" min="0" step="0.01" oninput="updatePayValidation()"></div>
+          <div class="pay-method-item"><div class="pay-method-label">📱 انستاباي</div><input type="number" id="pmInstapay" class="pay-method-input" min="0" step="0.01" oninput="updatePayValidation()"></div>
+          <div class="pay-method-item"><div class="pay-method-label">👛 محفظة</div><input type="number" id="pmWallet" class="pay-method-input" min="0" step="0.01" oninput="updatePayValidation()"></div>
         </div>
         <div class="pay-validation" id="payValidation"><span class="pay-val-text" id="payValText">أدخل طرق الدفع</span></div>
       </div>
@@ -963,8 +987,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
                     <span class="ms-ftr-count" id="msFtrCount-logCourier"></span>
                   </div>
                   <div class="ms-search-wrap">
-                    <input type="text" class="ms-search" id="msSearch-logCourier"
-                      placeholder="بحث..." oninput="msFilterList('logCourier', this.value)">
+                    <input type="text" class="ms-search" id="msSearch-logCourier" oninput="msFilterList('logCourier', this.value)">
                   </div>
                   <div class="ms-selectall-row" onclick="msToggleSelectAll('logCourier')">
                     <input type="checkbox" id="msSelectAll-logCourier"
@@ -978,7 +1001,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
             <div class="log-fg">
               <label class="log-flabel">بحث برقم الأوردر</label>
-              <input type="text" class="log-finput w-search" id="logSearch" placeholder="مثال: 1780" autocomplete="off" spellcheck="false" oninput="toggleSearchActiveState(this)">
+              <input type="text" class="log-finput w-search" id="logSearch" autocomplete="off" spellcheck="false" oninput="toggleSearchActiveState(this)">
             </div>
 
             <div class="log-fg">
@@ -1179,7 +1202,20 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
       <div class="cl-version-block">
         <div class="cl-version-row">
-          <span class="cl-ver-badge" id="clVerBadge">v3.6.0</span>
+          <span class="cl-ver-badge" id="clVerBadge">v3.7.0</span>
+          <span class="cl-ver-date">02-11-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span><strong>مربع إدخال موحّد</strong> بدل كارتَي «ماسح الباركود» و«إدخال يدوي»: الأداة بتعرف النوع من الطول (١–٧ أرقام = رقم أوردر · ١٣–١٥ = باركود فاتورة شوبيفاي)، والإضافة بـ Enter أو «إضافة» بس — مفيش مؤقّت إضافة تلقائي. نفس المربع في «شحن إضافي».</span></li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span>الفشل (طول مش معروف · حروف · أكتر من رقم · أوردر مش موجود) في <strong>صندوق أحمر</strong> بسطر قصير + ✕، وزرار التسجيل مقفول لحد ما يتفضّى. المكرر: توست أصفر + صوت + وميض الصف.</span></li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span>تهريب HTML لكل قيمة جاية من شوبيفاي/الـ Worker (أسماء العملاء · الأخطاء · SKU · المناديب · الملحوظات)، ورابط الأوردر أرقام بس.</span></li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span>اسم ملف التصدير بتاريخ القاهرة بدل UTC، وشيل الـ placeholders من كل الحقول.</span></li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.6.0</span>
           <span class="cl-ver-date">07-10-2026</span>
         </div>
         <ul class="cl-items">
@@ -1392,7 +1428,7 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
           <h4>FEATURE MAP</h4>
           <ul>
             <li><code>§AUTH-JS</code> — Universal D1 Auth (خطوتين: اختيار الموظف ثم PIN)</li>
-            <li><code>§SCAN</code> — ماسح الباركود الرئيسي + ماسح الشحن الإضافي (نفس نمط handleScan)</li>
+            <li><code>§ENTRY-BAR</code> — مربع الإدخال الموحّد (chips تتبع النوع · Enter فقط · صندوق الفشل الأحمر · ٣ أصوات) + إدخال الشحن الإضافي بنفس التصنيف</li>
             <li><code>§TOOL-JS</code> — إضافة/حذف الأوردرات، الحسابات (<code>calcCourierCollect</code>)، جدول العرض، طرق الدفع، التأكيد والتنفيذ الجماعي (pay/refund)</li>
             <li><code>§TOOL-JS::allocatePaymentSplit</code> — توزيع طرق الدفع على أوردرات الجلسة بالتناسب مع تحصيل كل أوردر. توزيع تراكمي عشان مجموع الحصص يساوي المُدخل بالمليم. الوزن للأوردرات اللي على نفس اتجاه صافي الجلسة بس</li>
             <li><code>§TOOL-JS::alertPartialFailure</code> — نافذة إقرار بتوقف الموظف لما جلسة تخلص بنجاح جزئي، وبتقوله بالجنيه إيه اللي اتقبض ومش مسجّل</li>
@@ -1460,11 +1496,11 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 // ══════════════════════════════════════════════════════════════
 const SHOP_DOMAIN = '6c7e1a-53.myshopify.com';
 function shopifyOrderUrl(orderId) {
-  const id = String(orderId).includes('gid://') ? orderId.split('/').pop() : orderId;
+  const id = String(String(orderId).includes('gid://') ? String(orderId).split('/').pop() : orderId).replace(/\D/g, '');   // أرقام بس قبل ما يدخل الـ href
   return `https://${SHOP_DOMAIN}/admin/orders/${id}`;
 }
 function orderLink(orderNumber, orderId) {
-  const label = String(orderNumber).startsWith('#') ? orderNumber : `#${orderNumber}`;
+  const label = esc(String(orderNumber).startsWith('#') ? orderNumber : `#${orderNumber}`);
   if (!orderId) return `<span class="order-num">${label}</span>`;
   return `<a href="${shopifyOrderUrl(orderId)}" target="_blank" rel="noopener" class="order-link">${label}</a>`;
 }
@@ -1485,7 +1521,7 @@ const TOOL_NAME    = 'cod_payment';      // قيمة tool في جدول logs ب�
 //    في تاب تاني عند نفس المستخدم.
 
 // مصدر واحد لرقم نسخة الواجهة — الهيدر وبادج الـ Changelog ونص شاشة الدخول
-const TOOL_VERSION = 'v3.6.0';
+const TOOL_VERSION = 'v3.7.0';
 
 // 🔴 أقل نسخة Worker الواجهة دي بتشتغل معاها صح.
 //    v3.5.0 هي اللي بترجّع `status`/`actions`/`logged` و`cap`/`total`/`truncated`
@@ -1640,6 +1676,12 @@ function openAbout()      { $('aboutOverlay').classList.add('open'); }
 function closeAbout()     { $('aboutOverlay').classList.remove('open'); }
 
 // ── Toast ─────────────────────────────────────────────────────
+// §ESC-BEGIN — في الهب `esc()` جاية من shared/core.js (المولّد بيشيل الكتلة دي)
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// §ESC-END
 function showToast(msg, type = 'neutral', duration = 3000) {
   const t = document.createElement('div');
   t.className = `toast toast-${type}`;
@@ -1768,6 +1810,22 @@ function playBeep(type) {
       gain.gain.setValueAtTime(0.3, _audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.25);
       osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.25);
+    } else if (type === 'fail') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(600, _audioCtx.currentTime);
+      osc.frequency.setValueAtTime(450, _audioCtx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.23, _audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.28);
+      osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.28);
+    } else if (type === 'dup') {
+      const t0 = _audioCtx.currentTime;
+      [659.3, 523.3, 440, 349.2].forEach((f, i) => {
+        const o = _audioCtx.createOscillator(), g = _audioCtx.createGain(), t = t0 + i * 0.1;
+        o.type = 'square'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.19, t + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+        o.connect(g); g.connect(_audioCtx.destination); o.start(t); o.stop(t + 0.115);
+      });
     } else {
       osc.frequency.setValueAtTime(300, _audioCtx.currentTime);
       osc.frequency.setValueAtTime(200, _audioCtx.currentTime + 0.15);
@@ -1968,7 +2026,7 @@ async function finishLogin(username, displayName) {
   playBeep('success');
 
   $('activeUserBtn').textContent = `👤 ${displayName}`;
-  setTimeout(() => scannerInput && scannerInput.focus(), 100);
+  setTimeout(() => entryInput && entryInput.focus(), 100);
 }
 
 async function doLogout() {
@@ -2024,20 +2082,161 @@ function switchMainTab(tab) {
 // ══════════════════════════════════════════════════════════════
 let orders = [], extraEntries = [], isProcessing = false;
 
-function setActiveMethod(methodId) {
-  ['methodScanner','methodManual','methodImport'].forEach(id => {
-    const el = $(id);
-    if (!el) return;
-    if (id === 'methodImport') return;
-    el.classList.toggle('active', id === methodId);
-  });
+// ══════════════════════════════════════════════════════════════
+// §SCAN — (اتشال) ماسح الباركود الرئيسي → §ENTRY-BAR تحت
+// ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// §ENTRY-BAR — مربع إدخال موحّد (unified-entry-box.md · html-builder v8.5.0)
+//   النوع بالطول: ١–٧ رقم أوردر · ١٣–١٥ باركود فاتورة شوبيفاي (Order ID).
+//   الإضافة بـ Enter أو «إضافة» بس — ⛔ مفيش مؤقّت إضافة تلقائي (السكانر بيبعت Enter).
+//   الفشل في صندوق أحمر (مش في الجدول) وزرار التسجيل مقفول لحد ما يتفضّى.
+// ⚠️ انحراف مقصود: أوردر اتضاف وفشل استعلامه (preview) بيفضل صف في الجدول
+//    بحالته (خطأ/غير موجود) زي ما كان — `updateStats` بيعدّه.
+// ══════════════════════════════════════════════════════════════
+const ENTRY_CFG = {
+  ORDER_NAME: { min: 1,  max: 7  },
+  ORDER_ID:   { min: 13, max: 15 },
+  DIGITS_WARN_MIN: 8,
+  MISSING_ENTER_MS: 1500,
+  TOAST_MS: { success: 2200, dup: 3200, neutral: 3200, error: 6500 },
+};
+const ENTRY_TYPES = { order_name: { mode: 'manual' }, order_id: { mode: 'shopify' } };
+const ENTRY_MODES = {
+  shopify: { to: 'فاتورة شوبيفاي', aria: 'مربع إضافة الأوردرات — اسكن باركود فاتورة شوبيفاي' },
+  manual:  { to: 'رقم الأوردر',    aria: 'مربع إضافة الأوردرات — اكتب رقم الأوردر' },
+};
+const entryInput = $('entryInput');
+let entryCurMode = 'shopify', entryStartMode = 'shopify', entryAuto = false;
+let entryBusy = false, entryMeTimer = null, entryFails = [], entryFseq = 0;
+
+const ENTRY_AR = '٠١٢٣٤٥٦٧٨٩', ENTRY_FA = '۰۱۲۳۴۵۶۷۸۹';
+const entryToWestern = s => String(s ?? '').replace(/[٠-٩]/g, d => ENTRY_AR.indexOf(d)).replace(/[۰-۹]/g, d => ENTRY_FA.indexOf(d));
+function entryNormalize(raw) {
+  let s = String(raw ?? '').replace(/[‎‏‪-‮⁦-⁩ ]/g, ' ');
+  s = entryToWestern(s).trim();
+  const noHash = s.replace(/#/g, '').trim();
+  if (/^\d[\d\s,،;]*$/.test(noHash)) return { clean: noHash, numeric: true };
+  return { clean: s, numeric: false };
 }
+const entryInR = (n, r) => n >= r.min && n <= r.max;
+function entryClassify(raw) {
+  const n = entryNormalize(raw);
+  if (!n.clean) return { kind: 'empty' };
+  if (!n.numeric) return { kind: 'invalid', reason: 'اكتب رقم الأوردر أو اسكن باركود الفاتورة — مفيش حروف' };
+  const tokens = [...new Set(n.clean.split(/[\s,،;]+/).filter(Boolean))];
+  if (tokens.length > 1) return { kind: 'invalid', reason: `${tokens.length} أرقام — أضف أوردر واحد في المرة` };
+  const v = tokens[0], len = v.length;
+  if (entryInR(len, ENTRY_CFG.ORDER_NAME)) {
+    const nv = String(Number(v));
+    if (nv === '0') return { kind: 'invalid', reason: 'رقم الأوردر مش ممكن يبقى صفر' };
+    return { kind: 'single', type: 'order_name', value: nv };
+  }
+  if (entryInR(len, ENTRY_CFG.ORDER_ID)) return { kind: 'single', type: 'order_id', value: v };
+  return { kind: 'invalid', reason: len > ENTRY_CFG.ORDER_ID.max
+    ? `${len} خانة — غالبًا باركودين ملزوقين، اسكنهم واحد واحد`
+    : `${len} خانة — مش طول معروف، غالبًا اتقرا ناقص` };
+}
+
+// ── الصوت والتوست (٣ أصوات: صح · خطأ · مكرر) ──
+const ENTRY_TOAST_ICON = { success: '✓', error: '✗', dup: '↻', neutral: '' };
+function entryToast(msg, type = 'neutral', ms) {
+  const box = $('toastContainer'); if (!box) return;
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  if (ENTRY_TOAST_ICON[type]) { const i = document.createElement('span'); i.className = 'ti'; i.textContent = ENTRY_TOAST_ICON[type]; t.appendChild(i); }
+  t.appendChild(document.createTextNode(msg));
+  box.appendChild(t);
+  setTimeout(() => t.remove(), ms || ENTRY_CFG.TOAST_MS[type] || 3200);
+}
+
+// ── الـ chips واللون والـ pill ──
+function entryRenderBar() {
+  const c = entryClassify(entryInput.value);
+  const detected = c.kind === 'single' ? ENTRY_TYPES[c.type].mode : null;
+  if (detected) entryCurMode = detected;
+  if (!entryInput.value) entryStartMode = entryCurMode;
+  entryAuto = !!entryInput.value && entryCurMode !== entryStartMode;
+  $('entryBar').dataset.view = entryCurMode;
+  document.querySelectorAll('#entryChips .entry-chip').forEach(ch => {
+    const on = ch.dataset.m === entryCurMode;
+    ch.classList.toggle('is-on', on);
+    ch.setAttribute('aria-pressed', on ? 'true' : 'false');
+    ch.querySelectorAll('.entry-chip-auto').forEach(x => x.remove());
+    if (on && entryAuto) { const t = document.createElement('span'); t.className = 'entry-chip-auto'; t.textContent = 'تلقائي'; ch.appendChild(t); }
+  });
+  entryInput.setAttribute('aria-label', ENTRY_MODES[entryCurMode].aria);
+  const hint = $('entryHint');
+  hint.dataset.m = entryCurMode;
+  hint.textContent = entryAuto ? 'اتحوّل تلقائيًا إلى ' + ENTRY_MODES[entryCurMode].to
+    : (entryCurMode === 'manual' ? '⌨️ كتابة الرقم يدوي' : '🔫 سكانر');
+}
+function entryLiveHint() {
+  clearTimeout(entryMeTimer);
+  const w = entryToWestern(entryInput.value);
+  if (w !== entryInput.value) entryInput.value = w;          // أرقام عربي ← إنجليزي لحظيًا
+  const v = entryInput.value;
+  entryRenderBar();
+  if (!v) return;
+  const nn = entryNormalize(v);
+  if (nn.numeric && nn.clean.replace(/\D/g, '').length >= ENTRY_CFG.DIGITS_WARN_MIN) {
+    entryMeTimer = setTimeout(() => {          // تحذير بس — عمره ما بيضيف لوحده
+      if (entryInput.value !== v) return;
+      playBeep('fail');
+      entryToast(`الرقم وصل (${nn.clean.length} خانة) ولسه ماتضافش — اضغط Enter أو «إضافة». لو بيتكرر مع السكانر راجع إعداد Enter فيه`, 'error');
+    }, ENTRY_CFG.MISSING_ENTER_MS);
+  }
+}
+
+// ── §FAILS — الصندوق الأحمر ──
+function entryAddFail(label, reason) {
+  label = String(label || '—');
+  if (!entryFails.find(f => f.label === label && f.reason === reason)) entryFails.unshift({ id: ++entryFseq, label, reason });
+  playBeep('fail');
+  entryToast(`${label} — ${reason}`, 'error');
+  entryRenderFails();
+}
+function entryRemoveFail(id) { if (isProcessing || entryBusy) return; entryFails = entryFails.filter(f => f.id !== id); entryRenderFails(); entryInput.focus(); }
+function entryClearFails()   { if (isProcessing || entryBusy) return; entryFails = []; entryRenderFails(); entryInput.focus(); }
+function entryRenderFails() {
+  const fb = $('entryFails'), lock = isProcessing || entryBusy;
+  fb.hidden = entryFails.length === 0;
+  fb.innerHTML = entryFails.length ? (entryFails.length > 1
+      ? `<div class="bc-fails-head"><span>${entryFails.length} حاجة ما اتضافتش للجدول</span><button class="btn-manual" type="button" id="entryClearFails" ${lock ? 'disabled' : ''}>🗑 احذف الكل</button></div>` : '') +
+    entryFails.map(f => `
+      <div class="bc-fail-row">
+        <span aria-label="فشل">⚠️</span>
+        <span class="bc-fail-lbl">${esc(f.label)}</span>
+        <span class="bc-fail-why">— ${esc(f.reason)}</span>
+        <button class="bc-fail-x" type="button" data-fx="${f.id}" aria-label="احذف ${esc(f.label)} من الصندوق" ${lock ? 'disabled' : ''}>✕</button>
+      </div>`).join('') : '';
+  if (typeof updatePayBtn === 'function') updatePayBtn();   // الصندوق مش فاضي = التسجيل مقفول
+}
+$('entryFails').addEventListener('click', (e) => {
+  const x = e.target.closest('[data-fx]');
+  if (x) { entryRemoveFail(Number(x.dataset.fx)); return; }
+  if (e.target.closest('#entryClearFails')) entryClearFails();
+});
+
+// ── القفل أثناء الدفعة أو الاستعلام (Standards #43) ──
+function syncEntryLock() {
+  const lock = isProcessing || entryBusy;
+  entryInput.disabled = lock;
+  $('entryAddBtn').disabled = lock;
+  const xi = $('extraEntryInput'), xb = $('extraEntryBtn');
+  if (xi) xi.disabled = lock;
+  if (xb) xb.disabled = lock;
+  entryRenderFails();
+  if (!lock && $('panelScan').classList.contains('active') && !$('extraAddPanel').classList.contains('show')) entryInput.focus();
+}
+
+function setActiveMethod(methodId) { /* باقي كارت «البحث عن أوردرات المندوب» بس — مفيش كروت سكانر/يدوي */ }
 function updateImportBtn() {
   const courier = getReadyCourier();
   const textEl = $('importBtnText'), methodEl = $('methodImport');
   if (!textEl) return;
   if (courier) {
-    textEl.innerHTML = `البحث عن أوردرات <span class="btn-import-method-courier">${courier}</span>`;
+    textEl.innerHTML = `البحث عن أوردرات <span class="btn-import-method-courier">${esc(courier)}</span>`;
     if (methodEl) methodEl.classList.add('active');
   } else {
     textEl.textContent = 'البحث عن أوردرات المندوب';
@@ -2045,67 +2244,100 @@ function updateImportBtn() {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// §SCAN — Main Scanner (scanner-gun pattern: read+clear inside handleScan)
-// ══════════════════════════════════════════════════════════════
-const scannerInput = $('scannerInput');
-let lastKeyTime = 0, scanTimer = null;
-
 // ⚠️ `confirmOverlay` مستثنى زي `importOverlay` بالظبط — من غيره السكانر
 //    بيفضل ماسك الفوكس والديالوج مفتوح، فمسحة واحدة بتضيف أوردر **بعد** ما
-//    الفلوس اتحققت. `doBulkPayAndRefund` بتقرا الجدول من جديد وقت التنفيذ،
-//    فالأوردر الزيادة كان بيتحصّل بفلوس جلسة مش متضمّناه. (الاتجاه المعاكس
-//    لعطل 05-09-2026 — نفس السبب البنيوي.)
+//    الفلوس اتحققت. (الاتجاه المعاكس لعطل 05-09-2026 — نفس السبب البنيوي.)
 function refocus() {
   if (!currentEmployee) return;
-  if ($('panelScan').classList.contains('active') && !$('extraAddPanel').classList.contains('show') && !$('importOverlay').classList.contains('open') && !$('confirmOverlay').classList.contains('open')) {
-    scannerInput.focus();
-    setActiveMethod('methodScanner');
+  if ($('panelScan').classList.contains('active') && !$('extraAddPanel').classList.contains('show') && !$('importOverlay').classList.contains('open') && !$('confirmOverlay').classList.contains('open') && !entryInput.disabled) {
+    entryInput.focus();
   }
 }
 document.addEventListener('click', e => {
-  const skip = ['.settings-overlay','.eco-overlay','.confirm-overlay','.import-overlay','.log-tab-wrap','.pay-methods-card','.table-wrap','.result-box','.manual-row','#settingsBtn','#extraAddPanel'];
+  const skip = ['.settings-overlay','.eco-overlay','.confirm-overlay','.import-overlay','.log-tab-wrap','.pay-methods-card','.table-wrap','.result-box','.entry-bar','.bc-fails','#settingsBtn','#extraAddPanel'];
   if (skip.some(s => e.target.closest(s))) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
   setTimeout(refocus, 50);
 });
-scannerInput.addEventListener('focus', () => setActiveMethod('methodScanner'));
-$('manualInput').addEventListener('focus', () => setActiveMethod('methodManual'));
 
-scannerInput.addEventListener('input', () => {
-  if (isProcessing) return;
-  const gap = Date.now() - lastKeyTime; lastKeyTime = Date.now();
-  clearTimeout(scanTimer); scanTimer = setTimeout(handleScan, gap < 80 ? 150 : 400);
-});
-scannerInput.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(scanTimer); handleScan(); } });
-$('manualInput').addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); handleManualAdd(); } });
-
-async function handleScan() {
-  const raw = scannerInput.value.trim(); scannerInput.value = ''; scannerInput.focus();
-  if (!raw || !/^\d+$/.test(raw)) return;
-  if (orders.find(o => o.id === raw)) { showToast('⚠ موجود بالفعل'); return; }
-  if (!isConfigured()) { openSettings(); return; }
-  await addOrder(raw);
+// ── §ENTRY::fire — Enter أو زرار «إضافة» بس. القراءة والمسح جوّه الدالة دي ──
+function entryFinish() {
+  entryInput.value = '';
+  entryStartMode = entryCurMode;
+  entryRenderBar();
+  if (!entryInput.disabled) entryInput.focus();
 }
-async function handleManualAdd() {
-  const input = $('manualInput'), raw = input.value.trim().replace(/^#/, '');
-  if (!raw) { input.focus(); return; }
+function entryFlashRow(i) {
+  const tr = document.querySelector(`#tableBody tr[data-type="order"][data-idx="${i}"]`);
+  if (tr) { tr.classList.remove('row-flash'); void tr.offsetWidth; tr.classList.add('row-flash'); }
+}
+function entryFindDup(c) {
+  return orders.findIndex(o => c.type === 'order_name'
+    ? String(o.orderName || '').replace(/^#/, '') === c.value
+    : String(o.id) === c.value);
+}
+async function entryFire() {
+  clearTimeout(entryMeTimer);
+  if (isProcessing || entryBusy) {
+    playBeep('fail');
+    entryToast(isProcessing ? 'جاري التنفيذ — الإدخال مقفول لحد ما يخلص' : 'جاري الاستعلام — استنى لحد ما يخلص', 'error');
+    return;
+  }
+  const raw = entryInput.value;
+  const c = entryClassify(raw);
+  if (c.kind === 'empty') return;
+  if (c.kind === 'invalid') {
+    const shown = (entryNormalize(raw).clean || String(raw).trim()).slice(0, 40);
+    entryFinish(); entryAddFail(shown, c.reason); return;
+  }
   if (!isConfigured()) { openSettings(); return; }
-  const manualBtn = $('manualBtn');
-  manualBtn.disabled = true; manualBtn.textContent = '...'; input.disabled = true;
+  entryFinish();
+  await entrySubmit(c);
+}
+async function entrySubmit(c) {
+  const dup = entryFindDup(c);
+  if (dup >= 0) { entryDup(dup); return; }
+  entryBusy = true; syncEntryLock();
   try {
-    if (orders.find(o => o.orderName === '#'+raw) || orders.find(o => o.id === raw)) { showToast('⚠ موجود بالفعل'); return; }
-    const d = await apiPostLegacy('resolveByName', { orderName: '#'+raw });
-    if (!d.success || !d.orderId) { showToast(d.notFound ? `⚠ #${raw} غير موجود` : '⚠ خطأ في الاستعلام'); return; }
-    if (orders.find(o => o.id === d.orderId)) { showToast('⚠ موجود بالفعل'); return; }
-    await addOrder(d.orderId);
-  } catch (e) { showToast('خطأ في الاتصال', 'error'); }
-  finally { manualBtn.disabled = false; manualBtn.textContent = 'إضافة'; input.disabled = false; input.value = ''; input.focus(); }
+    let id = c.value;
+    if (c.type === 'order_name') {
+      let d;
+      try { d = await apiPostLegacy('resolveByName', { orderName: '#' + c.value }); }
+      catch (e) { entryAddFail('#' + c.value, 'تعذّر الاتصال — راجع النت وجرّب تاني'); return; }
+      if (!d.success || !d.orderId) { entryAddFail('#' + c.value, d.notFound ? 'مفيش أوردر بالرقم ده على شوبيفاي' : 'خطأ في الاستعلام'); return; }
+      id = String(d.orderId);
+      const dup2 = orders.findIndex(o => String(o.id) === id);
+      if (dup2 >= 0) { entryDup(dup2); return; }
+    }
+    await addOrder(id);
+    const o = orders.find(x => String(x.id) === id);
+    if (!o || o.status === 'error' || o.status === 'notfound') {
+      playBeep('fail');
+      entryToast(`${c.type === 'order_name' ? '#' + c.value : id} — ${o && o.status === 'notfound' ? 'مفيش أوردر بباركود الفاتورة ده على شوبيفاي' : 'تعذّر الاستعلام عن الأوردر'}`, 'error');
+    } else {
+      playBeep('success');
+      entryToast(`اتضاف ${o.orderName || '#' + c.value}`, 'success');
+    }
+  } finally { entryBusy = false; syncEntryLock(); }
 }
-
-document.getElementById('manualInput').addEventListener('keypress', e => {
-  if (e.key === 'Enter') { e.preventDefault(); handleManualAdd(); }
-});
+function entryDup(i) {
+  playBeep('dup');
+  entryToast(`${orders[i].orderName || '#' + orders[i].id} موجود في الجدول بالفعل`, 'dup');
+  entryFlashRow(i);
+}
+function entrySelectChip(m) {
+  if (isProcessing || entryBusy) return;
+  entryCurMode = m; entryStartMode = m;
+  entryInput.value = '';
+  clearTimeout(entryMeTimer);
+  entryRenderBar();
+  entryInput.focus();
+}
+entryInput.addEventListener('input', entryLiveHint);
+entryInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); entryFire(); } });
+$('entryAddBtn').addEventListener('click', entryFire);
+$('entryChips').addEventListener('click', e => { const ch = e.target.closest('.entry-chip'); if (ch) entrySelectChip(ch.dataset.m); });
+entryRenderBar();
 
 async function addOrder(numericId) {
   const order = {
@@ -2121,7 +2353,6 @@ async function addOrder(numericId) {
   };
   orders.unshift(order);
   showTable(); updateStats(); renderTable();
-  showToast(`🔫 ${numericId}`);
 
   try {
     const d = await apiPostLegacy('preview', { orderId: numericId });
@@ -2174,35 +2405,37 @@ function deleteOrder(idx) {
 // ══════════════════════════════════════════════════════════════
 // §SCAN::extra — Extra Shipping Scanner
 // ══════════════════════════════════════════════════════════════
-let extraScanTimer = null, extraLastKeyTime = 0;
+const extraEntryInput = $('extraEntryInput');
 
-function showExtraScanner() { $('extraAddPanel').classList.add('show'); $('extraScanInput').focus(); }
-function hideExtraScanner() { $('extraAddPanel').classList.remove('show'); $('extraScanInput').value=''; $('extraManualInput').value=''; refocus(); }
+function showExtraScanner() { $('extraAddPanel').classList.add('show'); extraEntryInput.focus(); }
+function hideExtraScanner() { $('extraAddPanel').classList.remove('show'); extraEntryInput.value = ''; refocus(); }
 
-const extraScanInput = $('extraScanInput');
-extraScanInput.addEventListener('input', () => {
-  const gap = Date.now() - extraLastKeyTime; extraLastKeyTime = Date.now();
-  clearTimeout(extraScanTimer);
-  extraScanTimer = setTimeout(handleExtraScan, gap < 80 ? 150 : 400);
-});
-extraScanInput.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(extraScanTimer); handleExtraScan(); } });
-$('extraManualInput').addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); handleExtraManualAdd(); } });
-
-async function handleExtraScan() {
-  const raw = extraScanInput.value.trim(); extraScanInput.value = '';
-  if (!raw) return;
-  if (/^\d+$/.test(raw)) await processExtraOrderById(raw);
-  else await processExtraOrderByName(raw.replace(/^#/, ''));
-}
-async function handleExtraManualAdd() {
-  const input = $('extraManualInput'), raw = input.value.trim().replace(/^#/, '');
-  if (!raw) { input.focus(); return; }
+// نفس تصنيف المربع الموحّد (الطول يحدد النوع) · Enter أو «إضافة» بس · الفشل في الصندوق الأحمر
+async function extraEntryFire() {
+  if (isProcessing || entryBusy) {
+    playBeep('fail');
+    entryToast(isProcessing ? 'جاري التنفيذ — الإدخال مقفول لحد ما يخلص' : 'جاري الاستعلام — استنى لحد ما يخلص', 'error');
+    return;
+  }
+  const raw = extraEntryInput.value;
+  const c = entryClassify(raw);
+  if (c.kind === 'empty') return;
+  extraEntryInput.value = '';
+  if (c.kind === 'invalid') {
+    entryAddFail((entryNormalize(raw).clean || String(raw).trim()).slice(0, 40), c.reason);
+    extraEntryInput.focus();
+    return;
+  }
   if (!isConfigured()) { openSettings(); return; }
-  const btn = $('extraManualBtn');
-  input.disabled = true; btn.disabled = true; btn.textContent = '...';
-  try { await processExtraOrderByName(raw); }
-  finally { input.disabled = false; btn.disabled = false; btn.textContent = 'إضافة'; input.value = ''; input.focus(); }
+  entryBusy = true; syncEntryLock();
+  try {
+    if (c.type === 'order_name') await processExtraOrderByName(c.value);
+    else await processExtraOrderById(c.value);
+  } finally { entryBusy = false; syncEntryLock(); }
 }
+extraEntryInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); extraEntryFire(); } });
+$('extraEntryBtn').addEventListener('click', extraEntryFire);
+
 async function processExtraOrderByName(orderNumber) {
   if (!isConfigured()) { openSettings(); return; }
   try {
@@ -2262,16 +2495,16 @@ function renderExtraEntries() {
 
     let statusHtml = '';
     if (e.status === 'loading') statusHtml = `<span class="extra-entry-status extra-entry-loading"><span class="spinner"></span></span>`;
-    else if (e.status === 'error' || e.status === 'notfound') statusHtml = `<span class="extra-entry-status extra-entry-error">⚠ ${e.error}</span>`;
+    else if (e.status === 'error' || e.status === 'notfound') statusHtml = `<span class="extra-entry-status extra-entry-error">⚠ ${esc(e.error)}</span>`;
     else if (e.cancelled) statusHtml = `<span class="extra-entry-status" style="color:var(--text-muted);font-size:10px">ملغي</span>`;
 
     let courierHtml = '';
     if (e.status === 'loading') courierHtml = `<span class="extra-entry-courier" style="color:var(--text-muted)">...</span>`;
     else if (!e.courier) courierHtml = `<span class="extra-entry-courier-warn"><span class="warn-name">⚠ لا يوجد مندوب</span></span>`;
-    else if (expectedCourier && e.courier !== expectedCourier) courierHtml = `<span class="extra-entry-courier-warn"><span class="warn-name">⚠ ${e.courier}</span><span class="warn-label">مندوب مختلف!</span></span>`;
-    else courierHtml = `<span class="extra-entry-courier">${e.courier}</span>`;
+    else if (expectedCourier && e.courier !== expectedCourier) courierHtml = `<span class="extra-entry-courier-warn"><span class="warn-name">⚠ ${esc(e.courier)}</span><span class="warn-label">مندوب مختلف!</span></span>`;
+    else courierHtml = `<span class="extra-entry-courier">${esc(e.courier)}</span>`;
 
-    const statusErrHtml = hasStatusErr ? `<div class="extra-status-err-row">⚠ ${e.statusError}</div>` : '';
+    const statusErrHtml = hasStatusErr ? `<div class="extra-status-err-row">⚠ ${esc(e.statusError)}</div>` : '';
     const nameLink = orderLink(e.orderName || ('#'+e.id), e.id);
 
     return `<div class="extra-entry-wrap">
@@ -2280,7 +2513,7 @@ function renderExtraEntries() {
         ${courierHtml}
         ${statusHtml}
         <div class="extra-entry-amount-wrap">
-          <input type="number" class="extra-entry-amount" placeholder="0.00" min="0" step="0.01"
+          <input type="number" class="extra-entry-amount" min="0" step="0.01"
             value="${e.amount}" oninput="updateExtraAmount(${i}, this.value)" ${e.status === 'loading' ? 'disabled' : ''}>
           <span class="extra-entry-currency">EGP</span>
         </div>
@@ -2324,11 +2557,11 @@ function calcStatusError(order, isExtra) {
   }
 }
 function renderSBadge(val, isErr) {
-  if (isErr) return `<span class="s-badge s-badge-err">⚠ ${val||'فارغ'}</span>`;
+  if (isErr) return `<span class="s-badge s-badge-err">⚠ ${esc(val||'فارغ')}</span>`;
   if (!val)  return `<span class="s-badge-empty">—</span>`;
-  if (val === 'Delivered') return `<span class="s-badge s-badge-delivered">${val}</span>`;
-  if (val === 'Returned')  return `<span class="s-badge s-badge-returned">${val}</span>`;
-  return `<span class="s-badge s-badge-other">${val}</span>`;
+  if (val === 'Delivered') return `<span class="s-badge s-badge-delivered">${esc(val)}</span>`;
+  if (val === 'Returned')  return `<span class="s-badge s-badge-returned">${esc(val)}</span>`;
+  return `<span class="s-badge s-badge-other">${esc(val)}</span>`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2397,7 +2630,7 @@ function renderTable() {
     let shopifyTotal = null;
     if (!isCancelled && o.amount != null) shopifyTotal = isRefundStatus ? -Math.abs(o.refundAmount || o.amount) : o.amount;
 
-    const courierDisplay = isCancelled ? `<span style="color:var(--text-muted)">—</span>` : (o.courier || `<span style="color:var(--text-muted)">—</span>`);
+    const courierDisplay = isCancelled ? `<span style="color:var(--text-muted)">—</span>` : (esc(o.courier) || `<span style="color:var(--text-muted)">—</span>`);
 
     let paymentStatusDisplay;
     if (isCancelled) paymentStatusDisplay = `<span style="color:var(--red);font-size:11px">Cancelled</span>`;
@@ -2410,15 +2643,15 @@ function renderTable() {
     else if (o.status === 'cancelled')badge = `<span class="badge badge-cancelled">ملغي</span>`;
     else if (o.status === 'refund')   badge = `<span class="badge badge-refund">استرداد</span>`;
     else if (o.status === 'refund-done') badge = `<span class="badge badge-refund-done">✓ تم الاسترداد</span>`;
-    else if (o.status === 'refund-error') badge = `<span class="badge badge-error" title="${o.error||''}">خطأ استرداد</span>`;
+    else if (o.status === 'refund-error') badge = `<span class="badge badge-error" title="${esc(o.error)}">خطأ استرداد</span>`;
     else if (o.status === 'ready')    badge = o.preRegistered ? `<span class="badge badge-prereg">📋 مسجل مسبقاً</span>` : `<span class="badge badge-collect">تحصيل</span>`;
     else if (o.status === 'done')     badge = `<span class="badge badge-done">✓ تم التحصيل</span>`;
     else if (o.status === 'skipped') {
       if (o.skipReason === 'مدفوع بالكامل') badge = `<span class="badge badge-paid">مدفوع بالكامل</span>`;
-      else badge = `<span class="badge badge-skipped">${o.skipReason||'مُتخطى'}</span>`;
+      else badge = `<span class="badge badge-skipped">${esc(o.skipReason||'مُتخطى')}</span>`;
     }
     else if (o.status === 'notfound') badge = `<span class="badge badge-notfound">غير موجود</span>`;
-    else badge = `<span class="badge badge-error" title="${o.error||''}">خطأ</span>`;
+    else badge = `<span class="badge badge-error" title="${esc(o.error)}">خطأ</span>`;
 
     let rowClass = 'order-row';
     if (i === 0 && orders.length === 1) rowClass += ' row-new';
@@ -2438,7 +2671,7 @@ function renderTable() {
       <td style="padding:6px 8px;text-align:center"><button class="row-del-btn" onclick="deleteOrder(${i})" title="حذف">❌</button></td>
       <td class="cell-order" onclick="${hasDetails?`toggleRow(${i})`:''}" style="${hasDetails?'cursor:pointer':''}">
         ${expandIcon}${nameDisplay}
-        ${o.statusError?`<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:3px">⚠ ${o.statusError}</div>`:''}
+        ${o.statusError?`<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:3px">⚠ ${esc(o.statusError)}</div>`:''}
         ${(o.preRegistered && o.s2Due && !o.preRegBlock)?`<div style="font-size:10px;color:var(--purple);font-weight:700;margin-top:3px">متبقي S2: ${fmt(o.s2Due)} — مش في تحصيل الجلسة دي، بيتحصّل مع شحنة الاستبدال</div>`:''}
       </td>
       <td class="cell-courier">${courierDisplay}</td>
@@ -2455,11 +2688,11 @@ function renderTable() {
     let detailContent = '';
     if (hasDetails) {
       let normalRows = o.lineItems ? o.lineItems.map(li => `<tr>
-        <td class="td-sku">${li.sku}</td><td class="td-qty">${li.quantity}</td>
+        <td class="td-sku">${esc(li.sku)}</td><td class="td-qty">${li.quantity}</td>
         <td class="td-price">${fmt(li.unitPrice)}</td><td class="td-total">${fmt(li.totalPrice)}</td>
       </tr>`).join('') : '';
       let returnRows = o.returnedItems ? o.returnedItems.map(ri => `<tr style="background:var(--red-soft)">
-        <td class="td-sku returned">↩ ${ri.sku}</td><td class="td-qty negative">−${ri.quantity}</td>
+        <td class="td-sku returned">↩ ${esc(ri.sku)}</td><td class="td-qty negative">−${ri.quantity}</td>
         <td class="td-price negative">−${fmt(ri.discountedUnitPrice)}</td>
         <td class="td-total negative">−${fmt(parseFloat(ri.discountedUnitPrice)*ri.quantity)}</td>
       </tr>`).join('') : '';
@@ -2476,10 +2709,10 @@ function renderTable() {
   extraEntries.forEach((e, i) => {
     const amount = parseFloat(e.amount) || 0;
     const nameDisplay = orderLink(e.orderName || ('#'+e.id), e.id);
-    const courierDisplay = e.courier ? `<span style="color:var(--purple);font-weight:600">${e.courier}</span>` : `<span style="color:var(--text-muted)">—</span>`;
+    const courierDisplay = e.courier ? `<span style="color:var(--purple);font-weight:600">${esc(e.courier)}</span>` : `<span style="color:var(--text-muted)">—</span>`;
     const moneyDisplay = amount > 0 ? `<span style="color:var(--orange);font-family:var(--font-mono);font-weight:700">−${fmt(amount)}</span>` : `<span style="color:var(--text-muted)">—</span>`;
     const statusHtml = e.status === 'loading' ? `<span class="badge badge-loading"><span class="spinner"></span> جاري...</span>`
-      : (e.status === 'error' || e.status === 'notfound') ? `<span class="badge badge-error">${e.error}</span>`
+      : (e.status === 'error' || e.status === 'notfound') ? `<span class="badge badge-error">${esc(e.error)}</span>`
       : e.statusError ? `<span class="badge badge-status-err">⚠ حالة خاطئة</span>`
       : e.cancelled ? `<span class="badge badge-extra">🚚 شحن إضافي <span style="font-size:9px;opacity:.7">ملغي</span></span>`
       : `<span class="badge badge-extra">🚚 شحن إضافي</span>`;
@@ -2496,7 +2729,7 @@ function renderTable() {
     const extraRowClass = 'order-row extra-row' + (e.statusError ? ' status-err-row' : '');
     rows.push(`<tr class="${extraRowClass}" data-type="extra" data-idx="${i}">
       <td style="padding:6px 8px;text-align:center"><button class="row-del-btn" onclick="deleteExtraEntry(${i})" title="حذف">❌</button></td>
-      <td class="cell-order">${nameDisplay}${e.statusError?`<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:3px">⚠ ${e.statusError}</div>`:''}</td>
+      <td class="cell-order">${nameDisplay}${e.statusError?`<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:3px">⚠ ${esc(e.statusError)}</div>`:''}</td>
       <td class="cell-courier">${courierDisplay}</td>
       <td class="cell-money">${moneyDisplay}</td>
       <td class="cell-money"><span style="color:var(--text-muted)">—</span></td>
@@ -2658,7 +2891,7 @@ function updatePayBtn() {
   const hasStatusErr = orders.some(o => o.statusError && (o.status==='ready'||o.status==='refund')) || extraEntries.some(e => e.statusError && e.status==='ok');
   const btn = $('payBtn');
   const needsPayValid = hasReady;
-  btn.disabled = (!hasReady && !hasRefund) || !!courierErr || (needsPayValid && !isPayValid()) || isProcessing || hasStatusErr;
+  btn.disabled = (!hasReady && !hasRefund) || !!courierErr || (needsPayValid && !isPayValid()) || isProcessing || hasStatusErr || (typeof entryFails !== 'undefined' && entryFails.length > 0);
   if (hasReady && hasRefund) { btn.textContent = '💵 تسجيل الدفع + 💸 تنفيذ الاسترداد'; btn.classList.add('has-refund'); }
   else if (hasRefund && !hasReady) { btn.textContent = '💸 تنفيذ الاسترداد'; btn.classList.add('has-refund'); }
   else { btn.textContent = '💵 تسجيل الدفع على شوبيفاي'; btn.classList.remove('has-refund'); }
@@ -2806,7 +3039,7 @@ async function doBulkPayAndRefund() {
     playBeep('error');
     showResult(false, '⛔ الجدول اتغيّر بعد التأكيد — مفيش أي عملية اتنفّذت',
       `المطلوب دلوقتي ${fmtSigned(getCourierCollectNet())} والمُدخل ${fmt(getPaySum())} — راجع الأرقام واضغط تسجيل الدفع من تاني.`);
-    isProcessing = false; updatePayBtn(); updatePayMethodsCard();
+    isProcessing = false; syncEntryLock(); updatePayBtn(); updatePayMethodsCard();
     return;
   }
 
@@ -2818,7 +3051,7 @@ async function doBulkPayAndRefund() {
   //    الحارس، بس هناك بيقف بعد ما أوردرات قبله اتسجّلت.
   const preRegReady = readyOrders.filter(o => o.preRegistered);
   if (preRegReady.length) {
-    isProcessing = true; $('payBtn').disabled = true;
+    isProcessing = true; syncEntryLock(); $('payBtn').disabled = true;
     const problems = [];
     for (const o of preRegReady) {
       try {
@@ -2830,7 +3063,7 @@ async function doBulkPayAndRefund() {
         o.s2Due = d.s2Due != null ? parseFloat(d.s2Due) : null;
       } catch (e) { problems.push(`${o.orderName || '#'+o.id}: تعذّر التحقق (خطأ في الاتصال)`); }
     }
-    isProcessing = false;
+    isProcessing = false; syncEntryLock();
     if (problems.length) {
       playBeep('error'); renderTable(); updatePayBtn(); updatePayMethodsCard();
       showResult(false, '⛔ الجلسة اتوقفت — مفيش أي عملية اتنفّذت', problems.join(' • '));
@@ -2870,7 +3103,7 @@ async function doBulkPayAndRefund() {
     },
   };
 
-  isProcessing = true; $('payBtn').disabled = true; setProgress(0); hideResult();
+  isProcessing = true; syncEntryLock(); $('payBtn').disabled = true; setProgress(0); hideResult();
   const total = [...readyOrders, ...refundOrders].length;
   let successPay=0, failPay=0, successRefund=0, failRefund=0, done=0;
   // 🆕 Step 3C — النتيجة تلات حالات. `warning` = الفعل الأساسي تم بس فيه حاجة
@@ -2919,7 +3152,7 @@ async function doBulkPayAndRefund() {
     done++; setProgress(done/total*100); updateStats(); renderTable();
   }
 
-  isProcessing = false; updatePayBtn(); updatePayMethodsCard();
+  isProcessing = false; syncEntryLock(); updatePayBtn(); updatePayMethodsCard();
 
   const allProcessed = [...readyOrders, ...refundOrders];
   const successfulOrders = allProcessed.filter(o => o.status === 'done' || o.status === 'refund-done');
@@ -3004,7 +3237,7 @@ function alertPartialFailure(courierName, failedOrders, failedMoney, methods) {
       <span class="confirm-detail-label">${orderLink(o.orderName || o.id, o.id)} · ${kind}</span>
       <span class="confirm-detail-val red">${fmt(amt)} جنيه</span>
     </div>
-    <div style="font-size:11.5px;color:var(--red);margin:-2px 2px 6px;line-height:1.6">${o.error || 'فشل غير معروف'}</div>`;
+    <div style="font-size:11.5px;color:var(--red);margin:-2px 2px 6px;line-height:1.6">${esc(o.error || 'فشل غير معروف')}</div>`;
   }).join('');
 
   const entered = (parseFloat(methods.cash)||0) + (parseFloat(methods.instapay)||0) + (parseFloat(methods.wallet)||0);
@@ -3097,11 +3330,11 @@ async function importLoadCouriers() {
       let values = data.values;
       if (activeCourier) values = values.filter(v => v === activeCourier);
       if (values.length) {
-        sel.innerHTML = '<option value="">اختر مندوباً...</option>' + values.map(v => `<option value="${v}">${v}</option>`).join('');
+        sel.innerHTML = '<option value="">اختر مندوباً...</option>' + values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
         if (values.length === 1) { sel.value = values[0]; btn.disabled = false; } else { btn.disabled = true; }
         hint.textContent = activeCourier ? `يظهر فقط مندوب الأوردرات الحالية: ${activeCourier}` : 'اختر مندوباً للاستعلام عن أوردراته';
       } else {
-        sel.innerHTML = `<option value="">${activeCourier} — غير موجود في القائمة</option>`;
+        sel.innerHTML = `<option value="">${esc(activeCourier)} — غير موجود في القائمة</option>`;
         hint.textContent = `المندوب الحالي (${activeCourier}) غير موجود في الـ metafield choices`;
       }
     } else { sel.innerHTML = '<option value="">لا توجد مناديب</option>'; hint.textContent = 'لا توجد مناديب محددة في الـ metafield definition'; }
@@ -3165,20 +3398,20 @@ function importMakeRow(o, i) {
   const amount = parseFloat(o.amount), shipping = parseFloat(o.shippingAmount);
   const statusErr = importCalcStatusError(o);
   const s1 = o.s1||null, s2 = o.s2||null;
-  const s1Badge = s1==='Delivered' ? `<span class="s-badge s-badge-delivered">${s1}</span>`
-    : s1==='Returned' ? `<span class="s-badge s-badge-returned">${s1}</span>`
-    : s1 ? `<span class="s-badge s-badge-other">${s1}</span>` : `<span class="s-badge-empty">—</span>`;
-  const s2Badge = s2==='Returned' ? `<span class="s-badge s-badge-returned">${s2}</span>`
-    : s2 ? `<span class="s-badge s-badge-other">${s2}</span>` : `<span class="s-badge-empty">—</span>`;
+  const s1Badge = s1==='Delivered' ? `<span class="s-badge s-badge-delivered">${esc(s1)}</span>`
+    : s1==='Returned' ? `<span class="s-badge s-badge-returned">${esc(s1)}</span>`
+    : s1 ? `<span class="s-badge s-badge-other">${esc(s1)}</span>` : `<span class="s-badge-empty">—</span>`;
+  const s2Badge = s2==='Returned' ? `<span class="s-badge s-badge-returned">${esc(s2)}</span>`
+    : s2 ? `<span class="s-badge s-badge-other">${esc(s2)}</span>` : `<span class="s-badge-empty">—</span>`;
   const statusBadge = alreadyInTable ? `<span class="import-already-badge">موجود بالجدول</span>`
-    : statusErr ? `<span class="s-badge-err" style="display:inline-block;padding:2px 7px;border-radius:5px">⚠ ${statusErr}</span>`
+    : statusErr ? `<span class="s-badge-err" style="display:inline-block;padding:2px 7px;border-radius:5px">⚠ ${esc(statusErr)}</span>`
     : o.preRegistered ? `<span class="import-prereg-badge">📋 مسجل مسبقاً</span>`
     : `<span style="color:var(--green);font-size:10px;font-weight:600">✓ مؤهل</span>`;
   const rowClass = alreadyInTable ? 'already-row' : (statusErr ? ' import-err-row' : '');
   return `<tr class="${rowClass}" id="irow-${i}">
     <td class="col-check"><input type="checkbox" class="import-row-cb" data-idx="${i}" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer" ${(alreadyInTable||!!statusErr)?'disabled':''} onchange="importOnCheckChange()"></td>
     <td class="cell-mono">${orderLink(o.orderName, o.id)}</td>
-    <td class="cell-dim">${o.customerName||'—'}</td>
+    <td class="cell-dim">${esc(o.customerName)||'—'}</td>
     <td class="cell-money">${fmt(amount)}</td>
     <td class="cell-money" style="color:var(--text-secondary)">${fmt(shipping)}</td>
     <td class="cell-dim">${importFmtDate(o.createdAt)}</td>
@@ -3280,9 +3513,9 @@ function msRenderList(key) {
     : visible.map(it => {
         const checked = st.selected.has(it.value);
         const labelCls = it.mono ? 'ms-item-label ms-item-mono' : 'ms-item-label';
-        return `<div class="ms-item ${checked ? 'checked' : ''}" onclick="msToggleItem('${key}','${it.value}')">
-          <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation(); msToggleItem('${key}','${it.value}')">
-          <span class="${labelCls}">${it.label}</span>
+        return `<div class="ms-item ${checked ? 'checked' : ''}" onclick="msToggleItem(${esc(JSON.stringify(key))},${esc(JSON.stringify(it.value))})">
+          <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation(); msToggleItem(${esc(JSON.stringify(key))},${esc(JSON.stringify(it.value))})">
+          <span class="${labelCls}">${esc(it.label)}</span>
         </div>`;
       }).join('');
 
@@ -3349,7 +3582,7 @@ function renderChips() {
     if (!row) return;
     row.innerHTML = [...msState[key].selected].map(val => {
       const label = (msState[key].items.find(it => it.value === val) || {}).label || val;
-      return `<span class="ms-chip">${label}<button onclick="msToggleItem('${key}','${val.replace(/'/g, "\\'")}')">✕</button></span>`;
+      return `<span class="ms-chip">${esc(label)}<button onclick="msToggleItem(${esc(JSON.stringify(key))},${esc(JSON.stringify(val))})">✕</button></span>`;
     }).join('');
   });
 }
@@ -3530,7 +3763,7 @@ async function fetchLog() {
     renderPagination();
     loadLogCount();
   } catch (e) {
-    body.innerHTML = `<div class="log-empty">⚠️ ${e.message}</div>`;
+    body.innerHTML = `<div class="log-empty">⚠️ ${esc(e.message)}</div>`;
     $('logFilteredCount').textContent = '—';
   }
 }
@@ -3751,13 +3984,13 @@ function renderLog(entries) {
           <td>${orderLink(e.order_name || e.order_id, e.order_id)}${hasSub ? '<span class="lo-arrow">▶</span>' : ''}</td>
           <td>${orderTypeLbl}${x.preRegistered ? ' <span style="color:var(--purple);font-size:10px">📋</span>' : ''}</td>
           <td style="color:${isRefund?'var(--red)':'var(--green)'};font-family:var(--font-mono);font-weight:700">${isRefund?'−':''}${fmt(amt)}</td>
-          <td>${e.notes || '—'}</td>
+          <td>${esc(e.notes) || '—'}</td>
         </tr>
         ${hasSub ? `<tr class="log-sub-row hidden" id="${subId}"><td colspan="4"><div class="log-sub-inner"><table class="log-detail-tbl">
             <thead><tr><th>SKU</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
             <tbody>
-              ${(x.lineItems||[]).map(li => `<tr><td>${li.sku}</td><td>${li.quantity}</td><td>${fmt(li.unitPrice)}</td><td>${fmt(li.totalPrice)}</td></tr>`).join('')}
-              ${(x.returnedItems||[]).map(ri2 => `<tr style="color:var(--red)"><td>↩ ${ri2.sku}</td><td>−${ri2.quantity}</td><td>−${fmt(ri2.discountedUnitPrice)}</td><td>−${fmt(parseFloat(ri2.discountedUnitPrice)*ri2.quantity)}</td></tr>`).join('')}
+              ${(x.lineItems||[]).map(li => `<tr><td>${esc(li.sku)}</td><td>${li.quantity}</td><td>${fmt(li.unitPrice)}</td><td>${fmt(li.totalPrice)}</td></tr>`).join('')}
+              ${(x.returnedItems||[]).map(ri2 => `<tr style="color:var(--red)"><td>↩ ${esc(ri2.sku)}</td><td>−${ri2.quantity}</td><td>−${fmt(ri2.discountedUnitPrice)}</td><td>−${fmt(parseFloat(ri2.discountedUnitPrice)*ri2.quantity)}</td></tr>`).join('')}
             </tbody>
           </table></div></td></tr>` : ''}`;
     }).join('');
@@ -3788,8 +4021,8 @@ function renderLog(entries) {
       <td>📅 ${formatDate(g.timestamp)}</td>
       <td>🕐 ${formatTimeOnly(g.timestamp)}</td>
       <td>${typeTag}</td>
-      <td>${g.courier ? `<span class="log-tag cr">🛵 ${g.courier}</span>` : '—'}</td>
-      <td>${(g.employeeDisplayName || g.employee) ? `<span class="log-tag emp">👤 ${(g.employeeDisplayName || g.employee).replace(/_/g,' ')}</span>` : '—'}</td>
+      <td>${g.courier ? `<span class="log-tag cr">🛵 ${esc(g.courier)}</span>` : '—'}</td>
+      <td>${(g.employeeDisplayName || g.employee) ? `<span class="log-tag emp">👤 ${esc((g.employeeDisplayName || g.employee).replace(/_/g,' '))}</span>` : '—'}</td>
       <td>${g.rows.length.toLocaleString('en-US')}${g.shortfall ? `<span class="log-miss" title="جلسة ناقصة">⚠ ${g.shortfall.orders > 0 ? '−'+g.shortfall.orders : 'فرق'}</span>` : ''}</td>
       <td style="color:var(--green);font-family:var(--font-mono);font-weight:700">${g.totalAmount ? fmt(g.totalAmount) : '—'}</td>
       <td style="color:var(--red);font-family:var(--font-mono);font-weight:700">${g.totalRefund ? '−'+fmt(g.totalRefund) : '—'}</td>
@@ -4201,7 +4434,7 @@ async function exportXLSX(selectedOnly) {
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob), a = document.createElement('a');
-  a.href = url; a.download = `cod-payment-center-${new Date().toISOString().slice(0,10)}.xlsx`;
+  a.href = url; a.download = `cod-payment-center-${cairoDateStr(cairoNow())}.xlsx`;
   a.click(); URL.revokeObjectURL(url);
 
   // 🔴 Standards #30 — رسالة النجاح في فرع else **بس**. `showToast('تم التصدير')`
