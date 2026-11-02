@@ -214,12 +214,60 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.6.0';
+const WORKER_VERSION = 'v3.8.0';
 
-// Cairo = UTC+3 (DST active). ⚠️ Egypt DST ends 29-10-2026 → change to 2
-// (نفس التغيير المطلوب في order-status-updater-worker — تغيير على مستوى الحزمة).
-// مستخدم في: فلتر تاريخ تاب السجل (dateFrom/dateTo) + "اليوم" في §TODAY-IMPORT.
-const CAIRO_OFFSET_HOURS = 3;
+// 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
+// كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
+// فلتر التاريخ و"اليوم" كانت هتغلط بساعة بلا أي شكوى (ecommoda-constants §13).
+// مستخدم في: فلتر تاريخ/وقت تاب السجل + "اليوم" في §TODAY-IMPORT.
+let _cairoFmt = null;
+function cairoOffsetMsAt(ms) {
+  if (!_cairoFmt) {
+    _cairoFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Cairo', hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+  }
+  const sec = Math.floor(ms / 1000) * 1000;
+  const o = {};
+  for (const x of _cairoFmt.formatToParts(new Date(sec))) if (x.type !== 'literal') o[x.type] = parseInt(x.value, 10);
+  return Date.UTC(o.year, o.month - 1, o.day, o.hour, o.minute, o.second) - sec;
+}
+// تاريخ/وقت محلي بتوقيت القاهرة → لحظة UTC (بالمللي ثانية)
+function cairoLocalToUtcMs(y, mo, d, h, mi, s, ms) {
+  const guess = Date.UTC(y, mo - 1, d, h, mi, s, ms);
+  let t = guess - cairoOffsetMsAt(guess);
+  t = guess - cairoOffsetMsAt(t);
+  return t;
+}
+// فترات الصيفي (UTC+3) بين 2023 و2040 — بتتحسب مرة وتتخزّن. بتتحط في SQL عشان
+// وقت اليوم بتوقيت القاهرة يتحسب صح لكل صف حسب تاريخه (مش بإزاحة واحدة للكل).
+let _dstSpans = null;
+function cairoDstSpans() {
+  if (_dstSpans) return _dstSpans;
+  const H = 3600 * 1000, DAY = 24 * H;
+  const from = Date.UTC(2023, 0, 1), to = Date.UTC(2040, 0, 1);
+  const spans = [];
+  let prev = cairoOffsetMsAt(from), start = prev === 3 * H ? from : null, t = from;
+  while (t < to) {
+    const nt = Math.min(t + 7 * DAY, to), cur = cairoOffsetMsAt(nt);
+    if (cur !== prev) {
+      let lo = t, hi = nt;                       // أول ثانية بالإزاحة الجديدة
+      while (hi - lo > 1000) { const mid = Math.floor((lo + hi) / 2); (cairoOffsetMsAt(mid) === prev ? (lo = mid) : (hi = mid)); }
+      if (cur === 3 * H) start = hi; else if (start !== null) { spans.push([start, hi]); start = null; }
+      prev = cur;
+    }
+    t = nt;
+  }
+  if (start !== null) spans.push([start, to]);
+  _dstSpans = spans.map(([a, b]) => [new Date(a).toISOString(), new Date(b).toISOString()]);
+  return _dstSpans;
+}
+function cairoOffsetCaseSQL() {
+  const sp = cairoDstSpans();
+  if (!sp.length) return '2';
+  return `(CASE WHEN ${sp.map(([a, b]) => `(timestamp >= '${a}' AND timestamp < '${b}')`).join(' OR ')} THEN 3 ELSE 2 END)`;
+}
 
 // سقف تصدير السجل — بيترجع للواجهة كـ `cap` جنب `total` و`truncated` عشان
 // التصدير المقصوص يبان كتحذير بدل علامة صح خضرا (html-builder Standards #30).
@@ -407,12 +455,42 @@ function parseListParam(v) {
 
 // Cairo calendar day (YYYY-MM-DD) → UTC ISO bounds for that day
 function cairoDayBoundsUTC(dateStr) {
-  const startUTCms = new Date(`${dateStr}T00:00:00.000Z`).getTime() - CAIRO_OFFSET_HOURS * 3600 * 1000;
-  const endUTCms   = new Date(`${dateStr}T23:59:59.999Z`).getTime() - CAIRO_OFFSET_HOURS * 3600 * 1000;
-  return { start: new Date(startUTCms).toISOString(), end: new Date(endUTCms).toISOString() };
+  const [y, m, d] = String(dateStr).split('-').map(n => parseInt(n, 10));
+  const start = cairoLocalToUtcMs(y, m, d, 0, 0, 0, 0);
+  const end   = cairoLocalToUtcMs(y, m, d, 23, 59, 59, 999);
+  return { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
 }
 
-function buildLogFilterSQL({ tool = null, employee = null, type = null, courier = null, search = null, dateFrom = null, dateTo = null } = {}) {
+// ─── v3.8.0 — فلاتر السجل الجديدة (طلب أحمد 02-11-2026، بنود html-builder v8.6.0) ───
+// 🔴 كلها server-side عن قصد: الجدول جلسات والصفحة ١٠٠ عملية بس، فأي فلتر في المتصفح
+//    كان هيعدّ الصفحة، والصفحة التانية تيجي بلا فلتر، والتصدير غير مفلتر.
+const SESSION_KEY_SQL = "COALESCE(NULLIF(json_extract(extra,'$.batchId'),''), type || '-row-' || id)";
+
+// توكنز رقم الأوردر: أرقام بس، OR بينهم (المسافة/الفاصلة = أوردر تاني)
+function parseOrderTokens(v) {
+  return [...new Set(String(v || '').replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632)).split(/\D+/).filter(Boolean))].slice(0, 30);
+}
+const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+function numSpec(raw, field) {
+  // raw: { from, to, list } — القايمة والنطاق متبادلين (القايمة تكسب)
+  const list = parseListParam(raw.list).map(Number).filter(n => isFinite(n)).slice(0, 100);
+  if (list.length) return { list };
+  const f = raw.from !== null && raw.from !== '' && isFinite(Number(raw.from)) ? Number(raw.from) : null;
+  const t = raw.to   !== null && raw.to   !== '' && isFinite(Number(raw.to))   ? Number(raw.to)   : null;
+  return (f !== null || t !== null) ? { from: f, to: t } : null;
+}
+// مجاميع الجلسة (نفس تعريف الواجهة: عدد = صفوف الجلسة · تحصيل = مجموع غير الاسترداد · استرداد = مجموع الاسترداد)
+function sessionAggSQL(tool) {
+  return `SELECT sk, COUNT(*) AS cnt,
+            ROUND(SUM(CASE WHEN type = 'refund' THEN 0 ELSE CAST(value_after AS REAL) END), 2) AS collect,
+            ROUND(SUM(CASE WHEN type = 'refund' THEN CAST(value_after AS REAL) ELSE 0 END), 2) AS refund
+          FROM (SELECT ${SESSION_KEY_SQL} AS sk, type, value_after FROM logs
+                WHERE type NOT IN ('login','logout','extra_shipping')${tool ? ' AND tool = ?' : ''})
+          GROUP BY sk`;
+}
+const NUM_COL = { count: 'cnt', collect: 'collect', refund: 'refund' };
+
+function buildLogFilterSQL({ tool = null, employee = null, type = null, courier = null, search = null, dateFrom = null, dateTo = null, orders = null, timeFrom = null, timeTo = null, num = null } = {}) {
   let sql = "FROM logs WHERE type NOT IN ('login','logout')";
   const b = [];
 
@@ -444,14 +522,48 @@ function buildLogFilterSQL({ tool = null, employee = null, type = null, courier 
   if (dateFrom) { const { start } = cairoDayBoundsUTC(dateFrom); sql += ' AND timestamp >= ?'; b.push(start); }
   if (dateTo)   { const { end }   = cairoDayBoundsUTC(dateTo);   sql += ' AND timestamp <= ?'; b.push(end); }
 
+  // رقم الأوردر — توكنز (OR) على order_name فقط
+  const toks = parseOrderTokens(orders);
+  if (toks.length) {
+    sql += ` AND (${toks.map(() => 'order_name LIKE ?').join(' OR ')})`;
+    b.push(...toks.map(t => `%${t}%`));
+  }
+
+  // وقت اليوم بتوقيت القاهرة (HH:MM) — مستقل عن التاريخ، والاتنين AND
+  const tf = HHMM_RE.test(timeFrom || '') ? timeFrom : null, tt = HHMM_RE.test(timeTo || '') ? timeTo : null;
+  if (tf || tt) {
+    const tod = `strftime('%H:%M', datetime(substr(timestamp, 1, 19), '+' || ${cairoOffsetCaseSQL()} || ' hours'))`;
+    if (tf) { sql += ` AND ${tod} >= ?`; b.push(tf); }
+    if (tt) { sql += ` AND ${tod} <= ?`; b.push(tt); }
+  }
+
+  // مجاميع الجلسة (عدد/تحصيل/استرداد): الجلسة كلها بتتحسب مش الصفوف المفلترة بس
+  if (num) {
+    const conds = [], nb = [];
+    for (const k of Object.keys(NUM_COL)) {
+      const sp = num[k]; if (!sp) continue;
+      const col = NUM_COL[k];
+      if (sp.list) { conds.push(`${col} IN (${sp.list.map(() => '?').join(',')})`); nb.push(...sp.list); }
+      else {
+        if (sp.from !== null && sp.from !== undefined) { conds.push(`${col} >= ?`); nb.push(sp.from); }
+        if (sp.to   !== null && sp.to   !== undefined) { conds.push(`${col} <= ?`); nb.push(sp.to); }
+      }
+    }
+    if (conds.length) {
+      sql += ` AND ${SESSION_KEY_SQL} IN (SELECT sk FROM (${sessionAggSQL(tool)}) WHERE ${conds.join(' AND ')})`;
+      if (tool) b.push(tool);
+      b.push(...nb);
+    }
+  }
+
   return { sql, binds: b };
 }
 
 async function getLogs(db, {
   tool = null, employee = null, type = null, courier = null, search = null,
-  dateFrom = null, dateTo = null, limit = 100, offset = 0,
+  dateFrom = null, dateTo = null, limit = 100, offset = 0, orders = null, timeFrom = null, timeTo = null, num = null,
 } = {}) {
-  const { sql: whereSql, binds } = buildLogFilterSQL({ tool, employee, type, courier, search, dateFrom, dateTo });
+  const { sql: whereSql, binds } = buildLogFilterSQL({ tool, employee, type, courier, search, dateFrom, dateTo, orders, timeFrom, timeTo, num });
   const sql = `SELECT * ${whereSql} ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
   const b = binds.slice();
   b.push(Math.min(limit, 100), offset);
@@ -459,9 +571,9 @@ async function getLogs(db, {
 }
 
 async function getLogsCount(db, {
-  tool = null, employee = null, type = null, courier = null, search = null, dateFrom = null, dateTo = null,
+  tool = null, employee = null, type = null, courier = null, search = null, dateFrom = null, dateTo = null, orders = null, timeFrom = null, timeTo = null, num = null,
 } = {}) {
-  const { sql: whereSql, binds } = buildLogFilterSQL({ tool, employee, type, courier, search, dateFrom, dateTo });
+  const { sql: whereSql, binds } = buildLogFilterSQL({ tool, employee, type, courier, search, dateFrom, dateTo, orders, timeFrom, timeTo, num });
   const row = await db.prepare(`SELECT COUNT(*) as total ${whereSql}`).bind(...binds).first();
   return row?.total ?? 0;
 }
@@ -471,9 +583,9 @@ async function getLogsCount(db, {
 //    مقصوص، والموظف فاكره كامل. الحقيقة بتيجي من هنا — ممنوع الواجهة تكتب
 //    السقف عندها (يتغيّر هنا ويفضل قديم هناك).
 async function getLogsExport(db, {
-  tool = null, employee = null, type = null, courier = null, search = null, dateFrom = null, dateTo = null,
+  tool = null, employee = null, type = null, courier = null, search = null, dateFrom = null, dateTo = null, orders = null, timeFrom = null, timeTo = null, num = null,
 } = {}) {
-  const args = { tool, employee, type, courier, search, dateFrom, dateTo };
+  const args = { tool, employee, type, courier, search, dateFrom, dateTo, orders, timeFrom, timeTo, num };
   const { sql: whereSql, binds } = buildLogFilterSQL(args);
   const sql = `SELECT * ${whereSql} ORDER BY timestamp DESC LIMIT ${LOG_EXPORT_MAX}`;
   const entries = (await db.prepare(sql).bind(...binds).all()).results || [];
@@ -619,7 +731,7 @@ async function listPendingPreReg(env) {
 // ─── §TODAY-IMPORT::todayCairoDate ───
 // نفس منطق cairoDate() في order-status-updater-worker
 function todayCairoDate() {
-  const d = new Date(Date.now() + CAIRO_OFFSET_HOURS * 3600 * 1000);
+  const d = new Date(Date.now() + cairoOffsetMsAt(Date.now()));
   const p = n => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
 }
@@ -1818,17 +1930,32 @@ export default {
       // ──────────────────────────────────────────────────────────────
 
       // ─── §LOG-ENDPOINTS ─────────────────────────────────────────
+      // v3.8.0: orders · timeFrom/timeTo · count/collect/refund (From/To/In) + get_log_suggest + get_log_num_values
+      const logArgs = () => {
+        const q = k => url.searchParams.get(k);
+        return {
+          tool:     q('tool')     || TOOL_NAME,
+          employee: q('employee') || null,
+          type:     q('type')     || null,
+          courier:  q('courier')  || null,
+          search:   q('search')   || null,
+          dateFrom: q('dateFrom') || null,
+          dateTo:   q('dateTo')   || null,
+          orders:   q('orders')   || null,
+          timeFrom: q('timeFrom') || null,
+          timeTo:   q('timeTo')   || null,
+          num: (() => {
+            const o = {};
+            for (const k of Object.keys(NUM_COL)) o[k] = numSpec({ from: q(k + 'From'), to: q(k + 'To'), list: q(k + 'In') }, k);
+            return Object.values(o).some(Boolean) ? o : null;
+          })(),
+        };
+      };
       // employee/type/courier بقوا يقبلوا قايمة comma-separated (اختيار متعدد)
       // + dateFrom/dateTo (تاريخ القاهرة YYYY-MM-DD) — v3.0.0.
       if (action === 'get_logs') {
         const entries = await getLogs(env.DB, {
-          tool:     url.searchParams.get('tool')     || TOOL_NAME,
-          employee: url.searchParams.get('employee') || null,
-          type:     url.searchParams.get('type')     || null,
-          courier:  url.searchParams.get('courier')  || null,
-          search:   url.searchParams.get('search')   || null,
-          dateFrom: url.searchParams.get('dateFrom')  || null,
-          dateTo:   url.searchParams.get('dateTo')    || null,
+          ...logArgs(),
           limit:    parseInt(url.searchParams.get('limit')  || '100'),
           offset:   parseInt(url.searchParams.get('offset') || '0'),
         });
@@ -1836,31 +1963,41 @@ export default {
       }
 
       if (action === 'get_logs_count') {
-        const total = await getLogsCount(env.DB, {
-          tool:     url.searchParams.get('tool')     || TOOL_NAME,
-          employee: url.searchParams.get('employee') || null,
-          type:     url.searchParams.get('type')     || null,
-          courier:  url.searchParams.get('courier')  || null,
-          search:   url.searchParams.get('search')   || null,
-          dateFrom: url.searchParams.get('dateFrom')  || null,
-          dateTo:   url.searchParams.get('dateTo')    || null,
-        });
+        const total = await getLogsCount(env.DB, logArgs());
         return json({ ok: true, total }, 200, request);
       }
 
       if (action === 'get_logs_export') {
-        const out = await getLogsExport(env.DB, {
-          tool:     url.searchParams.get('tool')     || TOOL_NAME,
-          employee: url.searchParams.get('employee') || null,
-          type:     url.searchParams.get('type')     || null,
-          courier:  url.searchParams.get('courier')  || null,
-          search:   url.searchParams.get('search')   || null,
-          dateFrom: url.searchParams.get('dateFrom')  || null,
-          dateTo:   url.searchParams.get('dateTo')    || null,
-        });
+        const out = await getLogsExport(env.DB, logArgs());
         // cap/total/truncated إلزاميين — من غيرهم الواجهة بتقول "تم التصدير ✓"
         // على ملف مقصوص (html-builder Standards #30)
         return json({ ok: true, ...out }, 200, request);
+      }
+
+      // اقتراحات رقم الأوردر (لايف): أحدث الأوردرات المطابقة + عدد عملياتها. أول ١٠ + الباقي في `total`.
+      if (action === 'get_log_suggest') {
+        const parts = parseOrderTokens(url.searchParams.get('q'));
+        const last = parts[parts.length - 1];
+        if (!last) return json({ ok: true, suggestions: [], total: 0 }, 200, request);
+        const exclude = parseOrderTokens(url.searchParams.get('exclude'));
+        const tool = url.searchParams.get('tool') || TOOL_NAME;
+        let where = "tool = ? AND type NOT IN ('login','logout','extra_shipping') AND order_name LIKE ?";
+        const b = [tool, `%${last}%`];
+        if (exclude.length) { where += ` AND ${exclude.map(() => "order_name NOT LIKE ?").join(' AND ')}`; b.push(...exclude.map(t => `%#${t}`)); }
+        const rows = (await env.DB.prepare(`SELECT order_name AS name, COUNT(*) AS n, MAX(timestamp) AS ts FROM logs WHERE ${where} GROUP BY order_name ORDER BY ts DESC LIMIT 10`).bind(...b).all()).results || [];
+        const tot = await env.DB.prepare(`SELECT COUNT(DISTINCT order_name) AS c FROM logs WHERE ${where}`).bind(...b).first();
+        return json({ ok: true, suggestions: rows.map(r => ({ name: r.name, count: r.n })), total: tot?.c ?? rows.length }, 200, request);
+      }
+
+      // قيم الفلتر الرقمي (قايمة القيم): القيم المميزة لمجاميع الجلسة + عدد الجلسات لكل قيمة، الأكتر تكرارًا الأول (حد ١٠٠).
+      if (action === 'get_log_num_values') {
+        const field = url.searchParams.get('field');
+        if (!NUM_COL[field]) return json({ ok: false, error: 'field غير معروف' }, 400, request);
+        const tool = url.searchParams.get('tool') || TOOL_NAME;
+        const col = NUM_COL[field];
+        const rows = (await env.DB.prepare(`SELECT ${col} AS v, COUNT(*) AS n FROM (${sessionAggSQL(tool)}) GROUP BY ${col} ORDER BY n DESC, v ASC LIMIT 100`).bind(tool).all()).results || [];
+        const tot = await env.DB.prepare(`SELECT COUNT(DISTINCT ${col}) AS c FROM (${sessionAggSQL(tool)})`).bind(tool).first();
+        return json({ ok: true, values: rows.map(r => ({ v: r.v, n: r.n })), total: tot?.c ?? rows.length }, 200, request);
       }
 
       // ── 🗑️ اتشالوا في v3.3.0 (31-08-2026) — متضيفهمش تاني ──────────
