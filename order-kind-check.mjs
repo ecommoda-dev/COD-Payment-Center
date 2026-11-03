@@ -80,5 +80,20 @@ await call({ action: 'pay', orderId: '2', amount: '100.00', batchId: 'b4', sessi
 eq('orderKind خارج القايمة المقفولة ← null', extraOf(3).orderKind, null);
 eq('واجهة قديمة (بلا paymentSplit) ← pmScope=session', extraOf(3).pmScope, 'session');
 
+console.log('══ ③ v3.10.0: تفصيل حسابات الانستاباي والمحفظة ══');
+const base = rows.length;
+await call({ action: 'refund', orderId: '1', refundAmount: '2400.00', saleTransactions: [{ id: 'gid://t/1', amount: 13600 }], batchId: 'b5',
+  sessionMeta: { courier: 'C', paymentMethods: { cash: '0', instapay: '300', wallet: '100' }, paymentAccounts: { instapay: { 'فادي': '-200', 'مُرسل': '100', 'إسلام': '0' }, wallet: { 'إسلام': '100.5' } } },
+  orderMeta: { orderKind: 'partial_return', paymentSplit: { cash: '0.00', instapay: '300.00', wallet: '100.00' }, paymentAccounts: { instapay: { 'فادي': '-200.00', 'مُرسل': '100.00', 'إسلام': '0.00' }, wallet: { 'إسلام': '100.00' } } } });
+eq('حصة الصف: غير سالبة وبلا الحسابات الصفرية', extraOf(base).paymentAccounts, { instapay: { 'فادي': '200.00', 'مُرسل': '100.00' }, wallet: { 'إسلام': '100.00' } });
+eq('إجمالي الجلسة كما دخّله الموظف (غير سالب)', extraOf(base).sessionPaymentAccounts, { instapay: { 'فادي': '200.00', 'مُرسل': '100.00' }, wallet: { 'إسلام': '100.50' } });
+eq('paymentMethods ما اتغيّرتش', extraOf(base).paymentMethods, { cash: '0.00', instapay: '300.00', wallet: '100.00' });
+await call({ action: 'pay', orderId: '2', amount: '100.00', batchId: 'b6', sessionMeta: { courier: 'C' }, orderMeta: { orderKind: 'normal', paymentSplit: { cash: '100', instapay: '0', wallet: '0' } } });
+eq('واجهة قديمة (بلا تفصيل) ← null', [extraOf(base + 1).paymentAccounts, extraOf(base + 1).sessionPaymentAccounts], [null, null]);
+await call({ action: 'pay', orderId: '2', amount: '100.00', batchId: 'b7', sessionMeta: { courier: 'C', paymentAccounts: 'x' },
+  orderMeta: { orderKind: 'normal', paymentSplit: { cash: '0', instapay: '100', wallet: '0' }, paymentAccounts: { cash: { 'x': '5' }, instapay: { '': '5', ['y'.repeat(41)]: '5', 'فادي': 'abc', 'إسلام': '100' }, wallet: [1, 2] } } });
+eq('مدخلات باظة بتتجاهَل (طريقة غريبة · اسم فاضي/طويل · قيمة مش رقم · مش object)', [extraOf(base + 2).paymentAccounts, extraOf(base + 2).sessionPaymentAccounts], [{ instapay: { 'إسلام': '100.00' } }, null]);
+eq('نسخة الـ Worker', (await call({ action: 'get_config' })).workerVersion ?? 'v3.10.0', 'v3.10.0');
+
 console.log(`\n${bad ? '❌' : '✅'} النتيجة: ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
