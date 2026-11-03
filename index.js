@@ -1,8 +1,19 @@
 /**
- * cod-payment-center-worker  (v3.9.0)
+ * cod-payment-center-worker  (v3.10.0)
  * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 — 03-11-2026
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * v3.10.0 — تفصيل حسابات الانستاباي والمحفظة (فادي · مُرسل · إسلام) في السجل (03-11-2026):
+ *   🆕 `extra.paymentAccounts` (حصة الصف) و`extra.sessionPaymentAccounts` (إجمالي الجلسة كما
+ *      دخّله الموظف) — شكلهم `{ instapay: { "فادي": "100.00" }, wallet: { … } }`، **غير سالبين**
+ *      دايمًا (الاتجاه من `type` الصف زي `paymentMethods`)، والحسابات الصفرية مابتتخزّنش.
+ *      `normalizePaymentAccounts` — أسماء الحسابات نص قصير (≤ 40 حرف · ≤ 12 حساب للطريقة)
+ *      ومش قايمة مقفولة، عشان إضافة حساب جديد مايحتاجش نشر Worker.
+ *   ✅ إضافة بحتة: الواجهة القديمة (بلا الحقلين) = `null`، و`paymentMethods`/`pmScope` ما اتغيّروش.
+ *   ⚠️ الصفوف الأقدم مالهاش التفصيل — الواجهة بتعرضها «بلا تفصيل حساب».
+ *   🔴 `codPayment.min = 3.10.0` في هب الشحن — انشر الـ Worker **قبل** الصفحة، وإلا التفصيل
+ *      بيتبعت ويتجاهَل **في صمت** والموظف فاكره اتسجّل.
+ *
  * v3.9.0 — نوع الأوردر من أحدث دورة + إشارة طرق الدفع في السجل (03-11-2026):
  *   🔴 **تصنيف الأوردر ماكانش بيتعمل في الـ Worker أصلاً** — الواجهة كانت بتحكم
  *      من `lineItems.length > 0` ⇒ «استبدال». لكن `lineItems` = القطع اللي
@@ -235,7 +246,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.9.0';
+const WORKER_VERSION = 'v3.10.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -828,6 +839,9 @@ function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, ref
     paymentMethods:        split || sm.paymentMethods || null,
     pmScope:               split ? 'order' : 'session',
     sessionPaymentMethods: sm.paymentMethods || null,
+    // 🆕 v3.10.0 — تفصيل حسابات الانستاباي/المحفظة (حصة الصف + إجمالي الجلسة)
+    paymentAccounts:        normalizePaymentAccounts(om.paymentAccounts),
+    sessionPaymentAccounts: normalizePaymentAccounts(sm.paymentAccounts),
     batchExpected:         sm.batchExpected  || null,
     extraShipping:      sm.extraShipping || null,
     extraShippingTotal: sm.extraShippingTotal || null,
@@ -857,6 +871,29 @@ function normalizePaymentSplit(split) {
   if (!split || typeof split !== 'object') return null;
   const n = v => Math.abs(parseFloat(v) || 0).toFixed(2);
   return { cash: n(split.cash), instapay: n(split.instapay), wallet: n(split.wallet) };
+}
+
+// ─── §PAY::normalizePaymentAccounts (v3.10.0) ───
+// `{ instapay: { "فادي": "100" }, wallet: { … } }` ← نفس الشكل بقيم موجبة بمليمين، من غير الحسابات الصفرية.
+// ⛔ قيمة بره الشكل ده (مش object · طريقة غير instapay/wallet · اسم فاضي أو طويل) بتتجاهَل في صمت —
+//    الحقل ده تفصيل مراجعة، والمبلغ الأساسي في `paymentMethods` ما بيتأثرش.
+const PAY_ACCOUNT_METHODS = ['instapay', 'wallet'];
+function normalizePaymentAccounts(acc) {
+  if (!acc || typeof acc !== 'object') return null;
+  const out = {};
+  for (const m of PAY_ACCOUNT_METHODS) {
+    const src = acc[m];
+    if (!src || typeof src !== 'object' || Array.isArray(src)) continue;
+    const one = {};
+    for (const [name, v] of Object.entries(src).slice(0, 12)) {
+      const nm = String(name).trim();
+      const n = Math.abs(parseFloat(v) || 0);
+      if (!nm || nm.length > 40 || !(n > 0)) continue;
+      one[nm] = n.toFixed(2);
+    }
+    if (Object.keys(one).length) out[m] = one;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 // ══════════════════════════════════════════════════════
