@@ -1,6 +1,27 @@
 /**
- * cod-payment-center-worker  (v3.6.0)
- * skills: worker-builder v3.7.0 · constants v3.1.0 — 26-09-2026
+ * cod-payment-center-worker  (v3.9.0)
+ * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 — 03-11-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.9.0 — نوع الأوردر من أحدث دورة + إشارة طرق الدفع في السجل (03-11-2026):
+ *   🔴 **تصنيف الأوردر ماكانش بيتعمل في الـ Worker أصلاً** — الواجهة كانت بتحكم
+ *      من `lineItems.length > 0` ⇒ «استبدال». لكن `lineItems` = القطع اللي
+ *      لسه في الأوردر، فأي **استرجاع جزئي** (رجّع ٤ وفضل ١) كان بيتسمّى
+ *      استبدال (#63578 · #57971 · #61366 — مقيسين على شوبيفاي 03-11-2026).
+ *   ✅ `classifyOrderKind` (§SHOPIFY) — `order-lifecycle` قاعدة 8 + 15: الاستبدال
+ *      = أحدث دورة (غير ملغاة) فيها `exchangeLineItems` مش فاضية. غير كده
+ *      `partial_return` (فيه قطع باقية) أو `full_return`. بيرجع في `preview`:
+ *      `orderKind` · `cycleCount` · `multiCycle` — وبيتخزّن في `extra`.
+ *      ⚠️ `exchangeLineItems` فاضية **مش دليل** إنه استرجاع (G-16: استبدال
+ *      اتعدّل يدويًا بعد التسجيل الرسمي بيقطع الرابط) — الحقل وصف، مش حكم مالي.
+ *   ⚠️ `multiCycle` علامة بس: `returnedItems` و`returnShipping` لسه بيتجمّعوا من
+ *      **كل** الدورات (#61954: دورتين = رسم ١٥٠). تغيير ده تغيير مالي — مؤجّل
+ *      لقرار أحمد، ومفيش رقم فلوس اتحرّك.
+ *   🔴 `extra.paymentMethods` (حصة الصف) بقت **دايمًا غير سالبة** — الإشارة
+ *      بتتحدد من `type` الصف وقت العرض. الموظفين بيكتبوا الاسترداد بالسالب في
+ *      الأغلب (١١ من ١٣ جلسة منذ 06-09) والواجهة كانت بتقلب الإشارة فوق كده.
+ *      `sessionPaymentMethods` بيفضل زي ما الموظف كتبه (أثر مراجعة).
+ *   ✅ النسخة: `codPayment.min = 3.9.0` في هب الشحن (الواجهة بتعتمد على `orderKind`).
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.6.0 — الأوردر المسجّل مسبقًا مابيتسجّلش عليه أي تحصيل على شوبيفاي (26-09-2026):
@@ -214,7 +235,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.8.0';
+const WORKER_VERSION = 'v3.9.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -798,7 +819,7 @@ async function fetchTodayDeliveredOrderIds(env, courier) {
 function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, refundAmount, result, actions }) {
   const sm    = sessionMeta || {};
   const om    = orderMeta   || {};
-  const split = om.paymentSplit || null;
+  const split = normalizePaymentSplit(om.paymentSplit);
   return {
     result:             result || null,
     actions:            Array.isArray(actions) ? actions : [],
@@ -819,7 +840,23 @@ function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, ref
     hasReturn:          om.hasReturn || false,
     returnShipping:     om.returnShipping || null,
     courierCollect:     om.courierCollect ?? null,
+    // 🆕 v3.9.0 — وصف الأوردر وقت العملية (مابيتحسبش من الصف بعدين). قيمة مش في
+    //    القايمة المقفولة = null، والصفوف الأقدم مالهاش الحقل (الواجهة بتعرض تسمية محايدة).
+    orderKind:          ORDER_KINDS.has(om.orderKind) ? om.orderKind : null,
+    multiCycle:         om.multiCycle === true,
   };
+}
+
+// ─── §PAY::normalizePaymentSplit (v3.9.0) ───
+// 🔴 حصة الصف من طرق الدفع بتتخزّن **غير سالبة دايمًا** — الإشارة (استرداد = سالب)
+//    بتتحدد من `type` الصف وقت العرض والتصدير. قبل كده الإشارة كانت بتتخزّن زي ما
+//    الموظف كتبها: الاسترداد بالسالب (١١ من ١٣ جلسة) أو بالموجب، والواجهة كانت
+//    بتقلب إشارة صفوف الاسترداد فوق كده ← 10,800 بدل −10,800 في السجل والإكسيل.
+//    `Math.abs` هنا آمن: مفيش حصة سالبة بمعنى مختلف (الاتجاه في `type`).
+function normalizePaymentSplit(split) {
+  if (!split || typeof split !== 'object') return null;
+  const n = v => Math.abs(parseFloat(v) || 0).toFixed(2);
+  return { cash: n(split.cash), instapay: n(split.instapay), wallet: n(split.wallet) };
 }
 
 // ══════════════════════════════════════════════════════
@@ -920,6 +957,29 @@ async function getAccessToken(env) {
   return data.access_token || null;
 }
 
+// ─── §SHOPIFY::classifyOrderKind (v3.9.0) ───
+// 🔴 النوع بيتقرا من **أحدث دورة** مش من `.some()` على كل الدورات (قاعدة 15 ②)،
+//    ومن `exchangeLineItems` مش من `lineItems` (قاعدة 8).
+//      normal          — مفيش دورة نشطة
+//      exchange        — أحدث دورة فيها قطع استبدال
+//      partial_return  — أحدث دورة استرجاع وفيه قطعة لسه في الأوردر
+//      full_return     — أحدث دورة استرجاع ومفيش ولا قطعة باقية
+// الدورات الملغاة/المرفوضة (CANCELED · DECLINED) بتتخطّى. الترتيب بـ`createdAt`
+// **مش** بترتيب المصفوفة. `multiCycle` علامة بس — مابتغيّرش ولا رقم فلوس.
+// ⚠️ `exchangeLineItems` فاضية = «مفيش قطع استبدال مسجّلة»، مش «ده استرجاع»
+//    (G-16): الوصف تقريبي في حالة الاستبدال المعدّل يدويًا، والفلوس مابتتأثرش.
+const ORDER_KINDS = new Set(['normal', 'exchange', 'partial_return', 'full_return']);
+function classifyOrderKind(returnsNodes, remainingQty) {
+  const cycles = (returnsNodes || [])
+    .filter(r => r && r.status !== 'CANCELED' && r.status !== 'DECLINED')
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+  if (!cycles.length) return { orderKind: 'normal', cycleCount: 0, multiCycle: false };
+  const current    = cycles[cycles.length - 1];
+  const isExchange = (current.exchangeLineItems?.nodes || []).length > 0;
+  const orderKind  = isExchange ? 'exchange' : ((Number(remainingQty) || 0) > 0 ? 'partial_return' : 'full_return');
+  return { orderKind, cycleCount: cycles.length, multiCycle: cycles.length > 1 };
+}
+
 async function getOrderDataById(env, numericId) {
   const token = await getAccessToken(env);
   if (!token) throw new Error('Failed to get Shopify access token');
@@ -972,6 +1032,8 @@ async function getOrderDataById(env, numericId) {
           nodes {
             id
             status
+            createdAt
+            exchangeLineItems(first: 10) { nodes { id } }
             returnShippingFees {
               amountSet { shopMoney { amount } }
             }
@@ -1069,6 +1131,11 @@ async function getOrderDataById(env, numericId) {
   }
 
   const returnShipping = returnShippingTotal.toFixed(2);
+  // 🆕 v3.9.0 — نوع الأوردر من **أحدث** دورة (order-lifecycle قاعدة 8 + 15).
+  //    `remainingQty` من **كل** سطور الأوردر (مش المصفّاة بـ sku) — فرق الاسترجاع
+  //    الجزئي عن الكلي هو «فيه قطعة لسه في الأوردر ولا لأ».
+  const remainingQty = (order.lineItems?.nodes || []).reduce((n, li) => n + (Number(li.currentQuantity) || 0), 0);
+  const kindInfo     = classifyOrderKind(returnsNodes, remainingQty);
 
   const txns        = order.transactions || [];
   const saleTransactions = txns
@@ -1119,6 +1186,7 @@ async function getOrderDataById(env, numericId) {
     outstanding: outstanding.toFixed(2), subtotal: subtotal.toFixed(2), shippingAmount: shippingAmount.toFixed(2),
     canMarkAsPaid, skipReason, financialStatus, courier, preRegMetafield, s1, s2,
     lineItems, orderDiscount, hasReturn, returnShipping, returnedItems, saleTransactions,
+    orderKind: kindInfo.orderKind, cycleCount: kindInfo.cycleCount, multiCycle: kindInfo.multiCycle,
   };
 }
 
@@ -1394,6 +1462,7 @@ export default {
             courier: orderData.courier || pending.courier, lineItems: pending.lineItems,
             orderDiscount: orderData.orderDiscount, preRegistered: true, registeredAt: pending.preRegisteredAt,
             cancelled: false, hasReturn: false, returnShipping: '0.00', returnedItems: [],
+            orderKind: 'normal', cycleCount: 0, multiCycle: false,
             saleTransactions: [], s1: orderData.s1, s2: null,
             s2Due: cls.s2Due != null ? cls.s2Due.toFixed(2) : null,
             preRegBlock: cls.block,
@@ -1409,6 +1478,7 @@ export default {
             orderDiscount: orderData.orderDiscount, preRegistered: false, preRegisteredHistorically: true,
             cancelled: false, hasReturn: orderData.hasReturn, returnShipping: orderData.returnShipping,
             returnedItems: orderData.returnedItems, saleTransactions: orderData.saleTransactions || [],
+            orderKind: orderData.orderKind, cycleCount: orderData.cycleCount, multiCycle: orderData.multiCycle,
             s1: orderData.s1, s2: orderData.s2,
           }, 200, request);
         }
@@ -1420,6 +1490,7 @@ export default {
           financialStatus: orderData.financialStatus, courier: orderData.courier, lineItems: orderData.lineItems,
           orderDiscount: orderData.orderDiscount, preRegistered: false, cancelled: false,
           hasReturn: orderData.hasReturn, returnShipping: orderData.returnShipping, returnedItems: orderData.returnedItems,
+          orderKind: orderData.orderKind, cycleCount: orderData.cycleCount, multiCycle: orderData.multiCycle,
           saleTransactions: orderData.saleTransactions || [], s1: orderData.s1, s2: orderData.s2,
         }, 200, request);
       }
