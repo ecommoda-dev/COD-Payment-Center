@@ -1,10 +1,10 @@
 # مركز تحصيل الأوردرات COD (`COD-Payment-Center`)
 
-![version](https://img.shields.io/badge/worker-v3.10.1-blue)
+![version](https://img.shields.io/badge/worker-v3.11.0-blue)
 
 **بتعمل إيه:** الموظف بيسجّل تحصيل/استرداد فلوس أوردرات الدفع عند الاستلام لكل مندوب، ويشوف سجل الحركة كامل.
 **مين بيستخدمها:** حسابات · مخزن
-**الإصدار:** Worker `v3.10.1` · الواجهة `v3.7.0`   ← الاتنين مستقلين، طبيعي يختلفوا
+**الإصدار:** Worker `v3.11.0` · الواجهة `v3.7.0`   ← الاتنين مستقلين، طبيعي يختلفوا
 
 ## 🔗 الأداة دي مدموجة تحت مركز الشحن والتحصيل (16-09-2026)
 
@@ -97,6 +97,28 @@
 > ⚠️ **وعدّاد `login` بتاع `cod_payment` بيقف عند رقمه** بقدر ما الناس بتستخدم
 > نسخة المركز — مش عطل، بس أي استعلام بيعدّ دخول الأداة دي لازم يعرف.
 
+## 🚚 Worker v3.11.0 — تحصيل بوسطة من ملف Cash Cycles (04-11-2026)
+
+> **الـ Worker بس.** الواجهة (تاب «🚚 تحصيل بوسطة») في `COD-Payment-Center.html` جوّه `Delivery-COD-Operations-Center` (v1.77.0) — `index.html` المستقل هنا **ما اتلمسش** (قرار أحمد).
+
+- 🆕 **`bostaValidate`** (POST + `action` في الجسم · ≤ 15 صف · **بلا أي كتابة**) و**`bostaPay`** (صف واحد) — §BOSTA.
+- 🔴 **شوبيفاي:** بيتسجّل **الإجمالي** (`COD` + `Online`) == `totalOutstanding` **بالقرش** (تحصيل `createTransaction` / استرداد `createRefund` لو سالب). ⛔ أي رسوم شحن مابتتحسبش.
+- 🔴 **الخزنة:** `extra.courierCollect` = **Net Value** (بعد رسوم بوسطة — `COD + Online − Total Fees + Flex Ship Amount`) = اللي بوسطة حوّلته فعلاً. نفس `tool='cod_payment'` ونفس `type` (`payment`/`refund`) — **مفيش قيم جديدة في `ecommoda-constants` §7**، وصفر تغيير في عقد القراءة.
+- `batchId = bosta-<Cash-out ID>` (جلسة واحدة لكل تحويل) · `batchExpected.orders` = **كل صفوف الملف** و`collect`/`net` = Σ Net الملف ← الجلسة «ناقصة» في الخزنة لحد ما كل الصفوف تتسجّل (**موظف الخزنة ما يأكّدش قبل الاكتمال** — إجراء تشغيلي، قرار أحمد).
+- **صفوف «بدون تحصيل»** (ملغي · استبدال بلا فرق · مرتجع بلا مبلغ): `payment` بـ`value_after=0` و`extra.noCollection=true` و`courierCollect` = Net (سالب = رسوم بوسطة اللي اتخصمت).
+- `extra` الإضافي: `source='bosta_cash_cycle'` · `cashOutId` · `paidAt` · `trackingNumber` · `slot` (S1/S2) · `bostaOrderType` · `codAmount` · `onlineAmount` · `grossCollected` · `bostaFees` · `flexShipAmount` · `netValue` · `shopifyCaptured` · `noCollection`. بلا `paymentMethods` (إجمالي بس).
+
+**قواعد الصف** (مخالفة = الصف مايتسجّلش وسببه بيرجع للجدول): Business ID = `MrQkqmcexcHuuMo7n` · Payment Status = Paid · Cash-out ID وPaid At = `ctx` الملف · `Order Type`: `SEND` ← S1 وغيره ← S2 · الإجمالي == مستحق شوبيفاي · `custom.courier` = Bosta · رقم التتبع == `bosta_tracking_number_s1`/`_s2` المناسب · Net == المعادلة (±قرش) · رقم تتبع/أوردر مش متكرر. **قواعد الملف** (شيت واحد `Cash Cycles` · الهيدر · Cash-out ID وPaid At موحّدين) بتتفحص في الواجهة وبتوقف الملف كله.
+
+- 🔴 **منع التكرار (درس بند 13):** فحص D1 بـ`cashOutId + trackingNumber` (`tool` + نطاق `timestamp` — `idx_logs_tool_ts`) قبل أي كتابة، وإعادة فحص شوبيفاي لحظة `bostaPay`. صفوف «بدون تحصيل» مالهاش أثر على شوبيفاي فحمايتها الوحيدة فحص D1. ⚠️ مفيش قيد UNIQUE في `logs` — نداءين متوازيين لنفس الصف ممكن يعدّوا (الواجهة بتبعت بالتتابع).
+- ⛔ **PRE_REG_KV ما بيتلمسش** (بند 14): الأوردر المسجّل مسبقًا بيرجع `preRegistered:true` (علامة 📋) بس. تنظيف مفاتيح بوسطة قرار منفصل.
+- ⚠️ حد ١٥ صف في `bostaValidate` من حد الـ subrequests (اسم أوردر + KV لكل صف) — غير مقيس على الإنتاج.
+- 🔴 **`codPayment.min = 3.11.0` في هب الشحن — انشر الـ Worker قبل الصفحة.** على Worker أقدم التاب بيرجع «action غير معروف».
+- 🔴 **Treasury-Ledger v1.1.0** (ريبو `Treasury-Ledger`): بتعلّم صفوف `source='bosta_cash_cycle'` وبتستثنيها من مقارنة Shopify (`BOSTA_NET`) — المعادلة `netPayment − shipping − returnFees` مابتنطبقش على الصافي.
+- الفحص: `node bosta-cash-cycle-check.mjs` (٨٢ بند · شوبيفاي وD1 وKV وهمية بأرقام ملف حقيقي: #61945 · #62701 · #61540 · #61298 · #61141 · #61655) + الفحوصات القديمة (`order-kind-check` ٢٥ · `log-filters-check` ١٩ · `check-log-values`).
+- ⚠️ ما اتجرّبش على Worker منشور ولا شوبيفاي/D1 حقيقيين — أول Cash-out حقيقي هو الاختبار الفعلي (ابدأ بملف صغير). استعلام `name:#N` لكل صف (٥ في نفس الوقت) غير مقيس على التكلفة.
+- 📋 ملاحظة من عيّنة الملف الحقيقي (04-11-2026): أوردرات استرداد ملفها `-2000` ومستحق شوبيفاي `-2300/-2500/-7500` (#57833 · #60705 · #61655) وأوردر استبدال `100` مقابل `200` (#58811) — **هتتمنع بقاعدة المطابقة** وتتعرض في الجدول لحد ما حد يراجعها.
+
 ## 🧾 Worker v3.10.0 — تفصيل حسابات الانستاباي والمحفظة (03-11-2026)
 
 - 🆕 **`extra.paymentAccounts`** (حصة الصف) و**`extra.sessionPaymentAccounts`** (إجمالي الجلسة كما دخّله الموظف): `{ "instapay": { "فادي": "100.00", "مُرسل": "50.00" }, "wallet": { "إسلام": "75.00" } }` — **غير سالبين دايمًا** (الاتجاه من `type` الصف، نفس قرار v3.9.0)، والحسابات الصفرية مابتتخزّنش. `normalizePaymentAccounts` (§PAY): الطرق `instapay`/`wallet` بس · اسم الحساب نص ≤ 40 حرف ومش قايمة مقفولة (حساب جديد مايحتاجش نشر Worker) · ≤ 12 حساب للطريقة · أي حاجة بره الشكل بتتجاهَل في صمت.
@@ -159,6 +181,7 @@
 | `preview` · `resolveByName` | POST | بحث/عرض الأوردر قبل التحصيل |
 | `pay` · `refund` | POST | التحصيل والاسترداد الفعلي. بياخدوا `orderMeta.paymentSplit` (حصة الأوردر من طرق الدفع) و`sessionMeta.batchExpected` — الاتنين بيتكتبوا في `extra` |
 | `getCourierValues` · `getCourierOrders` · `getCourierOrdersToday` | POST | أوردرات المندوب + استيراد تسليمات اليوم |
+| `bostaValidate` · `bostaPay` | POST | 🆕 v3.11.0 — فحص/تسجيل صفوف ملف Cash Cycles (بوسطة) |
 
 ## D1
 
@@ -405,4 +428,4 @@ git show 505f84b:3.0.html
 - **`Build watch paths` لسه `*`** — التضييق على `index.js` + `wrangler.toml` (§13-ب في `ecommoda-tool-migration-playbook`) ما اتعملش. لو اتعمل، **يتوثّق هنا** عشان أي ملف جديد يعتمد عليه الـ Worker يتضاف للقايمة.
 - **`extra_shipping`** — قيمة مسجّلة في `ecommoda-constants` §7 والكود مابيكتبهاش. محتاجة قرار: تتشال من الجدول ولا تتعلّم «تاريخية» زي `bosta_tracker`؟
 
-آخر تحديث: 04-11-2026 — 10:20 (Worker v3.10.1 · توثيق عقد قراءة Treasury-Ledger + تعليق فوق `buildPayExtra` · صفر تغيير سلوك)
+آخر تحديث: 04-11-2026 — Worker v3.11.0 (تحصيل بوسطة · bostaValidate/bostaPay · Net Value للخزنة). السابق: 10:20 (Worker v3.10.1 · توثيق عقد قراءة Treasury-Ledger + تعليق فوق `buildPayExtra` · صفر تغيير سلوك)
