@@ -1,8 +1,11 @@
 /**
- * cod-payment-center-worker  (v3.10.0)
- * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 — 03-11-2026
+ * cod-payment-center-worker  (v3.10.1)
+ * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 — 04-11-2026
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * v3.10.1 — توثيق عقد قراءة Treasury-Ledger (04-11-2026): تعليق فوق `buildPayExtra` + قسم في CLAUDE.md.
+ *   صفر تغيير سلوك ولا في أي اسم مفتاح أو شكل `extra`.
+ *
  * v3.10.0 — تفصيل حسابات الانستاباي والمحفظة (فادي · مُرسل · إسلام) في السجل (03-11-2026):
  *   🆕 `extra.paymentAccounts` (حصة الصف) و`extra.sessionPaymentAccounts` (إجمالي الجلسة كما
  *      دخّله الموظف) — شكلهم `{ instapay: { "فادي": "100.00" }, wallet: { … } }`، **غير سالبين**
@@ -246,7 +249,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.10.0';
+const WORKER_VERSION = 'v3.10.1';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -827,6 +830,9 @@ async function fetchTodayDeliveredOrderIds(env, courier) {
 //    مالهاش الحقل ده، والواجهة بتعرض "—" مش "✓" عليها: إحنا فعليًا مش عارفين
 //    إن الفعل اتأكد وقتها. و`actions` بيتملى **أول بأول** من بره مش بيترجع من
 //    دالة في الآخر — عشان استثناء في النص مايخليش السجل يقول "ما حصلش حاجة".
+// ⚠️ عقد قراءة: Treasury-Ledger بتقرا batchId · courier · courierCollect · extraShipping[] ·
+//    extraShippingTotal · batchExpected (+ result · preRegistered · hasReturn) من الصفوف دي.
+//    تغيير اسم أي مفتاح = جلسات فاضية/ناقصة في الخزنة بلا أي خطأ. غيّر في الاتنين معًا.
 function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, refundAmount, result, actions }) {
   const sm    = sessionMeta || {};
   const om    = orderMeta   || {};
