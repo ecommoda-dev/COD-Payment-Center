@@ -1202,7 +1202,18 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
       <div class="cl-version-block">
         <div class="cl-version-row">
-          <span class="cl-ver-badge" id="clVerBadge">v3.7.0</span>
+          <span class="cl-ver-badge" id="clVerBadge">v3.7.1</span>
+          <span class="cl-ver-date">05-11-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>إجمالي الشحن الإضافي بقى = مجموع البنود المتحقق منها بس.</strong> كان بيجمع كل بند حتى لو البحث عنه فشل (غير موجود / خطأ اتصال) أو لسه بيتحمّل، فالجلسة كانت بتتسجّل بإجمالي أكبر من القايمة (مثال: 225 مقابل بند واحد 75) والخزنة بترفضها ويتعلّق تأكيد التوريد.</span></li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span>زرار التسجيل بقى <strong>مقفول</strong> لو فيه بند شحن إضافي مش متحقق منه، ومعاه رسالة بأسماء البنود — احذفه أو انتظر التحميل. والفحص بيتكرر وقت التنفيذ.</span></li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.7.0</span>
           <span class="cl-ver-date">02-11-2026</span>
         </div>
         <ul class="cl-items">
@@ -1521,7 +1532,7 @@ const TOOL_NAME    = 'cod_payment';      // قيمة tool في جدول logs ب�
 //    في تاب تاني عند نفس المستخدم.
 
 // مصدر واحد لرقم نسخة الواجهة — الهيدر وبادج الـ Changelog ونص شاشة الدخول
-const TOOL_VERSION = 'v3.7.0';
+const TOOL_VERSION = 'v3.7.1';
 
 // 🔴 أقل نسخة Worker الواجهة دي بتشتغل معاها صح.
 //    v3.5.0 هي اللي بترجّع `status`/`actions`/`logged` و`cap`/`total`/`truncated`
@@ -2531,7 +2542,17 @@ function updateExtraAmount(idx, val) {
   else totalEl.style.display = 'none';
   updateStats(); updatePayValidation(); updatePayBtn();
 }
-function getTotalExtraShipping() { return extraEntries.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0); }
+// 🔴 v3.7.1 — الإجمالي لازم يتحسب من **نفس** البنود اللي بتتبعت في `extraShipping[]` (status==='ok').
+//    كان بيجمع كل بند حتى لو البحث عنه فشل (error/notfound) أو لسه بيتحمّل، فالجلسة كانت بتتسجّل بـ
+//    `extraShippingTotal` أكبر من مجموع القايمة — والخزنة بترفض الجلسة دي (بيانات المصدر فيها مشكلة).
+function getTotalExtraShipping() { return extraEntries.filter(e => e.status === 'ok').reduce((s, e) => s + (parseFloat(e.amount) || 0), 0); }
+// بنود شحن إضافي لسه ما اتحلّتش (جاري التحميل / خطأ / غير موجود) — بتقفل التسجيل لحد ما تتحذف أو تتحلّ.
+function getExtraNotOk() { return extraEntries.filter(e => e.status !== 'ok'); }
+function getExtraNotOkError() {
+  const bad = getExtraNotOk();
+  if (!bad.length) return null;
+  return `فيه ${bad.length} بند شحن إضافي مش متحقق منه (${bad.map(e => e.orderName || e.error || 'جاري التحميل').join('، ')}) — احذفه أو انتظر لحد ما يتحمّل، وبعدين سجّل.`;
+}
 </script>
 <script>
 // ══════════════════════════════════════════════════════════════
@@ -2888,7 +2909,7 @@ function updatePayBtn() {
   const hasReady = orders.filter(o => o.status === 'ready').length > 0;
   const hasRefund = orders.filter(o => o.status === 'refund').length > 0;
   const courierErr = getReadyCourierError();
-  const hasStatusErr = orders.some(o => o.statusError && (o.status==='ready'||o.status==='refund')) || extraEntries.some(e => e.statusError && e.status==='ok');
+  const hasStatusErr = orders.some(o => o.statusError && (o.status==='ready'||o.status==='refund')) || extraEntries.some(e => e.statusError && e.status==='ok') || getExtraNotOk().length > 0;
   const btn = $('payBtn');
   const needsPayValid = hasReady;
   btn.disabled = (!hasReady && !hasRefund) || !!courierErr || (needsPayValid && !isPayValid()) || isProcessing || hasStatusErr || (typeof entryFails !== 'undefined' && entryFails.length > 0);
@@ -2932,6 +2953,8 @@ async function confirmBulkPay() {
   if (!readyOrders.length && !refundOrders.length) return;
   const courierErr = getReadyCourierError();
   if (courierErr) { showResult(false, '⚠ لا يمكن تسجيل الدفع', courierErr); return; }
+  const extraErr = getExtraNotOkError();
+  if (extraErr) { showResult(false, '⚠ لا يمكن تسجيل الدفع', extraErr); return; }
   if (readyOrders.length && !isPayValid()) { showResult(false, '⚠ طريقة الدفع غير مكتملة', ''); return; }
 
   const courierName = getReadyCourier();
@@ -3035,6 +3058,13 @@ async function doBulkPayAndRefund() {
   //    `preview` متأخر بيغيّر حالة أوردر. والدالة دي بتقرا `orders` وخانات
   //    الفلوس **من جديد** وقت التنفيذ — يعني أي تغيير بينهم كان بيعدّي بلا
   //    أي فحص، والفلوس تتسجّل على مجموعة أوردرات مش اللي اتحققت عليها.
+  const extraErrNow = getExtraNotOkError();
+  if (extraErrNow) {
+    playBeep('error');
+    showResult(false, '⛔ الجدول اتغيّر بعد التأكيد — مفيش أي عملية اتنفّذت', extraErrNow);
+    isProcessing = false; syncEntryLock(); updatePayBtn(); updatePayMethodsCard();
+    return;
+  }
   if (readyOrders.length && !isPayValid()) {
     playBeep('error');
     showResult(false, '⛔ الجدول اتغيّر بعد التأكيد — مفيش أي عملية اتنفّذت',
