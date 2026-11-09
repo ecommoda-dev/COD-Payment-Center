@@ -1,4 +1,4 @@
-// bosta-cash-cycle-check.mjs — Worker v3.11.0: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
+// bosta-cash-cycle-check.mjs — Worker v3.11.1: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
 // تشغيل: node bosta-cash-cycle-check.mjs   (من غير شبكة — شوبيفاي ووكيل D1 وKV وهمية)
 // الأرقام مأخوذة من ملف حقيقي (Cash-out MONCOD02NOV26) ومن ردود شوبيفاي الحقيقية 04-11-2026:
 //   #61945 (2675) · #62701 (أونلاين 1850) · #61540 (ملغي صفر) · #61298 (استرداد −1650) ·
@@ -12,7 +12,7 @@ const yes = (name, c) => eq(name, !!c, true);
 const CASH = 'MONCOD02NOV26', PAID = '2026-11-02', BIZ = 'MrQkqmcexcHuuMo7n';
 
 // ── شوبيفاي وهمية ────────────────────────────────────────────────
-const mk = (name, id, out, extra = {}) => ({ name, id, out, courier: 'Bosta', t1: null, t2: null, cancelledAt: null, tx: [], ...extra });
+const mk = (name, id, out, extra = {}) => ({ name, id, out, courier: 'Bosta', createdAt: '2026-10-20T10:00:00Z', t1: null, t2: null, cancelledAt: null, tx: [], ...extra });
 const SHOP = {
   '61945': mk('#61945', 101, '2675.0', { t1: '7371541199', tx: [{ id: 'gid://shopify/OrderTransaction/1', kind: 'SALE', status: 'PENDING', amt: '2675.0' }] }),
   '62701': mk('#62701', 102, '1850.0', { t1: '3577596929' }),
@@ -24,6 +24,11 @@ const SHOP = {
   '70002': mk('#70002', 108, '1000.0', { t1: '2222222222' }),
   '70003': mk('#70003', 109, '300.0', { t1: '3333333333' }),
   '70004': mk('#70004', 110, '0.0', { t1: '4444444444' }),
+  '49764': mk('#49764', 111, '2200.0', { createdAt: '2026-08-05T01:53:42Z' }),            // قديم بلا تتبع
+  '46820': mk('#46820', 112, '0.0', { createdAt: '2026-07-07T23:53:27Z' }),               // قديم بلا تتبع · صفر
+  '70010': mk('#70010', 113, '300.0', { createdAt: '2026-09-20T10:00:00Z' }),             // جديد بلا تتبع = عطل
+  '70011': mk('#70011', 114, '0.0', { t1: '5555555555' }),                                // شحنة بديلة (الحالية 5555555555)
+  '70012': mk('#70012', 115, '800.0', { createdAt: '2026-08-10T10:00:00Z', t1: '6666666666' }),  // قديم + له تتبع تاني
 };
 const byGid = {}; for (const o of Object.values(SHOP)) byGid[`gid://shopify/Order/${o.id}`] = o;
 const rest = [], refunds = [], gqlOps = [];
@@ -41,7 +46,7 @@ globalThis.fetch = async (url, init = {}) => {
     if (query.includes('bostaOrders')) {
       gqlOps.push('nodes');
       const nodes = variables.ids.map(g => { const o = byGid[g]; if (!o) return null; return {
-        id: g, name: o.name, cancelledAt: o.cancelledAt, displayFinancialStatus: 'PENDING',
+        id: g, name: o.name, createdAt: o.createdAt, cancelledAt: o.cancelledAt, displayFinancialStatus: 'PENDING',
         totalOutstandingSet: { shopMoney: { amount: o.out } }, courier: o.courier ? { value: o.courier } : null,
         t1: o.t1 ? { value: o.t1 } : null, t2: o.t2 ? { value: o.t2 } : null, t0: null,
         transactions: o.tx.map(t => ({ id: t.id, kind: t.kind, status: t.status, amountSet: { shopMoney: { amount: t.amt } } })),
@@ -146,6 +151,34 @@ const bigPay = R('#61945', '7371541199', 'SEND', 2675, 0, 2538.2, 136.8);
 const dueMixed = await val([bigPay, { ...ROWS.online, businessId: 'Z' }]);
 eq('صف فاسد ما بيمنعش الصف السليم في نفس الدفعة', dueMixed.results.map(r => r.status), ['ready', 'error']);
 
+console.log('══ ②-ب أوردرات قديمة بلا رقم تتبع + شحنات متعددة (v3.11.1) ══');
+const old1 = (await val([R('#49764', '3214694813', 'SEND', 2200, 0, 2071.75, 128.25, { rowNo: 60 })])).results[0];
+eq('قديم (قبل 13-09) بلا أي تتبع + مبلغ مطابق → ready بعلامة', [old1.status, old1.trackingUnverified, old1.reasons], ['ready', true, []]);
+const old0 = (await val([R('#46820', '7810489907', 'SEND', 0, 0, -115.14, 115.14, { rowNo: 61 })])).results[0];
+eq('قديم صفر/صفر (رسوم) → ready_zero بعلامة', [old0.status, old0.trackingUnverified], ['ready_zero', true]);
+const oldBadAmt = (await val([R('#49764', '3214694813', 'SEND', 2000, 0, 1900, 100, { rowNo: 62 })])).results[0];
+eq('قديم بلا تتبع بس المبلغ ≠ مستحق شوبيفاي → لسه error', oldBadAmt.status, 'error');
+const newNo = (await val([R('#70010', '7777777777', 'SEND', 300, 0, 250, 50, { rowNo: 63 })])).results[0];
+eq('جديد (بعد 13-09) بلا تتبع → لسه error', [newNo.status, /مش مسجّل/.test(newNo.reasons.join())], ['error', true]);
+const oldOther = (await val([R('#70012', '9999999999', 'SEND', 800, 0, 700, 100, { rowNo: 64 })])).results[0];
+eq('تتبع مختلف عن الموجود → error حتى لو الأوردر قديم', [oldOther.status, oldOther.trackingUnverified], ['error', false]);
+eq('الأوردر الحديث السليم مش معلّم', (await val([ROWS.ok])).results[0].trackingUnverified, false);
+const dupZero = (await val([
+  R('#70011', '5555555555', 'SEND', 0, 0, -50, 50, { rowNo: 70 }),
+  R('#70011', '5555555555', 'SEND', 0, 0, -50, 50, { rowNo: 71, trackingNumber: '8888888888' }),
+])).results;
+eq('نفس الأوردر/S1 مرتين بصفرين (شحنة ملغية وبديلها) → الصفين مش بسبب التكرار', dupZero.map(r => /أكتر من صف بمبلغ/.test(r.reasons.join())), [false, false]);
+const dupMoney = (await val([
+  R('#61945', '7371541199', 'SEND', 2675, 0, 2538.2, 136.8, { rowNo: 72 }),
+  R('#61945', '1212121212', 'SEND', 2675, 0, 2538.2, 136.8, { rowNo: 73 }),
+])).results;
+eq('نفس الأوردر/S1 بصفين عليهم فلوس → التاني بيتمنع', [dupMoney[0].status, dupMoney[1].status, /أكتر من صف بمبلغ/.test(dupMoney[1].reasons.join())], ['ready', 'error', true]);
+const dupMix = (await val([
+  R('#61945', '7371541199', 'SEND', 2675, 0, 2538.2, 136.8, { rowNo: 74 }),
+  R('#61945', '1313131313', 'SEND', 0, 0, -50, 50, { rowNo: 75 }),
+])).results;
+eq('صف بمبلغ + صف صفر لنفس الأوردر → مفيش منع تكرار', dupMix.map(r => /أكتر من صف بمبلغ/.test(r.reasons.join())), [false, false]);
+
 console.log('══ ③ bostaPay ══');
 const pay = async row => (await call({ action: 'bostaPay', row, ctx, employee: 'Ahmed_Ibraheem' })).body;
 let p = await pay(ROWS.ok);
@@ -217,7 +250,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.11.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.11.0');
+eq('get_config بيرجّع 3.11.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.11.1');
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
