@@ -259,7 +259,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.11.0';
+const WORKER_VERSION = 'v3.11.1';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1432,6 +1432,9 @@ async function createRefund(token, env, numericOrderId, saleTransactions, amount
 const BOSTA_BUSINESS_ID   = 'MrQkqmcexcHuuMo7n';
 const BOSTA_SOURCE        = 'bosta_cash_cycle';
 const BOSTA_COURIER       = 'Bosta';
+// 🔴 أوردر اتشحن قبل ميتافيلدات رقم التتبع (13-09-2026) ماكانش بيتكتب عليه أي رقم تتبع (مسار bosta_synced/StyleBox القديم).
+//   مفيش تعبئة بأثر رجعي (قرار أحمد 09-11-2026) → الأوردر القديم اللي ميتافيلداته التلاتة فاضية بيعدّي بعلامة trackingUnverified.
+const BOSTA_TRACKING_CUTOFF = '2026-09-13T00:00:00Z';
 const BOSTA_VALIDATE_MAX  = 15;       // حد الـ subrequests (اسم أوردر + KV لكل صف) — أقل من 50
 
 // نص/رقم → قروش (integer). null لو فاضي أو مش رقم (مفيش "0" ضمني).
@@ -1502,7 +1505,7 @@ async function bostaFindOrderId(env, token, ref) {
 
 const Q_BOSTA_ORDERS = `query bostaOrders($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Order {
-    id name cancelledAt displayFinancialStatus
+    id name createdAt cancelledAt displayFinancialStatus
     totalOutstandingSet { shopMoney { amount } }
     courier: metafield(namespace: "custom", key: "courier") { value }
     t1: metafield(namespace: "custom", key: "bosta_tracking_number_s1") { value }
@@ -1538,7 +1541,7 @@ async function bostaEvaluate(env, rawRows, ctx) {
     slot: n.orderType === 'SEND' ? 'S1' : 'S2', status: 'error', reasons: [], kind: null,
     gross: (n.cod !== null && n.online !== null) ? bostaFmt(n.cod + n.online) : null,
     net: n.net !== null ? bostaFmt(n.net) : null, shopify: null, preRegistered: null,
-    financialStatus: null, _n: n, _sale: [],
+    financialStatus: null, trackingUnverified: false, _n: n, _sale: [],
   }));
 
   // ① فحوصات بلا شبكة + تكرار داخل الدفعة
@@ -1546,8 +1549,11 @@ async function bostaEvaluate(env, rawRows, ctx) {
   res.forEach(r => {
     r.reasons.push(...bostaLocalReasons(r._n, ctx));
     if (r.tracking) { if (seenT.has(r.tracking)) r.reasons.push('رقم التتبع متكرر في الملف'); seenT.add(r.tracking); }
+    // نفس الأوردر/الـ slot أكتر من مرة (شحنة اتلغت وبديلها — كل واحدة برقم تتبع مختلف) مسموح،
+    // بشرط صف واحد بس عليه فلوس؛ الباقي لازم يكون صفر (رسوم/ملغي). مضاعفة التحصيل ممنوعة.
     const rk = r._n.orderRef.replace(/^#/, '') + '|' + r.slot;
-    if (r._n.orderRef) { if (seenR.has(rk)) r.reasons.push('نفس الأوردر متكرر في الملف لنفس الشحنة (S1/S2)'); seenR.add(rk); }
+    const nonZero = r._n.cod !== null && r._n.online !== null && (r._n.cod + r._n.online) !== 0;
+    if (r._n.orderRef && nonZero) { if (seenR.has(rk)) r.reasons.push('نفس الأوردر متكرر في الملف لنفس الشحنة (S1/S2) وعليه أكتر من صف بمبلغ'); seenR.add(rk); }
   });
   let live = res.filter(r => !r.reasons.length);
 
@@ -1591,7 +1597,10 @@ async function bostaEvaluate(env, rawRows, ctx) {
     const courier = nd.courier?.value || null;
     if (courier !== BOSTA_COURIER) r.reasons.push(`المندوب على شوبيفاي «${courier || 'فاضي'}» مش ${BOSTA_COURIER}`);
     const want = r.slot === 'S1' ? (nd.t1?.value || nd.t0?.value || null) : (nd.t2?.value || null);
-    if (!want) r.reasons.push(`رقم التتبع ${r.slot} مش مسجّل على الأوردر في شوبيفاي`);
+    const noTrackingAtAll = !nd.t1?.value && !nd.t2?.value && !nd.t0?.value;
+    const legacyOrder = noTrackingAtAll && nd.createdAt && Date.parse(nd.createdAt) < Date.parse(BOSTA_TRACKING_CUTOFF);
+    if (!want && legacyOrder) r.trackingUnverified = true;   // أوردر قديم بلا رقم تتبع مسجّل — بيعدّي والباقي (مبلغ · مندوب · Net) شغّال
+    else if (!want) r.reasons.push(`رقم التتبع ${r.slot} مش مسجّل على الأوردر في شوبيفاي`);
     else if (String(want).trim() !== r.tracking) r.reasons.push(`رقم التتبع (${r.tracking}) ≠ ${r.slot} على شوبيفاي (${String(want).trim()})`);
     r._sale = (nd.transactions || []).filter(t => t.kind === 'SALE' && t.status === 'SUCCESS')
       .map(t => ({ id: t.id, amount: parseFloat(t.amountSet?.shopMoney?.amount || '0') })).filter(t => t.amount > 0);
@@ -1638,6 +1647,7 @@ function buildBostaExtra({ n, r, ctx, result, actions }) {
     codAmount: bostaFmt(n.cod), onlineAmount: bostaFmt(n.online), grossCollected: bostaFmt(gross),
     bostaFees: bostaFmt(n.fees), flexShipAmount: bostaFmt(n.flex), netValue: bostaFmt(n.net),
     shopifyCaptured: r.kind === 'none' ? '0.00' : bostaFmt(Math.abs(gross)), noCollection: r.kind === 'none',
+    trackingUnverified: r.trackingUnverified === true,
   };
 }
 
