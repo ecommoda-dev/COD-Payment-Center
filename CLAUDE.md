@@ -1,10 +1,10 @@
 # مركز تحصيل الأوردرات COD (`COD-Payment-Center`)
 
-![version](https://img.shields.io/badge/worker-v3.12.0-blue)
+![version](https://img.shields.io/badge/worker-v3.13.0-blue)
 
 **بتعمل إيه:** الموظف بيسجّل تحصيل/استرداد فلوس أوردرات الدفع عند الاستلام لكل مندوب، ويشوف سجل الحركة كامل.
 **مين بيستخدمها:** حسابات · مخزن
-**الإصدار:** Worker `v3.12.0` · الواجهة `v3.7.1`   ← الاتنين مستقلين، طبيعي يختلفوا
+**الإصدار:** Worker `v3.13.0` · الواجهة `v3.7.1`   ← الاتنين مستقلين، طبيعي يختلفوا
 
 ## 🔗 الأداة دي مدموجة تحت مركز الشحن والتحصيل (16-09-2026)
 
@@ -104,6 +104,21 @@
 **الإصلاح:** الإجمالي بيتحسب من البنود `ok` بس (نفس فلتر القايمة)، وزرار التسجيل بيتقفل لو فيه بند مش `ok` (`getExtraNotOk()`)، والفحص بيتكرر في `confirmBulkPay` و`doBulkPayAndRefund`.
 ⛔ **عقد الخزنة ما اتغيّرش** (نفس المفاتيح) — بس المبدأ دلوقتي: `extraShippingTotal` = Σ `extraShipping[].amount` دايمًا من المصدر.
 ⚠️ **التعديل في `index.html` لازم يتبعه المولّد ودفعة في `Delivery-COD-Operations-Center`** (قسم «نسختان من الواجهة» فوق) — وإلا نسخة المركز تفضل بالعطل.
+
+## 🔎 Worker v3.13.0 — S1 من بوسطة مباشرة (بديل رفع ملف الـ Cash-out القديم) (10-11-2026)
+
+- 🔴 **المشكلة:** بوابة S2 (v3.12.0) بتمنع S2 قبل S1، وS1 اللي اتحوّل في cash-out قديم عمره ما اتعمله رفع (مثال #49395: S1 في `WEDCOD05AUG26` · S2 في `WEDCOD12AUG26`) مالوش طريق غير تسجيل يدوي في D1. الـ Net بتاعه لازم يدخل الخزنة (قرار أحمد: cash-outs أغسطس الـ Net بتاعها **ما دخلش** الخزنة بأي طريقة تانية).
+- 🆕 **`bostaS1Check`** (POST + `action` · **قراءة بس**): بيقرا شحنات الأوردر من بوسطة (`POST /deliveries/search` بالمرجع ثم `GET /deliveries/business/{tn}` لكل شحنة ≤ 5، مهلة 8 ث) + شوبيفاي + D1، ويرجّع **كل** الشحنات بأدلتها (النوع بالكود · الحالة · الإجمالي · الصافي · الرسوم · Cash-out وتاريخه بتوقيت القاهرة · الدفع الأونلاين) و`blockers` لكل واحدة. **الموظف هو اللي بيختار** — مفيش اختيار تلقائي حتى لو شحنة واحدة (قرار أحمد: أكتر من SEND أو S1 رجع RTO).
+- 🆕 **`bostaPayS1`** (كتابة **D1 بس** — صفر `createTransaction`): بيعيد التقييم كله لحظة الكتابة ويرفض (`stale:true`) لو `expected` (إجمالي · صافي · Cash-out) اللي الموظف شافها اتغيّرت. الصف: `type='payment'` · `courierCollect = الصافي` · `extra.slot='S1'` · `source='bosta_cash_cycle'` · **`s1Origin='bosta_api'`** · `s1Catchup=true` · `s1CatchupForTracking` (S2 اللي طلب الفحص) · `cashOutId` الحقيقي (من بوسطة) · `shopifyCaptured='0.00'`.
+- 🔴 **عقد الخزنة (`Treasury-Ledger` v1.4.0 اتقرا):** `batchId = bosta-s1-<trackingNumber>` — **مش** `bosta-<CashOutId>`. السبب: الجلسة `UNIQUE` في `treasury_confirmations` ولو اتأكدت ما بتقبلش صف بعدها، و`batchExpected` بيتاخد من **أول صف بالـ id** — صف بـ`orders=1` جوّه جلسة ملف `orders=N` بيخلّيها «ناقصة» غلط. الجلسة المستقلة `batchExpected = {orders:1, payOrders:1, refundOrders:0, collect:net, net}` = **كاملة** والخزنة بتجمّعها مع باقي المعلّق لنفس المندوب (Bosta).
+- 🔴 **الأرقام (مقيسة على 186/186 صف من `WEDCOD12AUG26` قبل الاعتماد):** الإجمالي = `total_amount − flex_ship_amount + paymentInfo.amount (SUCCEEDED)` · الصافي = `total_amount + paymentInfo.amount − bosta_fees` (الأوردر الأونلاين `cod` و`total_amount` بتوعه صفر والمبلغ في `paymentInfo`). `capturedStatus ≠ SUCCEEDED` = منع بالحرف. تاريخ التحويل بتوقيت القاهرة طابق Paid At في كل الصفوف.
+- 🔴 **أسباب المنع (كلها بتتعرض):** مش S1 (`typeCode 10` أو `20` بـ`oldType=SEND` — الفلترة بالكود) · بلا Cash Cycle · لسه ما اتحوّلتش · الأونلاين مش SUCCEEDED · رقم التتبع ≠ S1 على شوبيفاي (إلا أوردر قديم بلا تتبع قبل 13-09) · المندوب مش Bosta · **مفيش معاملة SALE ناجحة على شوبيفاي تغطي الإجمالي** (دليل إن فلوس S1 اتسجّلت) · الأوردر لسه متبقي عليه إجمالي S1 كله (يتسجّل بملف الـ Cash-out العادي) · اتسجّلت قبل كده (فحص D1 بـ tracking).
+- ✅ مفتاح `PRE_REG_KV` بيتمسح **بعد نجاح السجل بس** لو المبلغ + `transactionId` مطابقين لمعاملة SALE ناجحة (`bostaClearPreReg` — مشتركة مع `prereg_s1`). السجل فشل = لا KV ولا شوبيفاي اتلمسوا.
+- ✅ `bostaValidate` بيرجّع **`code:'S1_MISSING'`** على صف S2 الممنوع (الواجهة بتظهر زرار الفحص من الكود مش من النص) و**`catchUp:true`** على الصف المسجّل من بوسطة مباشرة: لو ملف الـ cash-out القديم اتسجّل بعدين، الواجهة بتطرح الصفوف دي من `ctx` (`orders` · `netTotal` · `payOrders`) فجلسة الملف تفضل كاملة.
+- 🔴 **Secret جديد: `BOSTA_API_KEY`** (مفتاح **خام** بلا `Bearer` — EcomModa حساب واحد) على `cod-payment-center-worker` + **Promote**. غيابه = `bostaS1Check` بيرمي رسالة بتسمّيه، و`?action=diag` بيعرضه. ⚠️ منطق الماديات (`bostaShapeCandidate`) **نسخة** من `Bosta-Order-Lookup` v3.5.2 (`shapeFinance`) — أي تعديل في صيغة الصافي لازم ينزل على الاتنين (درس R1). ⛔ ما نداش `bosta-order-lookup-worker` بـHTTP (درس §PREREG: فشل صامت).
+- 🔴 **`codPayment.min = 3.13.0` في هب الشحن — انشر الـ Worker قبل الصفحة.** الفحص: `node bosta-cash-cycle-check.mjs` **153 بند** (+41 على §⑦) · `order-kind-check` 25 · `log-filters-check` 19.
+- ⚠️ **ما اتجرّبش على بوسطة/شوبيفاي/D1 حقيقيين.** أول تسجيل حقيقي = #49395 (S1 `6579132603` → Net 4,791.74 في `WEDCOD05AUG26`). ⚠️ **عدم تطابق معروف:** عمليات التسجيل على أكتر من يوم في جلسة ملف واحدة بتبان «ناقصة» في عرض اليوم في الخزنة (هامش ±6 ساعات في `loadDaySessions`) — موجود قبل v3.13.0 ومحتاج فحص على جلسة بوسطة فعلية.
+- ⚠️ **بدل «ثمن معروف» في v3.12.0 تحت:** S2 لأوردر S1 بتاعه اتحصّل خارج أي أداة بقى ليه طريق (الفحص من بوسطة)، بشرط وجود Cash Cycle متحوّل وSALE على شوبيفاي.
 
 ## 🚚 Worker v3.12.0 — تحصيل بوسطة: S1 المسجّل مسبقًا + بوابة S2 (10-11-2026)
 
@@ -211,6 +226,7 @@
 | `pay` · `refund` | POST | التحصيل والاسترداد الفعلي. بياخدوا `orderMeta.paymentSplit` (حصة الأوردر من طرق الدفع) و`sessionMeta.batchExpected` — الاتنين بيتكتبوا في `extra` |
 | `getCourierValues` · `getCourierOrders` · `getCourierOrdersToday` | POST | أوردرات المندوب + استيراد تسليمات اليوم |
 | `bostaValidate` · `bostaPay` | POST | 🆕 v3.11.0 — فحص/تسجيل صفوف ملف Cash Cycles (بوسطة) |
+| `bostaS1Check` · `bostaPayS1` | POST | 🆕 v3.13.0 — فحص S1 من بوسطة مباشرة (قراءة) وتسجيله في D1 بس (بتأكيد الموظف) |
 
 ## D1
 
@@ -257,6 +273,7 @@ type  : payment · refund · login · logout
 Bindings : DB         → ecommoda-dev-logs                (D1)
            PRE_REG_KV → pre-register-payment-cod-KV      (KV · aaeff3d84e2c4e87bc7cce6bfd83ce6b)
 Secrets  : WORKER_SECRET · CLIENT_ID · CLIENT_SECRET
+           🔴 BOSTA_API_KEY  ← v3.13.0 — مفتاح خام بلا Bearer · لسه محتاج يتضاف يدويًا + Promote
 Vars     : SHOP_DOMAIN                                   ← من [vars] في wrangler.toml
 Build watch paths : * (الافتراضي) — التضييق لسه ما اتعملش (راجع «مسائل مفتوحة»)
 ```
@@ -457,4 +474,4 @@ git show 505f84b:3.0.html
 - **`Build watch paths` لسه `*`** — التضييق على `index.js` + `wrangler.toml` (§13-ب في `ecommoda-tool-migration-playbook`) ما اتعملش. لو اتعمل، **يتوثّق هنا** عشان أي ملف جديد يعتمد عليه الـ Worker يتضاف للقايمة.
 - **`extra_shipping`** — قيمة مسجّلة في `ecommoda-constants` §7 والكود مابيكتبهاش. محتاجة قرار: تتشال من الجدول ولا تتعلّم «تاريخية» زي `bosta_tracker`؟
 
-آخر تحديث: 10-11-2026 — Worker v3.12.0 (S1 المسجّل مسبقًا + بوابة S2). السابق: 04-11-2026 — Worker v3.11.0 (تحصيل بوسطة · bostaValidate/bostaPay · Net Value للخزنة). السابق: 10:20 (Worker v3.10.1 · توثيق عقد قراءة Treasury-Ledger + تعليق فوق `buildPayExtra` · صفر تغيير سلوك)
+آخر تحديث: 10-11-2026 — Worker v3.13.0 (S1 من بوسطة مباشرة · `bostaS1Check`/`bostaPayS1` · Secret `BOSTA_API_KEY`). السابق: 10-11-2026 — Worker v3.12.0 (S1 المسجّل مسبقًا + بوابة S2). السابق: 04-11-2026 — Worker v3.11.0 (تحصيل بوسطة · bostaValidate/bostaPay · Net Value للخزنة). السابق: 10:20 (Worker v3.10.1 · توثيق عقد قراءة Treasury-Ledger + تعليق فوق `buildPayExtra` · صفر تغيير سلوك)

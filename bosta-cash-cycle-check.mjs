@@ -1,4 +1,4 @@
-// bosta-cash-cycle-check.mjs — Worker v3.12.0: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
+// bosta-cash-cycle-check.mjs — Worker v3.13.0: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
 // تشغيل: node bosta-cash-cycle-check.mjs   (من غير شبكة — شوبيفاي ووكيل D1 وKV وهمية)
 // الأرقام مأخوذة من ملف حقيقي (Cash-out MONCOD02NOV26) ومن ردود شوبيفاي الحقيقية 04-11-2026:
 //   #61945 (2675) · #62701 (أونلاين 1850) · #61540 (ملغي صفر) · #61298 (استرداد −1650) ·
@@ -34,6 +34,41 @@ const SHOP = {
   '49401': mk('#49401', 203, '0.0', { createdAt: '2026-08-01T12:21:08Z', tx: [{ id: 'gid://shopify/OrderTransaction/555', kind: 'SALE', status: 'SUCCESS', amt: '3000.0' }] }),  // S1 مسجّل مسبقًا ومفيش S2
   '70012': mk('#70012', 115, '800.0', { createdAt: '2026-08-10T10:00:00Z', t1: '6666666666' }),  // قديم + له تتبع تاني
 };
+// v3.13.0 — أوردرات «S1 من بوسطة مباشرة» (المتبقي على شوبيفاي = فرق S2، وS1 اتحصّل قبل كده)
+const TX = (id, amt, kind = 'SALE', status = 'SUCCESS') => ({ id: `gid://shopify/OrderTransaction/${id}`, kind, status, amt });
+Object.assign(SHOP, {
+  '49500': mk('#49500', 301, '1225.0', { createdAt: '2026-08-01T12:21:08Z', t1: '6579132699', t2: '8145633099', tx: [TX('8545299431746', '4975.0')] }),   // #49395 الحقيقي (بنفس الأرقام)
+  '49501': mk('#49501', 302, '500.0',  { createdAt: '2026-08-01T12:21:08Z', t1: '3214694801', t2: '3214694802', tx: [TX('777', '1350.0')] }),         // S1 مدفوع أونلاين
+  '49502': mk('#49502', 303, '500.0',  { createdAt: '2026-08-01T12:21:08Z', t1: '3214694811', t2: '3214694812', tx: [TX('778', '1350.0')] }),         // أونلاين FAILED
+  '49503': mk('#49503', 304, '300.0',  { createdAt: '2026-08-01T12:21:08Z', t1: '5996728906', t2: '5996728907', tx: [] }),                              // S1 راجع RTO (بدون تحصيل)
+  '49504': mk('#49504', 305, '300.0',  { createdAt: '2026-08-01T12:21:08Z', t1: '4141414141', t2: '4141414142', tx: [TX('779', '100.0')] }),           // SALE أقل من الإجمالي
+  '49505': mk('#49505', 306, '2200.0', { createdAt: '2026-08-01T12:21:08Z', t1: '4242424242', tx: [] }),                                                  // لسه مش متحصّل (المتبقي = إجمالي S1)
+  '49506': mk('#49506', 307, '400.0',  { createdAt: '2026-08-01T12:21:08Z', t1: '4343434343', t2: '4343434344', tx: [TX('780', '1000.0')] }),          // شحنتين SEND
+  '49507': mk('#49507', 308, '400.0',  { createdAt: '2026-08-01T12:21:08Z', t1: '4444444441', t2: '4444444442', tx: [TX('781', '1000.0')] }),          // لسه ما اتحوّلتش
+});
+const bd = (tn, code, state, o = {}) => ({ trackingNumber: tn, type: { code, value: { 10: 'Send', 20: 'Return to Origin', 30: 'Exchange' }[code] }, state: { code: state }, createdAt: '2026-08-01T12:00:00Z', ...(o.oldType ? { oldType: o.oldType } : {}) });
+const wal = (total, fees, tx, date, flex = '0.00') => ({ wallet: { cashCycle: { total_amount: total, bosta_fees: String(fees), flex_ship_amount: flex, deposited_amt: total - fees }, cashout: tx ? { transaction_id: tx, transaction_date: date } : { next_cashout_date: '2026-11-12' } } });
+const BOSTA = {
+  search: {
+    '49500': [bd('8145633099', 30, 46), bd('6579132699', 10, 45)],
+    '49501': [bd('3214694801', 10, 45)], '49502': [bd('3214694811', 10, 45)], '49503': [bd('5996728906', 20, 46, { oldType: 'SEND' })],
+    '49504': [bd('4141414141', 10, 45)], '49505': [bd('4242424242', 10, 45)],
+    '49506': [bd('4343434343', 10, 45), bd('4343434399', 10, 49)], '49507': [bd('4444444441', 10, 45)],
+  },
+  full: {
+    '8145633099': { ...bd('8145633099', 30, 46), ...wal(1225, 172.14, 'WEDCOD12AUG26', '2026-08-12T00:00:00.000Z') },
+    '6579132699': { ...bd('6579132699', 10, 45), ...wal(4975, 183.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '3214694801': { ...bd('3214694801', 10, 45), ...wal(0, 119.13, 'WEDCOD12AUG26', '2026-08-12T00:00:00.000Z'), paymentInfo: { amount: 1350, capturedStatus: 'SUCCEEDED', provider: 'Flash', method: 'flash' } },
+    '3214694811': { ...bd('3214694811', 10, 45), ...wal(0, 119.13, 'WEDCOD12AUG26', '2026-08-12T00:00:00.000Z'), paymentInfo: { amount: 1350, capturedStatus: 'FAILED', provider: 'Flash' } },
+    '5996728906': { ...bd('5996728906', 20, 46, { oldType: 'SEND' }), ...wal(0, 167.01, 'WEDCOD12AUG26', '2026-08-12T00:00:00.000Z') },
+    '4141414141': { ...bd('4141414141', 10, 45), ...wal(1000, 100, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '4242424242': { ...bd('4242424242', 10, 45), ...wal(2200, 128.25, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '4343434343': { ...bd('4343434343', 10, 45), ...wal(1000, 100, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '4343434399': { ...bd('4343434399', 10, 49) },   // شحنة ملغية — مفيش cycle
+    '4444444441': { ...bd('4444444441', 10, 45), ...wal(1000, 100, null, null) },
+  },
+};
+const bostaCalls = []; let bostaMode = 'ok';
 const byGid = {}; for (const o of Object.values(SHOP)) byGid[`gid://shopify/Order/${o.id}`] = o;
 const rest = [], refunds = [], gqlOps = [];
 globalThis.fetch = async (url, init = {}) => {
@@ -63,6 +98,13 @@ globalThis.fetch = async (url, init = {}) => {
       return new Response(JSON.stringify({ data: { refundCreate: { refund: { id: 'gid://shopify/Refund/1', totalRefundedSet: { shopMoney: { amount: '1' } } }, userErrors: [] } } }), { status: 200 });
     }
   }
+  if (u.startsWith('https://app.bosta.co/api/v2/')) {
+    bostaCalls.push({ method: init.method || 'GET', path: u.replace('https://app.bosta.co/api/v2', ''), auth: init.headers && init.headers.Authorization });
+    if (bostaMode === '401') return new Response('{"message":"Invalid"}', { status: 401 });
+    if (u.endsWith('/deliveries/search')) { const ref = JSON.parse(init.body).businessReference.replace('#', ''); return new Response(JSON.stringify({ data: { deliveries: BOSTA.search[ref] || [] } }), { status: 200 }); }
+    const g = u.match(/deliveries\/business\/(\d+)$/);
+    if (g) return BOSTA.full[g[1]] ? new Response(JSON.stringify({ data: BOSTA.full[g[1]] }), { status: 200 }) : new Response('{}', { status: 400 });
+  }
   const m = u.match(/orders\/(\d+)\/transactions\.json/);
   if (m) {
     const body = JSON.parse(init.body); rest.push({ id: m[1], ...body.transaction });
@@ -80,10 +122,15 @@ const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; }
   async run() { if (/INSERT INTO logs/.test(sql)) { if (failLog) throw new Error('D1 down'); const b = this._b; logs.push({ id: logs.length + 1, timestamp: b[0], tool: b[1], type: b[2], employee: b[3], order_id: b[4], order_name: b[5], value_after: b[10], notes: b[11], extra: b[12] }); } return {}; },
   async first() { return null; },
   async all() {
+    if (/AS co,/.test(sql)) {   // bostaFindByTracking (v3.13.0)
+      const [tool, since, src, tn] = this._b;
+      return { results: logs.filter(l => { const e = JSON.parse(l.extra || '{}'); return l.tool === tool && l.timestamp >= since && e.source === src && e.trackingNumber === tn; })
+        .map(l => ({ id: l.id, timestamp: l.timestamp, order_name: l.order_name, co: JSON.parse(l.extra).cashOutId, s1o: JSON.parse(l.extra).s1Origin || null })) };
+    }
     if (/FROM logs WHERE tool = \? AND timestamp >= \?/.test(sql)) {
       const [tool, since, src, cash, ...tn] = this._b;
       return { results: logs.filter(l => { const e = JSON.parse(l.extra || '{}'); return l.tool === tool && l.timestamp >= since && e.source === src && e.cashOutId === cash && tn.includes(e.trackingNumber); })
-        .map(l => ({ id: l.id, timestamp: l.timestamp, type: l.type, order_name: l.order_name, tn: JSON.parse(l.extra).trackingNumber })) };
+        .map(l => ({ id: l.id, timestamp: l.timestamp, type: l.type, order_name: l.order_name, tn: JSON.parse(l.extra).trackingNumber, s1o: JSON.parse(l.extra).s1Origin || null })) };
     }
     if (/SELECT DISTINCT order_id FROM logs/.test(sql)) {
       const [tool, ...ids] = this._b;
@@ -94,11 +141,12 @@ const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; }
     return { results: [] };
   } }) };
 const kvGets = [], kvDeletes = [];
-const PREREG = { '105': JSON.stringify({ orderId: '105', amount: '4500', orderName: '#61141' }),
+const PREREG = { '301': JSON.stringify({ orderId: '301', orderName: '#49500', amount: '4975.00', transactionId: 8545299431746 }),
+  '105': JSON.stringify({ orderId: '105', amount: '4500', orderName: '#61141' }),
   '201': JSON.stringify({ orderId: '7102191829314', orderName: '#49395', amount: '4975.00', transactionId: 8545299431746 }),
   '203': JSON.stringify({ orderId: '203', orderName: '#49401', amount: '3000.00', transactionId: 555 }) };
 const KV = { async get(k) { kvGets.push(k); return PREREG[k.replace('preReg:', '')] || null; }, async delete(k) { kvDeletes.push(k); delete PREREG[k.replace('preReg:', '')]; }, async list() { return { keys: [] }; } };
-const env = { DB, PRE_REG_KV: KV, WORKER_SECRET: 's', SHOP_DOMAIN: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b' };
+const env = { DB, PRE_REG_KV: KV, WORKER_SECRET: 's', SHOP_DOMAIN: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b', BOSTA_API_KEY: 'RAWKEY' };
 const call = async (body, auth = 'Bearer s') => { const r = await w.fetch(new Request('https://x/', { method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json', Origin: 'https://ecommoda-dev.github.io' }, body: JSON.stringify(body) }), env); return { status: r.status, body: await r.json() }; };
 
 // ── صفوف الملف ──────────────────────────────────────────────────
@@ -265,7 +313,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.12.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.12.0');
+eq('get_config بيرجّع 3.13.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.13.0');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -332,6 +380,112 @@ const s2c = (await val6([R('#49400', '4040404040', 'EXCHANGE', 600, 0, 500, 100,
 eq('S1 اتسجّل بأداة المناديب (صف بلا slot) → S2 يعدّي', s2c.status, 'ready');
 p6 = await pay6(R('#49400', '4040404040', 'EXCHANGE', 600, 0, 500, 100, { rowNo: 220 }));
 eq('وbostaPay الصارم كمان يسجّله', [p6.success, rest[rest.length - 1].amount], [true, '600.00']);
+
+
+console.log('══ ⑦ v3.13.0 — S1 من بوسطة مباشرة (bostaS1Check · bostaPayS1) ══');
+const chk = async ref => (await call({ action: 'bostaS1Check', orderRef: ref })).body;
+const payS1 = async (ref, tn, expected, extra = {}) => (await call({ action: 'bostaPayS1', orderRef: ref, trackingNumber: tn, expected, employee: 'Ahmed_Ibraheem', ...extra })).body;
+const cand = (r, tn) => r.candidates.find(c => c.trackingNumber === tn);
+const restBefore7 = rest.length, refBefore7 = refunds.length;
+
+// بوابة S2 تدّي كود يتعرّف عليه الواجهة
+const s2mis = (await val6([R('#49500', '8145633099', 'EXCHANGE', 1225, 0, 1052.86, 172.14, { rowNo: 301 })], { ...ctx6, s1Orders: [] }))[0];
+eq('S2 الممنوع: code = S1_MISSING + الرسالة بتدل على زرار الفحص', [s2mis.status, s2mis.code, /فحص S1 من بوسطة/.test(s2mis.reasons.join())], ['error', 'S1_MISSING', true]);
+
+// ① #49395 الحقيقي: كل الشحنات بتتعرض، S1 قابلة للتسجيل (Net 4791.74 — الرقم الحقيقي من داشبورد بوسطة)
+const w0 = [logs.length, rest.length, refunds.length, kvDeletes.length];
+let c1 = await chk('#49500');
+eq('الفحص: نجاح + الأوردر', [c1.success, c1.orderName, c1.hasS1, c1.candidates.length], [true, '#49500', false, 2]);
+eq('الفحص: S1 الأول (مرتّبة) وS2 معاها', c1.candidates.map(c => c.trackingNumber), ['6579132699', '8145633099']);
+const k1 = cand(c1, '6579132699');
+eq('S1: إجمالي 4975 · صافي 4791.74 · Cash-out WEDCOD05AUG26 · 2026-08-05', [k1.gross, k1.net, k1.cashOutId, k1.cashOutDate, k1.eligible, k1.collection], ['4975.00', '4791.74', 'WEDCOD05AUG26', '2026-08-05', true, 'cashed_out']);
+eq('S2 معروضة بس مش قابلة للتسجيل كـ S1', [cand(c1, '8145633099').eligible, /مش شحنة S1/.test(cand(c1, '8145633099').blockers.join())], [false, true]);
+eq('الفحص: دليل شوبيفاي + التسجيل المسبق ظاهرين', [c1.shopifySaleCaptured, c1.shopifyOutstanding, c1.preRegistered, c1.preReg.transactionId], ['4975.00', '1225.00', true, '8545299431746']);
+eq('الفحص ما كتبش حاجة (لا D1 ولا شوبيفاي ولا KV)', [logs.length, rest.length, refunds.length, kvDeletes.length], w0);
+yes('مفتاح بوسطة خام بلا Bearer', bostaCalls.length > 0 && bostaCalls.every(c => c.auth === 'RAWKEY'));
+yes('الرد العام مفيهوش حقول داخلية', !JSON.stringify(c1).includes('"_p"') && !JSON.stringify(c1).includes('_sales'));
+
+const logsBefore = logs.length, kvDelBefore = kvDeletes.length;
+// رقم متغيّر من وقت الفحص → رفض بلا كتابة
+let ps = await payS1('#49500', '6579132699', { gross: '4975.00', net: '4000.00', cashOutId: 'WEDCOD05AUG26' });
+eq('أرقام اتغيّرت → رفض stale بلا أي كتابة', [ps.success, ps.stale, logs.length, kvDeletes.length], [false, true, logsBefore, kvDelBefore]);
+ps = await payS1('#49500', '8145633099', { gross: '1225.00', net: '1052.86', cashOutId: 'WEDCOD12AUG26' });
+eq('تسجيل شحنة S2 كـ S1 ممنوع', [ps.success, /مش شحنة S1/.test(ps.error || '')], [false, true]);
+ps = await payS1('#49500', '1111111111', { gross: '1', net: '1', cashOutId: 'x' });
+eq('شحنة مش من الأوردر → رفض', [ps.success, /مش من شحنات الأوردر/.test(ps.error || '')], [false, true]);
+failLog = true; ps = await payS1('#49500', '6579132699', { gross: '4975.00', net: '4791.74', cashOutId: 'WEDCOD05AUG26' }); failLog = false;
+eq('D1 واقعة → فشل نضيف (KV لسه موجود · صفر شوبيفاي)', [ps.success, '301' in PREREG, rest.length, kvDeletes.length], [false, true, restBefore7, kvDelBefore]);
+
+ps = await payS1('#49500', '6579132699', { gross: '4975.00', net: '4791.74', cashOutId: 'WEDCOD05AUG26' }, { s2Tracking: '8145633099' });
+let L7 = logs[logs.length - 1], E7 = JSON.parse(L7.extra);
+eq('تسجيل S1: نجاح + مسح KV + صفر معاملة على شوبيفاي', [ps.success, ps.status, ps.preRegCleared, ps.net, rest.length, refunds.length], [true, 'success', true, '4791.74', restBefore7, refBefore7]);
+eq('الصف: payment · 4975 · أوردر 301', [L7.type, L7.value_after, L7.order_id, L7.order_name], ['payment', 4975, '301', '#49500']);
+eq('🔴 عقد الخزنة: batchId مستقل + batchExpected كامل (جلسة من صف واحد)', [E7.batchId, E7.batchExpected, E7.courierCollect, E7.courier, E7.result, E7.source],
+  ['bosta-s1-6579132699', { orders: 1, payOrders: 1, refundOrders: 0, collect: '4791.74', extraShippingTotal: '0.00', net: '4791.74', methods: null }, 4791.74, 'Bosta', 'success', 'bosta_cash_cycle']);
+eq('الصف: slot S1 · مصدر API · Cash-out الحقيقي · بلا شوبيفاي', [E7.slot, E7.s1Origin, E7.s1Catchup, E7.cashOutId, E7.paidAt, E7.shopifyCaptured, E7.noCollection, E7.s1CatchupForTracking], ['S1', 'bosta_api', true, 'WEDCOD05AUG26', '2026-08-05', '0.00', false, '8145633099']);
+eq('الصف: الرسوم والتأمين والتسجيل المسبق', [E7.grossCollected, E7.bostaFees, E7.netValue, E7.preRegCaptured, E7.preRegTransactionId], ['4975.00', '183.26', '4791.74', '4975.00', '8545299431746']);
+eq('KV: مفتاح 301 بس اتمسح', [kvDeletes.slice(kvDelBefore), '301' in PREREG], [['preReg:301'], false]);
+
+// إعادة التسجيل → ممنوع (اتسجّلت) — صفر صف جديد
+const nLogs7 = logs.length;
+ps = await payS1('#49500', '6579132699', { gross: '4975.00', net: '4791.74', cashOutId: 'WEDCOD05AUG26' });
+eq('تسجيل نفس S1 تاني → ممنوع بلا صف جديد', [ps.success, /اتسجّلت قبل كده/.test(ps.error || ''), logs.length], [false, true, nLogs7]);
+c1 = await chk('#49500');
+eq('الفحص بعد التسجيل: hasS1 + السبب + مين سجّلها', [c1.hasS1, cand(c1, '6579132699').registered.viaApi, cand(c1, '6579132699').eligible], [true, true, false]);
+
+// ② بوابة S2 بعد S1: تعدّي بالمسار العادي (bostaPay صارم) وبتتحصّل 1225 على شوبيفاي
+const s2ok = (await val6([R('#49500', '8145633099', 'EXCHANGE', 1225, 0, 1052.86, 172.14, { rowNo: 301 })], { ...ctx6, s1Orders: [] }))[0];
+eq('S2 بعد S1 من بوسطة: ready بلا s1Orders', [s2ok.status, s2ok.code], ['ready', null]);
+p6 = await pay6(R('#49500', '8145633099', 'EXCHANGE', 1225, 0, 1052.86, 172.14, { rowNo: 301 }));
+eq('S2 اتسجّل: 1225 على شوبيفاي · الصف S2', [p6.success, rest[rest.length - 1].amount, JSON.parse(logs[logs.length - 1].extra).slot], [true, '1225.00', 'S2']);
+
+// ③ ملف الـ cash-out القديم اتسجّل بعدين: الصف المسجّل من الـ API بيتعلّم catchUp عشان الواجهة تطرحه
+const fileS1 = R('#49500', '6579132699', 'SEND', 4975, 0, 4791.74, 183.26, { rowNo: 5, cashOutId: 'WEDCOD05AUG26', paidAt: '2026-08-05' });
+const vf = (await val6([fileS1], { cashOutId: 'WEDCOD05AUG26', paidAt: '2026-08-05', rowsTotal: 2, netTotal: '5000.00', payOrders: 2, refundOrders: 0 }))[0];
+eq('ملف cash-out قديم: الصف المسجّل بالـ API → done + catchUp', [vf.status, vf.catchUp], ['done', true]);
+const vnorm = (await val6([R('#61945', '7371541199', 'SEND', 2675, 0, 2538.2, 136.8, { rowNo: 6 })], ctx))[0];
+eq('صف عادي: catchUp = false', vnorm.catchUp, false);
+
+// ④ أونلاين: cod=0 وtotal=0 والمبلغ في paymentInfo — الصافي = الأونلاين − الرسوم (الملف: 1230.87)
+const c2 = await chk('#49501'), k2 = cand(c2, '3214694801');
+eq('أونلاين SUCCEEDED: إجمالي 1350 · صافي 1230.87 · قابل للتسجيل', [k2.gross, k2.net, k2.onlineAmount, k2.totalAmount, k2.eligible], ['1350.00', '1230.87', '1350.00', '0.00', true]);
+ps = await payS1('#49501', '3214694801', { gross: '1350.00', net: '1230.87', cashOutId: 'WEDCOD12AUG26' });
+L7 = logs[logs.length - 1]; E7 = JSON.parse(L7.extra);
+eq('أونلاين: courierCollect 1230.87 · شوبيفاي صفر · warning لو KV ماليش (مفيش KV هنا)', [ps.success, E7.courierCollect, E7.onlineAmount, E7.codAmount, E7.shopifyCaptured, E7.preRegTransactionId], [true, 1230.87, '1350.00', '0.00', '0.00', null]);
+// الدفع الأونلاين FAILED → ممنوع ومتعرّضش
+const k3 = cand(await chk('#49502'), '3214694811');
+eq('أونلاين FAILED → ممنوع بالحالة بالحرف', [k3.eligible, /FAILED/.test(k3.blockers.join())], [false, true]);
+
+// ⑤ S1 راجع RTO (بدون تحصيل): type 20 + oldType SEND — بيتسجّل لرسوم بوسطة (Net سالب) من غير دليل دفع
+const k4 = cand(await chk('#49503'), '5996728906');
+eq('RTO كانت SEND: S1 قابلة · إجمالي 0 · صافي −167.01', [k4.isS1Type, k4.typeCode, k4.oldType, k4.gross, k4.net, k4.eligible], [true, 20, 'SEND', '0.00', '-167.01', true]);
+ps = await payS1('#49503', '5996728906', { gross: '0.00', net: '-167.01', cashOutId: 'WEDCOD12AUG26' });
+L7 = logs[logs.length - 1]; E7 = JSON.parse(L7.extra);
+eq('RTO: صف بلا تحصيل · courierCollect سالب · valueAfter 0', [ps.success, ps.kind, L7.value_after, E7.noCollection, E7.courierCollect, E7.batchExpected.collect], [true, 'none', 0, true, -167.01, '-167.01']);
+
+// ⑥ المنع: دليل شوبيفاي ناقص · لسه مش متحصّل · لسه ما اتحوّلتش · شحنتين (كلهم بيتعرضوا والموظف يقرر)
+const k5 = cand(await chk('#49504'), '4141414141');
+eq('SALE أقل من إجمالي S1 → ممنوع', [k5.eligible, /مفيش معاملة SALE ناجحة/.test(k5.blockers.join())], [false, true]);
+const k6 = cand(await chk('#49505'), '4242424242');
+eq('الأوردر لسه مش متحصّل على شوبيفاي → ممنوع ويوجّه للمسار العادي', [k6.eligible, /لسه مش متحصّل/.test(k6.blockers.join())], [false, true]);
+const k7 = cand(await chk('#49507'), '4444444441');
+eq('لسه ما اتحوّلتش في Cash-out → ممنوع', [k7.collection, k7.eligible, /ما اتحوّلتش/.test(k7.blockers.join())], ['awaiting_cashout', false, true]);
+const c8 = await chk('#49506');
+eq('شحنتين SEND: الاتنين معروضين · القابلة والغير قابلة', [c8.candidates.length, cand(c8, '4343434343').eligible, cand(c8, '4343434399').eligible], [2, true, false]);
+eq('الملغية بتتعرض بسببها (مفيش cycle + مش مطابقة لـ S1 على شوبيفاي)', [/Cash Cycle/.test(cand(c8, '4343434399').blockers.join()), /≠ S1 على شوبيفاي/.test(cand(c8, '4343434399').blockers.join())], [true, true]);
+
+// ⑦ أخطاء بوسطة/الإعداد
+bostaMode = '401'; let e401 = await call({ action: 'bostaS1Check', orderRef: '#49500' }); bostaMode = 'ok';
+eq('بوسطة 401 → خطأ صريح (مش «مفيش شحنات»)', [e401.status, /المفتاح مرفوض/.test(e401.body.error || '')], [500, true]);
+const envKey = env.BOSTA_API_KEY; delete env.BOSTA_API_KEY;
+const eNoKey = await call({ action: 'bostaS1Check', orderRef: '#49500' }); env.BOSTA_API_KEY = envKey;
+eq('BOSTA_API_KEY ناقص → رسالة بتسمّيه', [eNoKey.status, /BOSTA_API_KEY/.test(eNoKey.body.error || '')], [500, true]);
+eq('orderRef غلط → 400', (await call({ action: 'bostaS1Check', orderRef: 'abc' })).status, 400);
+eq('بلا موظف → 400', (await call({ action: 'bostaPayS1', orderRef: '#49500', trackingNumber: '6579132699', expected: {} })).status, 400);
+eq('أوردر مش موجود → رسالة', (await chk('#99999')).error, 'الأوردر #99999 مش موجود على شوبيفاي');
+const dg = await (await w.fetch(new Request('https://x/?action=diag', { headers: { Authorization: 'Bearer s' } }), env)).json();
+eq('diag: بند BOSTA_API_KEY موجود', dg.checks.find(c => c.label === 'env.BOSTA_API_KEY')?.ok, true);
+
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
