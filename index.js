@@ -1,6 +1,24 @@
 /**
- * cod-payment-center-worker  (v3.12.0)
- * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 — 10-11-2026
+ * cod-payment-center-worker  (v3.13.0)
+ * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 10-11-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.13.0 — S1 من بوسطة مباشرة (بديل رفع ملف الـ Cash-out القديم) — 10-11-2026:
+ *   🔴 المشكلة: S2 ممنوع لحد ما S1 بتاعه يتسجّل (بوابة v3.12.0)، وS1 اللي اتحوّل في cash-out قديم عمره ما اتعمله رفع
+ *      (مثال #49395: S1 في WEDCOD05AUG26 · S2 في WEDCOD12AUG26) مالوش طريق غير تسجيل يدوي في D1.
+ *   🆕 `bostaS1Check` (قراءة بس): بيجيب كل شحنات الأوردر من بوسطة (search بالمرجع + GET لكل شحنة، ≤ 5) ويرجّعها كلها بأدلتها
+ *      (النوع · الحالة · COD · الأونلاين · الرسوم · الصافي · Cash-out ID وتاريخه) + أسباب المنع. الموظف هو اللي بيختار.
+ *   🆕 `bostaPayS1` (كتابة D1 بس — صفر كتابة على شوبيفاي): بيعيد التقييم كله من بوسطة وشوبيفاي وD1 لحظة الكتابة، ويرفض لو الأرقام
+ *      المبعوتة من الواجهة اتغيّرت. الصف بنفس شكل صفوف بوسطة + `extra.s1Origin='bosta_api'` · `batchId='bosta-s1-<تتبع>'`
+ *      (جلسة مستقلة كاملة: `batchExpected.orders=1`) — مش `bosta-<CashOut>` عشان ما يلخبطش `batchExpected` بتاع جلسة الملف.
+ *   🔴 الإجمالي من بوسطة = `total_amount − flex_ship_amount + paymentInfo.amount (SUCCEEDED)` والصافي = `total_amount + paymentInfo.amount − bosta_fees`
+ *      (الأوردر الأونلاين `cod` و`total_amount` بتوعه صفر — اتقاس: 186/186 صف في WEDCOD12AUG26 مطابقين لـ Net Value).
+ *   🔴 دليل الدفع على شوبيفاي إلزامي لو في تحصيل: معاملة SALE ناجحة مجموعها ≥ إجمالي S1، وإلا المنع (المسار العادي بالملف بيعالجه).
+ *   🔴 لو للأوردر مفتاح PRE_REG_KV مطابق (مبلغ + معاملة) بيتمسح بعد نجاح السجل بس — نفس سلوك `prereg_s1` (قرار أحمد 10-11).
+ *   ✅ `bostaValidate` بيرجّع `code:'S1_MISSING'` على صف S2 الممنوع و`catchUp:true` على الصف المسجّل من بوسطة مباشرة
+ *      (الواجهة بتطرحه من عدّادات الملف لو ملف الـ cash-out اتسجّل بعدين).
+ *   ⚠️ محتاج Secret جديد: `BOSTA_API_KEY` (مفتاح خام بلا Bearer) + Promote. `codPayment.min = 3.13.0` — انشر الـ Worker قبل الصفحة.
+ *   ⚠️ ما اتجرّبش على بوسطة/شوبيفاي/D1 حقيقيين. قيم `capturedStatus` غير SUCCEEDED مش معروفة → بتتمنع وبتتعرض بالحرف.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.12.0 — تحصيل بوسطة: S1 المسجّل مسبقًا + بوابة S2 (10-11-2026):
@@ -270,7 +288,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.12.0';
+const WORKER_VERSION = 'v3.13.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1535,7 +1553,8 @@ async function bostaFindRegistered(db, cashOutId, paidAt, trackings) {
   for (let i = 0; i < list.length; i += 40) {
     const part = list.slice(i, i + 40);
     const { results } = await db.prepare(
-      `SELECT id, timestamp, type, order_name, json_extract(extra,'$.trackingNumber') AS tn
+      `SELECT id, timestamp, type, order_name, json_extract(extra,'$.trackingNumber') AS tn,
+              json_extract(extra,'$.s1Origin') AS s1o
          FROM logs WHERE tool = ? AND timestamp >= ? AND type IN ('payment','refund')
           AND json_extract(extra,'$.source') = ? AND json_extract(extra,'$.cashOutId') = ?
           AND json_extract(extra,'$.trackingNumber') IN (${part.map(() => '?').join(',')})`
@@ -1572,7 +1591,7 @@ async function bostaEvaluate(env, rawRows, ctx, strictS1 = false) {
     slot: n.orderType === 'SEND' ? 'S1' : 'S2', status: 'error', reasons: [], kind: null,
     gross: (n.cod !== null && n.online !== null) ? bostaFmt(n.cod + n.online) : null,
     net: n.net !== null ? bostaFmt(n.net) : null, shopify: null, preRegistered: null,
-    financialStatus: null, trackingUnverified: false, _n: n, _sale: [],
+    financialStatus: null, trackingUnverified: false, code: null, catchUp: false, _n: n, _sale: [],
   }));
 
   // ① فحوصات بلا شبكة + تكرار داخل الدفعة
@@ -1593,7 +1612,7 @@ async function bostaEvaluate(env, rawRows, ctx, strictS1 = false) {
     const reg = await bostaFindRegistered(env.DB, ctx.cashOutId, ctx.paidAt, live.map(r => r.tracking));
     for (const r of live) {
       const hit = reg.get(r.tracking);
-      if (hit) { r.status = 'done'; r.orderName = hit.order_name; r.reasons.push(`اتسجّل قبل كده (${String(hit.timestamp).slice(0, 16).replace('T', ' ')} UTC)`); }
+      if (hit) { r.status = 'done'; r.orderName = hit.order_name; r.catchUp = hit.s1o === 'bosta_api'; r.reasons.push(`اتسجّل قبل كده (${String(hit.timestamp).slice(0, 16).replace('T', ' ')} UTC)`); }
     }
     live = live.filter(r => r.status !== 'done');
   }
@@ -1665,7 +1684,8 @@ async function bostaEvaluate(env, rawRows, ctx, strictS1 = false) {
     for (const r of gateRows) {
       if (has.has(String(r.orderId))) continue;
       if (!strictS1 && inFile.has(r._n.orderRef.replace(/^#/, ''))) continue;   // S1 بتاعه في نفس الملف — هيتسجّل الأول
-      r.reasons.push('S1 بتاع الأوردر ده لسه ما اتسجّلش — سجّل ملف/صف S1 من بوسطة الأول (الـ Net بتاعه لازم يدخل الخزنة قبل S2)');
+      r.code = 'S1_MISSING';
+      r.reasons.push('S1 بتاع الأوردر ده لسه ما اتسجّلش — سجّل ملف/صف S1 من بوسطة الأول، أو اضغط «🔎 فحص S1 من بوسطة» (الـ Net بتاعه لازم يدخل الخزنة قبل S2)');
     }
   }
 
@@ -1681,11 +1701,11 @@ async function bostaEvaluate(env, rawRows, ctx, strictS1 = false) {
 const bostaPublic = r => { const { _n, _sale, preRegTx, ...pub } = r; return pub; };
 
 // extra الصف — شكله نفس buildPayExtra (عقد Treasury-Ledger) + حقول بوسطة
-function buildBostaExtra({ n, r, ctx, result, actions }) {
+function buildBostaExtra({ n, r, ctx, result, actions, batchId = null, extend = null }) {
   const gross = n.cod + n.online;
   return {
     result, actions: Array.isArray(actions) ? actions : [],
-    batchId: bostaBatchId(ctx.cashOutId), courier: BOSTA_COURIER,
+    batchId: batchId || bostaBatchId(ctx.cashOutId), courier: BOSTA_COURIER,
     // 🔴 الرقم اللي الخزنة بتتوقعه = Net Value (بعد الرسوم)، مش المحصَّل على شوبيفاي
     courierCollect: Number((n.net / 100).toFixed(2)),
     paymentMethods: null, pmScope: 'session', sessionPaymentMethods: null,
@@ -1704,12 +1724,179 @@ function buildBostaExtra({ n, r, ctx, result, actions }) {
     bostaOrderType: n.orderType, slot: r.slot, bostaOrderStatus: n.orderStatus || null,
     codAmount: bostaFmt(n.cod), onlineAmount: bostaFmt(n.online), grossCollected: bostaFmt(gross),
     bostaFees: bostaFmt(n.fees), flexShipAmount: bostaFmt(n.flex), netValue: bostaFmt(n.net),
-    shopifyCaptured: (r.kind === 'none' || r.kind === 'prereg_s1') ? '0.00' : bostaFmt(Math.abs(gross)), noCollection: r.kind === 'none',
+    shopifyCaptured: (r.kind === 'none' || r.kind === 'prereg_s1' || r.kind === 's1_api') ? '0.00' : bostaFmt(Math.abs(gross)), noCollection: r.kind === 'none',
     // 🔴 v3.12.0 — S1 اتحصّل قبل كده بالتسجيل المسبق: الفلوس على شوبيفاي من أداة التسجيل المسبق (transactionId ده)، والصف هنا للـ Net بس
     preRegCaptured: r.kind === 'prereg_s1' ? bostaFmt(gross) : null, preRegTransactionId: r.kind === 'prereg_s1' ? r.preRegTx : null,
     trackingUnverified: r.trackingUnverified === true,
+    ...(extend || {}),
   };
 }
+
+
+// 🔴 v3.13.0 — مسح مفتاح التسجيل المسبق **بعد** نجاح صف السجل (مشترك بين `prereg_s1` و`bostaPayS1`).
+// بيتأكد إن المفتاح لسه نفس المعاملة قبل المسح. ما بيرميش أبدًا — الفشل = warning بنص للموظف.
+async function bostaClearPreReg(env, orderId, preRegTx, actions) {
+  let preRegCleared = false, warning = null;
+  try {
+    const again = await checkPendingPreReg(env, orderId);
+    if (!again) { preRegCleared = true; actions.push('مفتاح PRE_REG_KV كان اتمسح قبل كده'); }
+    else if (String(again.transactionId || '') !== String(preRegTx)) warning = 'التسجيل المسبق في KV اتغيّر بعد الفحص (معاملة مختلفة) — ما اتمسحش. راجعه.';
+    else if (await clearPendingPreReg(env, orderId)) { preRegCleared = true; actions.push('مسح التسجيل المسبق من PRE_REG_KV'); }
+    else warning = 'مسح التسجيل المسبق من PRE_REG_KV فشل — الأوردر هيفضل «معلّق» في أداة التسجيل المسبق. امسح المفتاح يدويًا.';
+  } catch (e) { warning = `مسح التسجيل المسبق فشل (${e.message}) — امسح المفتاح يدويًا.`; }
+  return { preRegCleared, warning };
+}
+
+// ══════════════════════════════════════════════════════
+// §BOSTA-S1 — S1 من بوسطة مباشرة (v3.13.0 · 10-11-2026)
+// ══════════════════════════════════════════════════════
+// الفكرة: S2 ممنوع قبل S1، وS1 اللي اتحوّل في cash-out قديم ما اتعملهوش رفع. بدل ما نرفع ملف قديم، بنقرا الشحنة من بوسطة نفسها
+// ونسجّل صف S1 في D1 بس (الـ Net للخزنة). شوبيفاي ما بيتلمسش: فلوس S1 المفروض اتسجّلت عليه قبل كده (دليل: معاملة SALE ناجحة).
+// المرجع: bosta-api-helper Step 8.15 (+ملاحظات 10-11-2026 عن الدفع الأونلاين `paymentInfo`) — مفتاح بوسطة خام بلا Bearer.
+const BOSTA_API_BASE = 'https://app.bosta.co/api/v2';
+const BOSTA_FETCH_MS = 8000;
+const BOSTA_MAX_FULL = 5;                          // شحنات بنجيب تفاصيلها (GET) لكل أوردر
+const BOSTA_TOOL_START = '2026-11-01T00:00:00Z';   // أول تسجيل بوسطة في D1 كان 04-11-2026 — حد أدنى لاستعلام idx_logs_tool_ts
+const BOSTA_STATE = { 10: 'Pickup requested', 20: 'Route Assigned', 21: 'Picked up from business', 24: 'Received at warehouse', 30: 'In transit between Hubs',
+  41: 'Picked up', 45: 'Delivered', 46: 'Returned to business', 47: 'Exception', 48: 'Terminated', 49: 'Canceled', 100: 'Lost', 101: 'Damaged' };
+const BOSTA_TYPE = { 10: 'Send', 20: 'Return to Origin', 25: 'Customer Return Pickup', 30: 'Exchange' };
+
+const cairoDayOfIso = iso => {
+  if (!iso) return null;
+  const t = Date.parse(iso); if (!Number.isFinite(t)) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
+};
+
+async function bostaApi(env, method, path, body) {
+  if (!env.BOSTA_API_KEY || !String(env.BOSTA_API_KEY).trim()) throw new Error('BOSTA_API_KEY ناقص على الـ Worker — ضيفه كـ Secret (مفتاح خام) ثم Promote');
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), BOSTA_FETCH_MS);
+  let resp, text;
+  try {
+    resp = await fetch(`${BOSTA_API_BASE}${path}`, {
+      method, signal: ctl.signal,
+      headers: { 'Authorization': env.BOSTA_API_KEY, 'Content-Type': 'application/json' },   // ⚠️ مفتاح خام — مش Bearer
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    text = await resp.text();
+  } catch (e) { throw new Error(e.name === 'AbortError' ? 'بوسطة: انتهت المهلة' : `بوسطة: فشل الاتصال — ${e.message}`); }
+  finally { clearTimeout(timer); }
+  if (!resp.ok) throw new Error(`بوسطة ردّت HTTP ${resp.status}${resp.status === 401 ? ' — المفتاح مرفوض' : ''}`);
+  try { return JSON.parse(text); } catch { throw new Error('بوسطة: رد مش JSON صالح'); }
+}
+function bostaExtractDeliveries(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw?.data?.deliveries)) return raw.data.deliveries;
+  if (Array.isArray(raw?.data)) return raw.data;
+  if (Array.isArray(raw?.deliveries)) return raw.deliveries;
+  if (raw?.trackingNumber) return [raw];
+  return [];
+}
+
+// شكل الشحنة للموظف + الأرقام بالقروش. d = رد search · full = رد GET (أو null) · err = سبب فشل الـ GET
+function bostaShapeCandidate(d, full, err) {
+  const src = full || d, cy = full?.wallet?.cashCycle || null, co = full?.wallet?.cashout || null;
+  const pi = src.paymentInfo || d.paymentInfo || null;
+  const typeCode = d.type?.code ?? src.type?.code ?? null;
+  const oldType = String(d.oldType ?? src.oldType ?? d.type_before ?? '').toUpperCase() || null;
+  const total = cy ? bostaPiastres(cy.total_amount) : null, fees = cy ? bostaPiastres(cy.bosta_fees) : null;
+  const flex = cy ? (bostaPiastres(cy.flex_ship_amount) || 0) : 0;
+  const onlineStatus = pi ? (String(pi.capturedStatus || '').toUpperCase() || null) : null;
+  const onlineRaw = pi ? bostaPiastres(pi.amount) : null;
+  const online = onlineStatus === 'SUCCEEDED' && onlineRaw ? onlineRaw : 0;
+  const cashOutId = co?.transaction_id ?? d.cashoutInfo?.oracleTransactionId ?? null;
+  const ok = total !== null && fees !== null;
+  return {
+    trackingNumber: String(d.trackingNumber ?? ''), typeCode, typeLabel: BOSTA_TYPE[typeCode] || d.type?.value || String(typeCode ?? '—'), oldType,
+    isS1Type: typeCode === 10 || (typeCode === 20 && oldType === 'SEND'),
+    stateCode: d.state?.code ?? null, stateLabel: BOSTA_STATE[d.state?.code] || d.state?.value || '—',
+    createdAt: d.createdAt ?? null, detailsOk: !!full, detailsError: full ? null : (err || null),
+    collection: !full ? 'unknown' : !cy ? 'no_cycle' : cashOutId ? 'cashed_out' : 'awaiting_cashout',
+    cashOutId: cashOutId ? String(cashOutId) : null, cashOutDate: cairoDayOfIso(co?.transaction_date),
+    totalAmount: total === null ? null : bostaFmt(total), flexShipAmount: bostaFmt(flex), fees: fees === null ? null : bostaFmt(fees),
+    onlineAmount: onlineRaw === null ? null : bostaFmt(onlineRaw), onlineStatus, onlineProvider: pi?.provider ?? null,
+    // الإجمالي (COD+Online زي ملف الـ Cash Cycles) والصافي (اللي الخزنة بتتوقعه)
+    gross: ok ? bostaFmt(total - flex + online) : null, net: ok ? bostaFmt(total + online - fees) : null,
+    _p: ok ? { gross: total - flex + online, net: total + online - fees, cod: total - flex, online, fees, flex } : null,
+    blockers: [], eligible: false, registered: null,
+  };
+}
+
+// D1: أي صف بوسطة اتسجّل لرقم التتبع ده (أي cash-out)
+async function bostaFindByTracking(db, tracking) {
+  const { results } = await db.prepare(
+    `SELECT id, timestamp, order_name, json_extract(extra,'$.cashOutId') AS co, json_extract(extra,'$.s1Origin') AS s1o
+       FROM logs WHERE tool = ? AND timestamp >= ? AND type IN ('payment','refund')
+        AND json_extract(extra,'$.source') = ? AND json_extract(extra,'$.trackingNumber') = ?`
+  ).bind(TOOL_NAME, BOSTA_TOOL_START, BOSTA_SOURCE, String(tracking)).all();
+  return (results || [])[0] || null;
+}
+
+// تقييم كامل لأوردر: شوبيفاي + بوسطة + D1 — بيستخدمه الفحص (بلا كتابة) و bostaPayS1 (قبل الكتابة مباشرة)
+async function bostaS1Evaluate(env, orderRef) {
+  const token = await getAccessToken(env);
+  if (!token) throw new Error('Failed to get Shopify access token');
+  const orderId = await bostaFindOrderId(env, token, orderRef);
+  if (!orderId) return { found: false, error: `الأوردر ${String(orderRef).startsWith('#') ? orderRef : '#' + orderRef} مش موجود على شوبيفاي` };
+  const data = await shopifyGQL(env, token, Q_BOSTA_ORDERS, { ids: [`gid://shopify/Order/${orderId}`] }, 'bostaOrders');
+  const nd = (data.data?.nodes || [])[0];
+  if (!nd?.id) return { found: false, error: 'شوبيفاي ما رجّعتش بيانات الأوردر' };
+
+  const out = bostaPiastres(nd.totalOutstandingSet?.shopMoney?.amount);
+  const sales = (nd.transactions || []).filter(t => t.kind === 'SALE' && t.status === 'SUCCESS')
+    .map(t => ({ id: String(t.id).split('/').pop(), p: bostaPiastres(t.amountSet?.shopMoney?.amount) || 0 }));
+  const saleSum = sales.reduce((s, t) => s + t.p, 0);
+  const t1 = nd.t1?.value || null, t0 = nd.t0?.value || null, t2 = nd.t2?.value || null;
+  const noTrackingAtAll = !t1 && !t2 && !t0;
+  const legacy = noTrackingAtAll && nd.createdAt && Date.parse(nd.createdAt) < Date.parse(BOSTA_TRACKING_CUTOFF);
+  const courier = nd.courier?.value || null;
+  const hasS1 = (await bostaOrdersWithS1(env.DB, [orderId])).has(String(orderId));
+  let pend = null; try { pend = await checkPendingPreReg(env, orderId); } catch { pend = null; }
+
+  const ref = String(orderRef).replace(/^#/, '');
+  const raw = bostaExtractDeliveries(await bostaApi(env, 'POST', '/deliveries/search', { businessReference: `#${ref}`, limit: 50, page: 1 }));
+  const sorted = [...raw].sort((a, b) => (b.type?.code === 10 || (b.type?.code === 20 && String(b.oldType || '').toUpperCase() === 'SEND') ? 1 : 0)
+    - (a.type?.code === 10 || (a.type?.code === 20 && String(a.oldType || '').toUpperCase() === 'SEND') ? 1 : 0));
+  const cands = await Promise.all(sorted.map(async (d, i) => {
+    let full = null, err = null;
+    if (i >= BOSTA_MAX_FULL) err = `تفاصيل الشحنة متجلبتش (أكتر من ${BOSTA_MAX_FULL} شحنات)`;
+    else if (!d.trackingNumber) err = 'مفيش رقم تتبع';
+    else { try { const j = await bostaApi(env, 'GET', `/deliveries/business/${encodeURIComponent(d.trackingNumber)}`); full = (j?.data && typeof j.data === 'object' && !Array.isArray(j.data)) ? j.data : j; } catch (e) { err = e.message; } }
+    const c = bostaShapeCandidate(d, full, err);
+    const b = c.blockers;
+    if (!c.isS1Type) b.push(`مش شحنة S1 (نوعها «${c.typeLabel}»${c.oldType ? ` — كانت ${c.oldType}` : ''})`);
+    if (!c.detailsOk) b.push(`تعذّر جلب تفاصيل الشحنة من بوسطة${c.detailsError ? ': ' + c.detailsError : ''}`);
+    else if (c.collection === 'no_cycle') b.push('مفيش Cash Cycle على الشحنة دي في بوسطة (لسه ما دخلتش الـ wallet أو ملغية)');
+    else if (c.collection === 'awaiting_cashout') b.push('اتحصّلت في بوسطة ولسه ما اتحوّلتش في Cash-out — استنى التحويل وارفع ملفه');
+    if (c.collection === 'cashed_out' && (!c.cashOutDate || !/^[A-Za-z0-9_-]{3,60}$/.test(c.cashOutId || ''))) b.push('الـ Cash-out ID أو تاريخ التحويل مش صالحين في رد بوسطة');
+    if (c.onlineStatus && c.onlineStatus !== 'SUCCEEDED' && c.onlineAmount && bostaPiastres(c.onlineAmount) > 0) b.push(`الدفع الأونلاين حالته «${c.onlineStatus}» مش SUCCEEDED — مش بنحسبه`);
+    if (c._p && c._p.gross < 0) b.push('الإجمالي سالب — مش حالة S1');
+    const want = t1 || t0;
+    if (c.isS1Type) {
+      if (!want && legacy) c.trackingUnverified = true;
+      else if (!want) b.push('رقم تتبع S1 مش مسجّل على الأوردر في شوبيفاي');
+      else if (String(want).trim() !== c.trackingNumber) b.push(`رقم التتبع (${c.trackingNumber}) ≠ S1 على شوبيفاي (${String(want).trim()})`);
+    }
+    if (courier !== BOSTA_COURIER) b.push(`المندوب على شوبيفاي «${courier || 'فاضي'}» مش ${BOSTA_COURIER}`);
+    if (c._p && c._p.gross > 0) {
+      if (out !== null && out === c._p.gross) b.push('الأوردر لسه مش متحصّل على شوبيفاي (المتبقي = إجمالي S1) — سجّله بملف الـ Cash-out العادي عشان يتحصّل');
+      else if (saleSum < c._p.gross) b.push(`مفيش معاملة SALE ناجحة على شوبيفاي تغطي إجمالي S1 (${bostaFmt(c._p.gross)}) — الموجود ${bostaFmt(saleSum)}`);
+    }
+    if (c.isS1Type && c.trackingNumber) {
+      const hit = await bostaFindByTracking(env.DB, c.trackingNumber);
+      if (hit) { c.registered = { cashOutId: hit.co, at: String(hit.timestamp).slice(0, 16).replace('T', ' '), viaApi: hit.s1o === 'bosta_api' }; b.push(`اتسجّلت قبل كده (Cash-out ${hit.co || '—'})`); }
+    }
+    c.eligible = b.length === 0;
+    return c;
+  }));
+  // مطابقة التسجيل المسبق (لو فيه): مبلغ + معاملة SALE ناجحة بنفس الـ id → المفتاح هيتمسح بعد نجاح السجل
+  const preReg = pend ? { amount: pend.amount ?? null, transactionId: pend.transactionId != null ? String(pend.transactionId) : null } : null;
+  return {
+    found: true, orderId: String(orderId), orderName: nd.name, courier, financialStatus: nd.displayFinancialStatus,
+    shopifyOutstanding: out === null ? null : bostaFmt(out), shopifySaleCaptured: bostaFmt(saleSum), t1, t2, hasS1, preRegistered: !!pend, preReg, trackingUnverifiedOrder: !!legacy,
+    candidates: cands, _sales: sales, _pend: pend,
+  };
+}
+const bostaS1Public = e => { const { _sales, _pend, candidates, ...pub } = e; return { ...pub, candidates: (candidates || []).map(({ _p, ...c }) => c) }; };
 
 // ══════════════════════════════════════════════════════
 // §HANDLER
@@ -2274,14 +2461,7 @@ export default {
           // السجل فشل = مفيش حاجة اتغيّرت (شوبيفاي ولا KV) → فشل نضيف وإعادة المحاولة آمنة
           if (!logged) return json({ success: false, status: 'error', error: `السجل فشل (${logError || 'D1'}) — مفيش حاجة اتغيّرت، أعد المحاولة`, actions: [] }, 200, request);
           // مسح المفتاح — بعد التأكد إنه لسه نفس التسجيل المسبق (مش تسجيل أحدث)
-          let preRegCleared = false, warning = null;
-          try {
-            const again = await checkPendingPreReg(env, r.orderId);
-            if (!again) { preRegCleared = true; actions.push('مفتاح PRE_REG_KV كان اتمسح قبل كده'); }
-            else if (String(again.transactionId || '') !== String(r.preRegTx)) warning = 'التسجيل المسبق في KV اتغيّر بعد الفحص (معاملة مختلفة) — ما اتمسحش. راجعه.';
-            else if (await clearPendingPreReg(env, r.orderId)) { preRegCleared = true; actions.push('مسح التسجيل المسبق من PRE_REG_KV'); }
-            else warning = 'مسح التسجيل المسبق من PRE_REG_KV فشل — الأوردر هيفضل «معلّق» في أداة التسجيل المسبق. امسح المفتاح يدويًا.';
-          } catch (e) { warning = `مسح التسجيل المسبق فشل (${e.message}) — امسح المفتاح يدويًا.`; }
+          const { preRegCleared, warning } = await bostaClearPreReg(env, r.orderId, r.preRegTx, actions);
           return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, preRegCleared, orderId: r.orderId, kind: r.kind, amount: bostaFmt(Math.abs(gross)) }, 200, request);
         }
 
@@ -2311,6 +2491,67 @@ export default {
         return json({ success: true, status: 'success', actions, logged, logError, orderId: r.orderId, kind: r.kind, amount: bostaFmt(Math.abs(gross)) }, 200, request);
       }
 
+
+      // ── ACTION: bostaS1Check (v3.13.0) — فحص S1 من بوسطة مباشرة (قراءة بس: بوسطة + شوبيفاي + D1) ──
+      // بيرجّع **كل** شحنات الأوردر بأدلتها وأسباب المنع — الموظف هو اللي بيختار (قرار أحمد 10-11).
+      if (action === 'bostaS1Check') {
+        const ref = String(bodyData.orderRef ?? '').trim();
+        if (!/^#?\d{1,10}$/.test(ref)) return json({ error: 'orderRef غير صالح' }, 400, request);
+        const e = await bostaS1Evaluate(env, ref);
+        if (!e.found) return json({ success: false, error: e.error }, 200, request);
+        return json({ success: true, ...bostaS1Public(e) }, 200, request);
+      }
+
+      // ── ACTION: bostaPayS1 (v3.13.0) — تسجيل S1 من بوسطة في D1 بس (صفر كتابة على شوبيفاي) ──
+      // بيعيد التقييم كامل لحظة الكتابة، وبيرفض لو الأرقام اللي الموظف شافها (expected) اتغيّرت.
+      if (action === 'bostaPayS1') {
+        const { orderRef, trackingNumber, employee, expected, s2Tracking } = bodyData;
+        const ref = String(orderRef ?? '').trim(), tn = String(trackingNumber ?? '').trim();
+        if (!/^#?\d{1,10}$/.test(ref)) return json({ error: 'orderRef غير صالح' }, 400, request);
+        if (!/^\d{5,15}$/.test(tn)) return json({ error: 'trackingNumber غير صالح' }, 400, request);
+        if (!employee) return json({ error: 'employee is required' }, 400, request);
+        if (!expected || typeof expected !== 'object') return json({ error: 'expected is required' }, 400, request);
+
+        const e = await bostaS1Evaluate(env, ref);
+        if (!e.found) return json({ success: false, status: 'error', error: e.error, actions: [] }, 200, request);
+        const c = e.candidates.find(x => x.trackingNumber === tn);
+        if (!c) return json({ success: false, status: 'error', error: 'الشحنة دي مش من شحنات الأوردر في بوسطة', actions: [] }, 200, request);
+        if (!c.eligible) return json({ success: false, status: 'error', error: c.blockers.join(' • '), actions: [] }, 200, request);
+        if (String(expected.gross) !== c.gross || String(expected.net) !== c.net || String(expected.cashOutId) !== c.cashOutId) {
+          return json({ success: false, status: 'error', stale: true, actions: [],
+            error: `الأرقام اتغيّرت من وقت الفحص (إجمالي ${c.gross} · صافي ${c.net} · Cash-out ${c.cashOutId}) — أعد الفحص وراجعها` }, 200, request);
+        }
+        const p = c._p, actions = [];
+        // مطابقة التسجيل المسبق: مبلغ + معاملة SALE ناجحة بنفس الـ id — وقتها المفتاح بيتمسح بعد نجاح السجل
+        let preRegTx = null;
+        if (e._pend && p.gross > 0) {
+          const tid = String(e._pend.transactionId || '');
+          if (tid && bostaPiastres(e._pend.amount) === p.gross && e._sales.some(t => t.id === tid && t.p === p.gross)) preRegTx = tid;
+        }
+        const n = { rowNo: null, tracking: tn, orderRef: ref, orderType: 'SEND', orderStatus: String(c.stateLabel || '').toUpperCase(), cod: p.cod, online: p.online, net: p.net, fees: p.fees, flex: p.flex };
+        const r = { kind: p.gross === 0 ? 'none' : 's1_api', slot: 'S1', preRegistered: !!e.preRegistered, trackingUnverified: c.trackingUnverified === true };
+        const sctx = { cashOutId: c.cashOutId, paidAt: c.cashOutDate, rowsTotal: 1, netTotal: c.net, payOrders: 1, refundOrders: 0 };
+        actions.push(p.gross > 0
+          ? `S1 اتحصّل قبل كده على شوبيفاي (${bostaFmt(p.gross)} ج — معاملات SALE ناجحة ${e.shopifySaleCaptured} ج) — تسجيل في السجل فقط (الـ Net للخزنة) من بوسطة مباشرة · Cash-out ${c.cashOutId}`
+          : `S1 بدون تحصيل — رسوم بوسطة (Net ${c.net}) اتسجّلت من بوسطة مباشرة · Cash-out ${c.cashOutId}`);
+        const extend = {
+          s1Origin: 'bosta_api', s1Catchup: true, s1CatchupForTracking: /^\d{5,15}$/.test(String(s2Tracking || '')) ? String(s2Tracking) : null,
+          bostaTypeCode: c.typeCode, bostaStateCode: c.stateCode, onlineStatus: c.onlineStatus, onlineProvider: c.onlineProvider,
+          preRegCaptured: preRegTx ? bostaFmt(p.gross) : null, preRegTransactionId: preRegTx,
+        };
+        const { logged, logError } = await safeWriteLog(env.DB, {
+          tool: TOOL_NAME, type: 'payment', employee, orderId: e.orderId, orderName: e.orderName, valueAfter: Math.abs(p.gross) / 100,
+          notes: `تحصيل بوسطة (S1 من بوسطة مباشرة) — ${c.cashOutId}`,
+          extra: buildBostaExtra({ n, r, ctx: sctx, result: 'success', actions, batchId: `bosta-s1-${tn}`, extend }),
+        });
+        // السجل فشل = مفيش حاجة اتغيّرت (لا KV ولا شوبيفاي) → إعادة المحاولة آمنة
+        if (!logged) return json({ success: false, status: 'error', error: `السجل فشل (${logError || 'D1'}) — مفيش حاجة اتغيّرت، أعد المحاولة`, actions: [] }, 200, request);
+        let preRegCleared = false, warning = null;
+        if (preRegTx) ({ preRegCleared, warning } = await bostaClearPreReg(env, e.orderId, preRegTx, actions));
+        else if (e._pend) warning = 'فيه تسجيل مسبق على الأوردر مش مطابق لإجمالي S1 — ما اتمسحش. راجعه.';
+        return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, preRegCleared, orderId: e.orderId, kind: r.kind, amount: bostaFmt(Math.abs(p.gross)), net: c.net }, 200, request);
+      }
+
       // ── ACTION: get_config ────────────────────────────────────────
       // الواجهة بتقارن النسخة دي بنسختها وبتحذّر لو مختلفين — بيكشف
       // Promote ناقص أو Worker شبح (نسخة قديمة لسه هي المنشورة).
@@ -2336,6 +2577,7 @@ export default {
           checks.push({ label: `env.${k}`, ok: !!v, detail: v ? String(v) : 'ناقص' });
         }
 
+        checks.push({ label: 'env.BOSTA_API_KEY', ok: !!env.BOSTA_API_KEY, detail: env.BOSTA_API_KEY ? `موجود (${String(env.BOSTA_API_KEY).length} حرف)` : 'ناقص — «فحص S1 من بوسطة» مش هيشتغل (مفتاح خام بلا Bearer)' });
         checks.push({
           label: 'DB binding (D1)', ok: !!env.DB,
           detail: env.DB ? 'موجود' : 'ناقص — تسجيل الدخول وتاب السجل هيفشلوا',
