@@ -1,4 +1,4 @@
-// bosta-cash-cycle-check.mjs — Worker v3.11.1: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
+// bosta-cash-cycle-check.mjs — Worker v3.12.0: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
 // تشغيل: node bosta-cash-cycle-check.mjs   (من غير شبكة — شوبيفاي ووكيل D1 وKV وهمية)
 // الأرقام مأخوذة من ملف حقيقي (Cash-out MONCOD02NOV26) ومن ردود شوبيفاي الحقيقية 04-11-2026:
 //   #61945 (2675) · #62701 (أونلاين 1850) · #61540 (ملغي صفر) · #61298 (استرداد −1650) ·
@@ -28,6 +28,10 @@ const SHOP = {
   '46820': mk('#46820', 112, '0.0', { createdAt: '2026-07-07T23:53:27Z' }),               // قديم بلا تتبع · صفر
   '70010': mk('#70010', 113, '300.0', { createdAt: '2026-09-20T10:00:00Z' }),             // جديد بلا تتبع = عطل
   '70011': mk('#70011', 114, '0.0', { t1: '5555555555' }),                                // شحنة بديلة (الحالية 5555555555)
+  // v3.12.0 — #49395 (حقيقي): S1 اتحصّل بالتسجيل المسبق 4975 (معاملة 8545299431746) والمتبقي 1225 هو فرق S2
+  '49395': mk('#49395', 201, '1225.0', { createdAt: '2026-08-01T12:21:08Z', tx: [{ id: 'gid://shopify/OrderTransaction/8545299431746', kind: 'SALE', status: 'SUCCESS', amt: '4975.0' }] }),
+  '49400': mk('#49400', 202, '600.0', { createdAt: '2026-08-01T12:21:08Z', t2: '4040404040' }),    // S2 وS1 بتاعه اتحصّل بأداة المناديب
+  '49401': mk('#49401', 203, '0.0', { createdAt: '2026-08-01T12:21:08Z', tx: [{ id: 'gid://shopify/OrderTransaction/555', kind: 'SALE', status: 'SUCCESS', amt: '3000.0' }] }),  // S1 مسجّل مسبقًا ومفيش S2
   '70012': mk('#70012', 115, '800.0', { createdAt: '2026-08-10T10:00:00Z', t1: '6666666666' }),  // قديم + له تتبع تاني
 };
 const byGid = {}; for (const o of Object.values(SHOP)) byGid[`gid://shopify/Order/${o.id}`] = o;
@@ -70,8 +74,10 @@ globalThis.fetch = async (url, init = {}) => {
 
 // ── D1 وهمية بتفهم اللي بنكتبه ونقراه ────────────────────────────
 const logs = [];
+const PRIOR_S1 = new Set(['104', '105', '106']);   // S1 اتسجّل قبل كده بأداة المناديب (الأوردرات اللي S2 بتاعها في الاختبارات القديمة)
+let failLog = false;
 const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; },
-  async run() { if (/INSERT INTO logs/.test(sql)) { const b = this._b; logs.push({ id: logs.length + 1, timestamp: b[0], tool: b[1], type: b[2], employee: b[3], order_id: b[4], order_name: b[5], value_after: b[10], notes: b[11], extra: b[12] }); } return {}; },
+  async run() { if (/INSERT INTO logs/.test(sql)) { if (failLog) throw new Error('D1 down'); const b = this._b; logs.push({ id: logs.length + 1, timestamp: b[0], tool: b[1], type: b[2], employee: b[3], order_id: b[4], order_name: b[5], value_after: b[10], notes: b[11], extra: b[12] }); } return {}; },
   async first() { return null; },
   async all() {
     if (/FROM logs WHERE tool = \? AND timestamp >= \?/.test(sql)) {
@@ -79,11 +85,19 @@ const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; }
       return { results: logs.filter(l => { const e = JSON.parse(l.extra || '{}'); return l.tool === tool && l.timestamp >= since && e.source === src && e.cashOutId === cash && tn.includes(e.trackingNumber); })
         .map(l => ({ id: l.id, timestamp: l.timestamp, type: l.type, order_name: l.order_name, tn: JSON.parse(l.extra).trackingNumber })) };
     }
+    if (/SELECT DISTINCT order_id FROM logs/.test(sql)) {
+      const [tool, ...ids] = this._b;
+      const got = new Set(ids.filter(id => PRIOR_S1.has(String(id))));
+      logs.forEach(l => { const e = JSON.parse(l.extra || '{}'); if (l.tool === tool && ['payment', 'refund'].includes(l.type) && ids.includes(String(l.order_id)) && (e.slot || '') !== 'S2') got.add(String(l.order_id)); });
+      return { results: [...got].map(order_id => ({ order_id })) };
+    }
     return { results: [] };
   } }) };
 const kvGets = [], kvDeletes = [];
-const PREREG = { '105': JSON.stringify({ orderId: '105', amount: '4500', orderName: '#61141' }) };
-const KV = { async get(k) { kvGets.push(k); return PREREG[k.replace('preReg:', '')] || null; }, async delete(k) { kvDeletes.push(k); }, async list() { return { keys: [] }; } };
+const PREREG = { '105': JSON.stringify({ orderId: '105', amount: '4500', orderName: '#61141' }),
+  '201': JSON.stringify({ orderId: '7102191829314', orderName: '#49395', amount: '4975.00', transactionId: 8545299431746 }),
+  '203': JSON.stringify({ orderId: '203', orderName: '#49401', amount: '3000.00', transactionId: 555 }) };
+const KV = { async get(k) { kvGets.push(k); return PREREG[k.replace('preReg:', '')] || null; }, async delete(k) { kvDeletes.push(k); delete PREREG[k.replace('preReg:', '')]; }, async list() { return { keys: [] }; } };
 const env = { DB, PRE_REG_KV: KV, WORKER_SECRET: 's', SHOP_DOMAIN: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b' };
 const call = async (body, auth = 'Bearer s') => { const r = await w.fetch(new Request('https://x/', { method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json', Origin: 'https://ecommoda-dev.github.io' }, body: JSON.stringify(body) }), env); return { status: r.status, body: await r.json() }; };
 
@@ -235,6 +249,7 @@ SHOP['70002'].out = '1200.0';
 p = await pay(stale);
 eq('الأوردر اتعدّل بعد الفحص → bostaPay بيرفض (إعادة فحص لحظية)', [p.success, rest.some(r => r.id === '108')], [false, false]);
 
+
 console.log('══ ④ عقد Treasury-Ledger ══');
 const rowsFor = logs.filter(l => { const e = JSON.parse(l.extra); return e.source === 'bosta_cash_cycle'; });
 const toP = v => { const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, '').trim()); return Math.round(n * 100); };
@@ -250,7 +265,73 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.11.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.11.1');
+eq('get_config بيرجّع 3.12.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.12.0');
+
+console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
+const kvDel0 = kvDeletes.length, restN = () => rest.length;
+const S1_49395 = R('#49395', '6579132603', 'SEND', 4975, 0, 4800, 175, { rowNo: 201, orderStatus: 'DELIVERED' });
+const S2_49395 = R('#49395', '8145633046', 'EXCHANGE', 1225, 0, 1052.86, 172.14, { rowNo: 202 });
+const ctx6 = { ...ctx, rowsTotal: 2, netTotal: '5852.86', payOrders: 2, refundOrders: 0, s1Orders: ['#49395'] };
+const val6 = async (rows, c) => (await call({ action: 'bostaValidate', rows, ctx: c })).body.results;
+const pay6 = async (row, c = ctx6) => (await call({ action: 'bostaPay', row, ctx: c, employee: 'Ahmed_Ibraheem' })).body;
+
+let v6 = await val6([S1_49395], ctx6);
+eq('S1 مسجّل مسبقًا: ready رغم إن المستحق 1225 ≠ 4975', [v6[0].status, v6[0].kind, v6[0].preRegistered], ['ready', 'prereg_s1', true]);
+yes('الرد العام مفيهوش preRegTx الداخلي', !('preRegTx' in v6[0]));
+v6 = await val6([S2_49395], { ...ctx6, s1Orders: [] });
+eq('S2 لوحده (S1 مش متسجّل ولا في الملف) → error بسبب S1', [v6[0].status, /S1 بتاع الأوردر ده لسه ما اتسجّلش/.test(v6[0].reasons.join())], ['error', true]);
+v6 = await val6([S2_49395], ctx6);
+eq('S2 وS1 بتاعه في نفس الملف → ready في الفحص', v6[0].status, 'ready');
+const wrN = [logs.length, restN(), kvDeletes.length];
+let p6 = await pay6(S2_49395);
+eq('bostaPay صارم: S2 قبل S1 → رفض بلا أي كتابة', [p6.success, /S1 بتاع/.test(p6.error || ''), [logs.length, restN(), kvDeletes.length]], [false, true, wrN]);
+
+// السجل واقع → مفيش حاجة تتغيّر (لا KV ولا شوبيفاي) وإعادة المحاولة آمنة
+failLog = true; p6 = await pay6(S1_49395); failLog = false;
+eq('S1: D1 واقعة → فشل نضيف (KV لسه موجود · صفر شوبيفاي)', [p6.success, '201' in PREREG, restN(), kvDeletes.length], [false, true, wrN[1], wrN[2]]);
+
+p6 = await pay6(S1_49395);
+let L6 = logs[logs.length - 1], E6 = JSON.parse(L6.extra);
+eq('S1: نجاح · kind · مسح KV', [p6.success, p6.kind, p6.preRegCleared, p6.logged], [true, 'prereg_s1', true, true]);
+eq('S1: صفر معاملة جديدة على شوبيفاي', restN(), wrN[1]);
+eq('S1: صف payment بقيمة 4975 على أوردر 201', [L6.type, L6.value_after, L6.order_id, L6.order_name], ['payment', 4975, '201', '#49395']);
+eq('🔴 S1: courierCollect = Net (4800) للخزنة', E6.courierCollect, 4800);
+eq('S1: slot · shopifyCaptured · preRegCaptured · tx', [E6.slot, E6.shopifyCaptured, E6.preRegCaptured, E6.preRegTransactionId, E6.noCollection, E6.preRegistered], ['S1', '0.00', '4975.00', '8545299431746', false, true]);
+eq('KV اتمسح (مفتاح 201 بس)', [kvDeletes.slice(kvDel0), '201' in PREREG], [['preReg:201'], false]);
+
+p6 = await pay6(S1_49395);
+eq('إعادة رفع S1: already بلا كتابة ولا مسح', [p6.status, kvDeletes.length - kvDel0], ['already', 1]);
+
+p6 = await pay6(S2_49395);
+L6 = logs[logs.length - 1]; E6 = JSON.parse(L6.extra);
+eq('S2 بعد S1: يتسجّل 1225 على شوبيفاي', [p6.success, rest[rest.length - 1].amount, rest[rest.length - 1].id], [true, '1225.00', '201']);
+eq('S2: courierCollect = 1052.86 وslot S2 (مايعدّش دليل S1 لغيره)', [E6.courierCollect, E6.slot], [1052.86, 'S2']);
+
+// مبلغ الملف ≠ التسجيل المسبق → مفيش مسار S1 المسجّل مسبقًا
+PREREG['203'] = JSON.stringify({ orderId: '203', orderName: '#49401', amount: '3000.00', transactionId: 555 });
+const badAmt = (await val6([R('#49401', '1212121299', 'SEND', 2900, 0, 2800, 100, { rowNo: 210 })], ctx6))[0];
+eq('S1 بمبلغ ≠ التسجيل المسبق → error والرسالة تقول المبلغين', [badAmt.status, /3000\.00/.test(badAmt.reasons.join()), /2900\.00/.test(badAmt.reasons.join())], ['error', true, true]);
+const okNoS2 = (await val6([R('#49401', '1212121298', 'SEND', 3000, 0, 2850, 150, { rowNo: 211 })], ctx6))[0];
+eq('أوردر مسجّل مسبقًا بالكامل (بلا S2، مستحق صفر) → ready مسار S1', [okNoS2.status, okNoS2.kind], ['ready', 'prereg_s1']);
+// معاملة التسجيل المسبق مش على شوبيفاي (id مختلف) → رفض
+PREREG['203'] = JSON.stringify({ orderId: '203', orderName: '#49401', amount: '3000.00', transactionId: 999 });
+const noTx = (await val6([R('#49401', '1212121298', 'SEND', 3000, 0, 2850, 150, { rowNo: 212 })], ctx6))[0];
+eq('transactionId مش لاقيينه على شوبيفاي → error', [noTx.status, /معاملته الناجحة/.test(noTx.reasons.join())], ['error', true]);
+PREREG['203'] = JSON.stringify({ orderId: '203', orderName: '#49401', amount: '3000.00', transactionId: 555 });
+// KV اتغيّر بين الفحص والمسح → ما يتمسحش + تحذير
+const origGet = KV.get; let gets203 = 0;
+KV.get = async k => { if (k === 'preReg:203' && ++gets203 >= 2) return JSON.stringify({ orderId: '203', amount: '3000.00', transactionId: 777 }); return origGet(k); };
+const delBefore = kvDeletes.length;
+p6 = await pay6(R('#49401', '1212121298', 'SEND', 3000, 0, 2850, 150, { rowNo: 213 }));
+KV.get = origGet;
+eq('KV اتبدّل بتسجيل أحدث → السجل اتكتب · المفتاح ما اتمسحش · تحذير', [p6.success, p6.status, p6.preRegCleared, /اتغيّر/.test(p6.warning || ''), kvDeletes.length], [true, 'warning', false, true, delBefore]);
+
+// دليل S1 من أداة المناديب (صف cod_payment بلا slot) يفتح بوابة S2
+logs.push({ id: 9001, timestamp: new Date().toISOString(), tool: 'cod_payment', type: 'payment', employee: 'x', order_id: '202', order_name: '#49400', value_after: 600, notes: '', extra: JSON.stringify({ courier: 'Bosta' }) });
+const s2c = (await val6([R('#49400', '4040404040', 'EXCHANGE', 600, 0, 500, 100, { rowNo: 220 })], { ...ctx6, s1Orders: [] }))[0];
+eq('S1 اتسجّل بأداة المناديب (صف بلا slot) → S2 يعدّي', s2c.status, 'ready');
+p6 = await pay6(R('#49400', '4040404040', 'EXCHANGE', 600, 0, 500, 100, { rowNo: 220 }));
+eq('وbostaPay الصارم كمان يسجّله', [p6.success, rest[rest.length - 1].amount], [true, '600.00']);
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
