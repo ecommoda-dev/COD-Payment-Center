@@ -1,10 +1,10 @@
 # مركز تحصيل الأوردرات COD (`COD-Payment-Center`)
 
-![version](https://img.shields.io/badge/worker-v3.13.1-blue)
+![version](https://img.shields.io/badge/worker-v3.13.0-blue)
 
 **بتعمل إيه:** الموظف بيسجّل تحصيل/استرداد فلوس أوردرات الدفع عند الاستلام لكل مندوب، ويشوف سجل الحركة كامل.
 **مين بيستخدمها:** حسابات · مخزن
-**الإصدار:** Worker `v3.13.1` · الواجهة `v3.7.1`   ← الاتنين مستقلين، طبيعي يختلفوا
+**الإصدار:** Worker `v3.13.0` · الواجهة `v3.7.1`   ← الاتنين مستقلين، طبيعي يختلفوا
 
 ## 🔗 الأداة دي مدموجة تحت مركز الشحن والتحصيل (16-09-2026)
 
@@ -105,7 +105,7 @@
 ⛔ **عقد الخزنة ما اتغيّرش** (نفس المفاتيح) — بس المبدأ دلوقتي: `extraShippingTotal` = Σ `extraShipping[].amount` دايمًا من المصدر.
 ⚠️ **التعديل في `index.html` لازم يتبعه المولّد ودفعة في `Delivery-COD-Operations-Center`** (قسم «نسختان من الواجهة» فوق) — وإلا نسخة المركز تفضل بالعطل.
 
-## 🔓 Worker v3.13.1 — Paid At مش شرط على الملف (13-11-2026)
+## 🔓 تعديل على v3.13.0 (بلا رفع رقم النسخة) — Paid At مش شرط على الملف (13-11-2026)
 
 - **الطلب (أحمد):** ملف فيه Paid At مختلف (مثال: صفين `29-07-2026` وباقي الصفوف `03-08-2026`) كان بيتوقف كله. الشرط اتشال بالكامل.
 - 🔴 **الـ Worker:** اتشال سبب «Paid At مختلف عن الملف» من `bostaLocalReasons`. `extra.paidAt` بقى **تاريخ الصف نفسه** (`n.paidAt || ctx.paidAt`). `ctx.paidAt` لسه لازم يبقى تاريخ صالح (`bostaCheckCtx`) واتحوّل لـ**أقدم** Paid At في الملف — بيُستخدم كحد أدنى لفحص «اتسجّل قبل كده».
@@ -160,7 +160,7 @@
 - **صفوف «بدون تحصيل»** (ملغي · استبدال بلا فرق · مرتجع بلا مبلغ): `payment` بـ`value_after=0` و`extra.noCollection=true` و`courierCollect` = Net (سالب = رسوم بوسطة اللي اتخصمت).
 - `extra` الإضافي: `source='bosta_cash_cycle'` · `cashOutId` · `paidAt` · `trackingNumber` · `slot` (S1/S2) · `bostaOrderType` · `codAmount` · `onlineAmount` · `grossCollected` · `bostaFees` · `flexShipAmount` · `netValue` · `shopifyCaptured` · `noCollection`. بلا `paymentMethods` (إجمالي بس).
 
-**قواعد الصف** (مخالفة = الصف مايتسجّلش وسببه بيرجع للجدول): Business ID = `MrQkqmcexcHuuMo7n` · Payment Status = Paid · Cash-out ID = `ctx` الملف (Paid At مش شرط — v3.13.1) · `Order Type`: `SEND` ← S1 وغيره ← S2 · الإجمالي == مستحق شوبيفاي · `custom.courier` = Bosta · رقم التتبع == `bosta_tracking_number_s1`/`_s2` المناسب · Net == المعادلة (±قرش) · رقم تتبع/أوردر مش متكرر. **قواعد الملف** (شيت واحد `Cash Cycles` · الهيدر · Cash-out ID وPaid At موحّدين) بتتفحص في الواجهة وبتوقف الملف كله.
+**قواعد الصف** (مخالفة = الصف مايتسجّلش وسببه بيرجع للجدول): Business ID = `MrQkqmcexcHuuMo7n` · Payment Status = Paid · Cash-out ID = `ctx` الملف (Paid At مش شرط — تعديل 13-11-2026) · `Order Type`: `SEND` ← S1 وغيره ← S2 · الإجمالي == مستحق شوبيفاي · `custom.courier` = Bosta · رقم التتبع == `bosta_tracking_number_s1`/`_s2` المناسب · Net == المعادلة (±قرش) · رقم تتبع/أوردر مش متكرر. **قواعد الملف** (شيت واحد `Cash Cycles` · الهيدر · Cash-out ID وPaid At موحّدين) بتتفحص في الواجهة وبتوقف الملف كله.
 
 - 🔴 **منع التكرار (درس بند 13):** فحص D1 بـ`cashOutId + trackingNumber` (`tool` + نطاق `timestamp` — `idx_logs_tool_ts`) قبل أي كتابة، وإعادة فحص شوبيفاي لحظة `bostaPay`. صفوف «بدون تحصيل» مالهاش أثر على شوبيفاي فحمايتها الوحيدة فحص D1. ⚠️ مفيش قيد UNIQUE في `logs` — نداءين متوازيين لنفس الصف ممكن يعدّوا (الواجهة بتبعت بالتتابع).
 - ⛔ **PRE_REG_KV ما بيتلمسش** (بند 14): الأوردر المسجّل مسبقًا بيرجع `preRegistered:true` (علامة 📋) بس. تنظيف مفاتيح بوسطة قرار منفصل.
