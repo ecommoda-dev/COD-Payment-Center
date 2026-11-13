@@ -1507,7 +1507,6 @@ function bostaLocalReasons(n, ctx) {
   if (n.businessId !== BOSTA_BUSINESS_ID) why.push(`Business ID («${n.businessId || 'فاضي'}») مش بتاع الشركة`);
   if (n.paymentStatus !== 'Paid') why.push(`Payment Status = «${n.paymentStatus || 'فاضي'}» مش Paid`);
   if (n.cashOutId !== ctx.cashOutId) why.push(`Cash-out ID («${n.cashOutId || 'فاضي'}») مختلف عن الملف (${ctx.cashOutId})`);
-  if (n.paidAt !== ctx.paidAt) why.push(`Paid At («${n.paidAt || 'فاضي'}») مختلف عن الملف (${ctx.paidAt})`);
   if (!n.orderType) why.push('Order Type فاضي');
   if (!/^\d{5,15}$/.test(n.tracking)) why.push(`Order Id (رقم التتبع) «${n.tracking || 'فاضي'}» مش رقم صالح`);
   if (!/^#?\d{1,10}$/.test(n.orderRef)) why.push(`Order Reference «${n.orderRef || 'فاضي'}» مش رقم أوردر`);
@@ -1720,7 +1719,7 @@ function buildBostaExtra({ n, r, ctx, result, actions, batchId = null, extend = 
     preRegistered: r.preRegistered === true, hasReturn: n.orderType !== 'SEND', returnShipping: null,
     orderKind: null, multiCycle: false,
     // — حقول بوسطة —
-    source: BOSTA_SOURCE, cashOutId: ctx.cashOutId, paidAt: ctx.paidAt, trackingNumber: n.tracking,
+    source: BOSTA_SOURCE, cashOutId: ctx.cashOutId, paidAt: n.paidAt || ctx.paidAt, trackingNumber: n.tracking,
     bostaOrderType: n.orderType, slot: r.slot, bostaOrderStatus: n.orderStatus || null,
     codAmount: bostaFmt(n.cod), onlineAmount: bostaFmt(n.online), grossCollected: bostaFmt(gross),
     bostaFees: bostaFmt(n.fees), flexShipAmount: bostaFmt(n.flex), netValue: bostaFmt(n.net),
