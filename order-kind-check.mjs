@@ -94,7 +94,7 @@ eq('واجهة قديمة (بلا تفصيل) ← null', [extraOf(base + 1).paym
 await call({ action: 'pay', orderId: '2', amount: '100.00', batchId: 'b7', sessionMeta: { courier: 'C', paymentAccounts: 'x' },
   orderMeta: { orderKind: 'normal', paymentSplit: { cash: '0', instapay: '100', wallet: '0' }, paymentAccounts: { cash: { 'x': '5' }, instapay: { '': '5', ['y'.repeat(41)]: '5', 'فادي': 'abc', 'إسلام': '100' }, wallet: [1, 2] } } });
 eq('مدخلات باظة بتتجاهَل (طريقة غريبة · اسم فاضي/طويل · قيمة مش رقم · مش object)', [extraOf(base + 2).paymentAccounts, extraOf(base + 2).sessionPaymentAccounts], [{ instapay: { 'إسلام': '100.00' } }, null]);
-eq('نسخة الـ Worker', (await call({ action: 'get_config' })).workerVersion ?? 'v3.15.0', 'v3.15.0');
+eq('نسخة الـ Worker', (await call({ action: 'get_config' })).workerVersion ?? 'v3.16.0', 'v3.16.0');
 
 console.log(`\n${bad ? '❌' : '✅'} النتيجة: ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);

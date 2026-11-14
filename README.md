@@ -2,7 +2,7 @@
 
 # COD Payment Center
 
-![version](https://img.shields.io/badge/worker-v3.15.0-blue)
+![version](https://img.shields.io/badge/worker-v3.16.0-blue)
 
 **Worker** أداة EcomModa الداخلية لتحصيل واسترداد فلوس أوردرات **الدفع عند الاستلام (COD)** لكل مندوب، مع سجل حركة كامل.
 
@@ -13,7 +13,7 @@
 |---|---|
 | **الواجهة** | https://ecommoda-dev.github.io/Delivery-COD-Operations-Center/COD-Payment-Center.html (ريبو `Delivery-COD-Operations-Center`) |
 | **الـ Worker** | https://cod-payment-center-worker.ecommoda-dev.workers.dev |
-| **الإصدار** | Worker `v3.15.0` |
+| **الإصدار** | Worker `v3.16.0` |
 
 ## البنية
 
