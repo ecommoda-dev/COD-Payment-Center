@@ -393,7 +393,8 @@ const LOG_EXPORT_MAX = 2000;
 // ══════════════════════════════════════════════════════
 // v3.1.0 — اتشال الدومين المهجور 'https://ecommoda24.github.io' والدومين غير
 // الموثّق 'https://ahmedibraheemsb.github.io'. الواجهة الوحيدة للأداة دي:
-// https://ecommoda-dev.github.io/COD-Payment-Center/Index.html
+// https://ecommoda-dev.github.io/Delivery-COD-Operations-Center/COD-Payment-Center.html
+// (من 14-11-2026 — صفحة جوّه مركز الشحن والتحصيل، نفس الـ Origin والمسار مش جزء منه. الريبو ده Worker وبس.)
 // ⚠️ العنصر [0] هو الـ fallback في getCORS() و json() — لازم يفضل دومين حقيقي.
 const ALLOWED_ORIGINS = [
   'https://ecommoda-dev.github.io',

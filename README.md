@@ -2,50 +2,48 @@
 
 # COD Payment Center
 
-![version](https://img.shields.io/badge/version-v1.1.0-blue)
+![version](https://img.shields.io/badge/worker-v3.15.0-blue)
 
-أداة EcomModa الداخلية لتحصيل واسترداد فلوس أوردرات **الدفع عند الاستلام (COD)** لكل مندوب، مع سجل حركة كامل.
+**Worker** أداة EcomModa الداخلية لتحصيل واسترداد فلوس أوردرات **الدفع عند الاستلام (COD)** لكل مندوب، مع سجل حركة كامل.
+
+> 🔴 **الريبو ده Worker وبس** (قرار أحمد 14-11-2026). الواجهة اتحذفت منه وبقت صفحة جوّه مركز الشحن والتحصيل،
+> زي باقي الأدوات. الرابط القديم (`.../COD-Payment-Center/`) بقى 404.
 
 | | |
 |---|---|
-| **الواجهة** | https://ecommoda-dev.github.io/COD-Payment-Center/ |
+| **الواجهة** | https://ecommoda-dev.github.io/Delivery-COD-Operations-Center/COD-Payment-Center.html (ريبو `Delivery-COD-Operations-Center`) |
 | **الـ Worker** | https://cod-payment-center-worker.ecommoda-dev.workers.dev |
-| **الإصدار** | Worker `v3.6.0` · الواجهة `v3.6.0` |
-
-> الرقمين **مستقلين بالتصميم** واختلافهم وضع طبيعي. اللي بيتفحص هو الحد الأدنى
-> (`MIN_WORKER_VERSION` في الواجهة)، مش التطابق.
+| **الإصدار** | Worker `v3.15.0` |
 
 ## البنية
 
 ```
 index.js       ← كود الـ Worker (Cloudflare Workers)
 wrangler.toml  ← الاسم + الـ bindings + الـ vars
-index.html     ← الواجهة (GitHub Pages)
-(اتشالت Index.html — 23-09-2026، قرار أحمد. الرابط الوحيد: https://ecommoda-dev.github.io/COD-Payment-Center/)
-CLAUDE.md      ← قواعد الأداة · خط الأساس · الفخاخ · المسائل المفتوحة
+*.mjs          ← فحوصات الـ Worker (شوبيفاي وD1 وهميين)
+CLAUDE.md      ← قواعد الأداة · عقد الخزنة · الفخاخ · المسائل المفتوحة
 ```
 
-## الإعداد لأول مرة على أي جهاز
+## الدخول والسر
 
-الموظف بيدخّل **الـ Worker Secret بس** من ⚙️ الإعدادات. رابط الـ Worker ورابط
-لوحة الموظفين ثابتين في الكود ومش حقول إدخال — الرابط مش سر، والحماية في الـ
-Secret + الـ CORS allowlist.
+الدخول من مركز الشحن والتحصيل (مرة واحدة)، والـ Worker بيستقبل سر مجموعة `delivery_cod_ops` من المركز.
+**مفيش واجهة هنا ولا إعدادات للسر في الريبو ده.** التفاصيل في [`CLAUDE.md`](./CLAUDE.md).
 
-بعدها زرار **🩺 افحص الأداة والاتصالات** في نفس النافذة بيتأكد من الاتصال
-والـ bindings وصلاحيات شوبيفاي قبل أي تحصيل.
+## الفحوصات
+
+```bash
+node free-shipping-check.mjs && node order-kind-check.mjs && node bosta-cash-cycle-check.mjs \
+  && node log-filters-check.mjs && node check-log-values.mjs
+```
 
 ## النشر
 
-آلي بالكامل — أي `push` على `main` بينشر:
-
-- **الـ Worker** عبر Cloudflare Workers Builds (~٢٣ ثانية)
-- **الواجهة** عبر GitHub Pages (أبطأ — استنى دقيقة–اتنين)
+آلي عبر Cloudflare Workers Builds — أي `push` على `main` بينشر الـ Worker.
 
 > ⚠️ **ممنوع لصق كود في داشبورد Cloudflare بعد الربط** — أول `push` بيمسحه.
-> الريبو ده هو المصدر الوحيد للكود المنشور.
+> الريبو ده هو المصدر الوحيد لكود الـ Worker.
+> 🔴 **انشر الـ Worker قبل صفحة المركز** لو التعديل بيرفع `ECO_WORKERS.codPayment.min` هناك.
 
-التفاصيل الكاملة (الـ bindings المضبوطة · الأسرار · الفخاخ · النسخ القديمة) في [`CLAUDE.md`](./CLAUDE.md).
-
-آخر تحديث: 06-09-2026 — 18:40
+آخر تحديث: 14-11-2026
 
 </div>
