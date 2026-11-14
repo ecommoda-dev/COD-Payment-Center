@@ -20,7 +20,7 @@
  *   🆕 `preview` بيرجّع `feeLeg` (`'return'` لأوردرات المرتجع، `null` لغيرها). `extra.freeShipping.leg = 'return'` بيتكتب للصفوف دي بس،
  *      والتأكيد لازم يطابقه (نسخة صفحة قديمة بلا `leg` بتتمنع بدل ما تتسجّل بلا أجر).
  *   ⚠️ الصفوف القديمة (9 صفوف مرتجع برسوم 0 من 01-09) **ما اتلمسوش** (قرار أحمد). عقد الخزنة: `courierCollect` نفس معناه، والمفتاح `leg` إضافة بحتة —
- *      `Treasury-Ledger` محتاجة تقرا `extra.freeShipping.courierFee` لصفوف الاسترداد كمان.
+ *      الخزنة (`Treasury-Ledger` ≥ v1.6.0) بتقرا `extra.freeShipping.courierFee` من أي صف تحصيل مؤكَّد (payment أو refund) — مفيش تعديل مطلوب هناك.
  *   🔴 `codPayment.min = 3.15.0` — انشر الـ Worker قبل الصفحة. الفحص: `node free-shipping-check.mjs`.
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -39,8 +39,8 @@
  *   🔴 `pay` بيعيد الحساب من شوبيفاي لحظة التنفيذ ويوقف (`blocked:true` — قبل أي كتابة) لو الأوردر شحنه مجاني ومفيش تأكيد
  *      (`orderMeta.freeShipping.confirmed`) — ده حارس صفحة قديمة. و`courierCollect` للأوردر ده بيتحسب هنا (مبلغ التحصيل − الرسوم) مش من المتصفح.
  *   🆕 `extra.freeShipping = { confirmed, confirmedBy, confirmedAt, courierKind, courierFee, shopifyShipping }` — للأوردرات دي بس.
- *      ⚠️ عقد الخزنة: `courierCollect` نفس معناه (اللي المندوب يورّده فعلاً) — والمفتاح الجديد إضافة بحتة. الخزنة محتاجة تقرا
- *      `extra.freeShipping.courierFee` في المقارنة مع شوبيفاي، وإلا هتعلّم الأوردر `SHORT`/`OVER` كاذب (ريبو Treasury-Ledger).
+ *      ⚠️ عقد الخزنة: `courierCollect` نفس معناه (اللي المندوب يورّده فعلاً) — والمفتاح الجديد إضافة بحتة. الخزنة (`Treasury-Ledger` v1.6.0)
+ *      بتقرا `extra.freeShipping.courierFee` في المقارنة مع شوبيفاي (من غيرها كانت هتعلّم الأوردر `SHORT`/`OVER` كاذب).
  *   🔴 `codPayment.min = 3.14.0` — انشر الـ Worker قبل الصفحة. الفحص: `node free-shipping-check.mjs`.
  *
  * ─────────────────────────────────────────────────────────────────────────
