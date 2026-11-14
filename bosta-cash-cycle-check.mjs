@@ -414,7 +414,7 @@ const restBefore7 = rest.length, refBefore7 = refunds.length;
 
 // بوابة S2 تدّي كود يتعرّف عليه الواجهة
 const s2mis = (await val6([R('#49500', '8145633099', 'EXCHANGE', 1225, 0, 1052.86, 172.14, { rowNo: 301 })], { ...ctx6, s1Orders: [] }))[0];
-eq('S2 الممنوع: code = S1_MISSING + الرسالة بتدل على زرار الفحص', [s2mis.status, s2mis.code, /فحص S1 من بوسطة/.test(s2mis.reasons.join())], ['error', 'S1_MISSING', true]);
+eq('S2 الممنوع: code = S1_MISSING + الرسالة بتدل على زرار الفحص', [s2mis.status, s2mis.code, /فحص شحنات من بوسطة/.test(s2mis.reasons.join())], ['error', 'S1_MISSING', true]);
 
 // ① #49395 الحقيقي: كل الشحنات بتتعرض، S1 قابلة للتسجيل (Net 4791.74 — الرقم الحقيقي من داشبورد بوسطة)
 const w0 = [logs.length, rest.length, refunds.length, kvDeletes.length];

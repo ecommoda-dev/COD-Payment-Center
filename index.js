@@ -1830,7 +1830,7 @@ async function bostaEvaluate(env, rawRows, ctx, strictS1 = false) {
       if (has.has(String(r.orderId))) continue;
       if (!strictS1 && inFile.has(r._n.orderRef.replace(/^#/, ''))) continue;   // S1 بتاعه في نفس الملف — هيتسجّل الأول
       r.code = 'S1_MISSING';
-      r.reasons.push('S1 بتاع الأوردر ده لسه ما اتسجّلش — سجّل ملف/صف S1 من بوسطة الأول، أو اضغط «🔎 فحص S1 من بوسطة» (الـ Net بتاعه لازم يدخل الخزنة قبل S2)');
+      r.reasons.push('S1 بتاع الأوردر ده لسه ما اتسجّلش — سجّل ملف/صف S1 من بوسطة الأول، أو اضغط «🔎 فحص شحنات من بوسطة» (الـ Net بتاعه لازم يدخل الخزنة قبل S2)');
     }
   }
 
