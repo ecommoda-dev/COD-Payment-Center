@@ -1,6 +1,26 @@
 /**
- * cod-payment-center-worker  (v3.13.0)
- * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 10-11-2026
+ * cod-payment-center-worker  (v3.14.0)
+ * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 14-11-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.14.0 — الشحن المجاني: رسوم المندوب (75 ثابتة) بتتخصم بعد تأكيد الموظف — 14-11-2026:
+ *   🔴 العطل (اتكشف على #64603): `courierCollect = amount − شحن شوبيفاي`، فأوردر شحنه 0 على شوبيفاي (خدمة العملاء شالت سطر الشحن
+ *      أو الأوردر اتعمل من الأول بلا شحن) كان بيطلّع المندوب بيورّد الأوردر كله — والمندوب بياخد أجره (75) في كل الأحوال.
+ *      من 01-09: 26 أوردر مندوب عادي بشحن صفر (+ 62 Showroom، وده سليم).
+ *   🆕 `courierFeePolicy` (§COURIER-FEE) — مصدر واحد للقاعدة (قرار أحمد 14-11-2026):
+ *        شحن شوبيفاي > 0                → زي ما هو (مفيش تنبيه ولا تغيير).
+ *        شحن 0 + مندوب عادي             → شحن مجاني: رسوم المندوب = 75 (`COURIER_FLAT_FEE`) تتخصم من تحصيل الأوردر **بعد تأكيد الموظف**.
+ *        شحن 0 + Showroom               → شحن مجاني: تنبيه وتأكيد بلا خصم.
+ *        شحن 0 + Bosta                  → مسار بوسطة بيحسب رسومه بنفسه — بلا تغيير.
+ *        شحن 0 + بلا مندوب على الأوردر → `courierMissing`: التسجيل ممنوع («حدد المندوب») — مفيش تخمين.
+ *        أوردر عليه مرتجع/استبدال       → خارج النطاق (مسألة عالقة — بيتحسب زي الأول).
+ *   🆕 `preview` بيرجّع `freeShipping` · `courierFee` · `courierKind` · `courierMissing` · `flatFee` (الواجهة بتعرض وبتطلب التأكيد).
+ *   🔴 `pay` بيعيد الحساب من شوبيفاي لحظة التنفيذ ويوقف (`blocked:true` — قبل أي كتابة) لو الأوردر شحنه مجاني ومفيش تأكيد
+ *      (`orderMeta.freeShipping.confirmed`) — ده حارس صفحة قديمة. و`courierCollect` للأوردر ده بيتحسب هنا (مبلغ التحصيل − الرسوم) مش من المتصفح.
+ *   🆕 `extra.freeShipping = { confirmed, confirmedBy, confirmedAt, courierKind, courierFee, shopifyShipping }` — للأوردرات دي بس.
+ *      ⚠️ عقد الخزنة: `courierCollect` نفس معناه (اللي المندوب يورّده فعلاً) — والمفتاح الجديد إضافة بحتة. الخزنة محتاجة تقرا
+ *      `extra.freeShipping.courierFee` في المقارنة مع شوبيفاي، وإلا هتعلّم الأوردر `SHORT`/`OVER` كاذب (ريبو Treasury-Ledger).
+ *   🔴 `codPayment.min = 3.14.0` — انشر الـ Worker قبل الصفحة. الفحص: `node free-shipping-check.mjs`.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.13.0 — S1 من بوسطة مباشرة (بديل رفع ملف الـ Cash-out القديم) — 10-11-2026:
@@ -288,7 +308,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.13.0';
+const WORKER_VERSION = 'v3.14.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -872,7 +892,7 @@ async function fetchTodayDeliveredOrderIds(env, courier) {
 // ⚠️ عقد قراءة: Treasury-Ledger بتقرا batchId · courier · courierCollect · extraShipping[] ·
 //    extraShippingTotal · batchExpected (+ result · preRegistered · hasReturn) من الصفوف دي.
 //    تغيير اسم أي مفتاح = جلسات فاضية/ناقصة في الخزنة بلا أي خطأ. غيّر في الاتنين معًا.
-function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, refundAmount, result, actions }) {
+function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, refundAmount, result, actions, freeShipping }) {
   const sm    = sessionMeta || {};
   const om    = orderMeta   || {};
   const split = normalizePaymentSplit(om.paymentSplit);
@@ -899,6 +919,9 @@ function buildPayExtra({ batchId, sessionMeta, orderMeta, courier, isRefund, ref
     hasReturn:          om.hasReturn || false,
     returnShipping:     om.returnShipping || null,
     courierCollect:     om.courierCollect ?? null,
+    // 🆕 v3.14.0 — شحن مجاني اتأكد من موظف التحصيل (الأوردرات دي بس — غير كده الحقل مش موجود).
+    //    `courierFee` = اللي اتخصم من `courierCollect` (75 · أو 0 لـ Showroom). الخزنة بتقراه في المقارنة مع شوبيفاي.
+    ...(freeShipping ? { freeShipping } : {}),
     // 🆕 v3.9.0 — وصف الأوردر وقت العملية (مابيتحسبش من الصف بعدين). قيمة مش في
     //    القايمة المقفولة = null، والصفوف الأقدم مالهاش الحقل (الواجهة بتعرض تسمية محايدة).
     orderKind:          ORDER_KINDS.has(om.orderKind) ? om.orderKind : null,
@@ -1037,6 +1060,62 @@ async function getAccessToken(env) {
   try { data = JSON.parse(raw); }
   catch { throw new Error(`OAuth: رد شوبيفاي مش JSON — ${raw.slice(0, 200)}`); }
   return data.access_token || null;
+}
+
+// ─── §COURIER-FEE::courierFeePolicy (v3.14.0) ───
+// 🔴 مصدر واحد لقاعدة «الشحن المجاني» — `preview` بيعرضها و`pay` بيفرضها (نفس الدالة).
+//    الأجر بيتحدد من **مندوب الأوردر على شوبيفاي** (`custom.courier`) مش من مندوب الجلسة.
+//    مفيش تخمين: أوردر شحنه 0 وبلا مندوب = `courierMissing` والتسجيل بيتمنع.
+//    الأوردر اللي عليه مرتجع/استبدال برّه النطاق (رسوم المرتجع ليها حساب تاني — مسألة عالقة).
+const COURIER_FLAT_FEE = 75;   // قرار أحمد 14-11-2026: أجر ثابت لأي مندوب غير Bosta/Showroom
+function courierFeePolicy({ courier, shippingAmount, hasReturn }) {
+  const none = { freeShipping: false, courierFee: null, courierKind: null, courierMissing: false };
+  if (hasReturn) return none;
+  const ship = Number(shippingAmount);
+  if (Number.isFinite(ship) && ship > 0.005) return none;   // فيه شحن على شوبيفاي = الحساب القديم زي ما هو
+  const c = String(courier || '').trim().toLowerCase();
+  if (!c)               return { freeShipping: true, courierFee: null,            courierKind: null,       courierMissing: true };
+  if (c === 'bosta')    return none;                         // بوسطة بتحسب رسومها في مسارها (§BOSTA)
+  if (c === 'showroom') return { freeShipping: true, courierFee: 0,               courierKind: 'showroom', courierMissing: false };
+  return                       { freeShipping: true, courierFee: COURIER_FLAT_FEE, courierKind: 'courier',  courierMissing: false };
+}
+// الحقول اللي `preview` بيضيفها — الواجهة بتقرا منها بس ومابتحسبش.
+function courierFeeFields(policy) {
+  return {
+    freeShipping: policy.freeShipping, courierFee: policy.courierFee, courierKind: policy.courierKind,
+    courierMissing: policy.courierMissing, flatFee: COURIER_FLAT_FEE,
+  };
+}
+// تأكيد الموظف لازم يطابق اللي الـ Worker حسبه دلوقتي (النوع والرسوم) — وإلا الصفحة شايفة أوردر مختلف.
+function freeShippingAckOk(ack, policy) {
+  return !!ack && ack.confirmed === true && ack.courierKind === policy.courierKind
+    && Number(ack.courierFee) === Number(policy.courierFee);
+}
+const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+// 🔴 فرض القاعدة وقت `pay`: بيوقف (قبل أي كتابة) لو الأوردر شحنه مجاني ومفيش تأكيد مطابق، وإلا بيحسب `courierCollect` هنا
+//    (مبلغ التحصيل − الرسوم) بدل ما نصدّق رقم المتصفح — نسخة صفحة قديمة كانت هتبعت المبلغ كامل من غير ما تسأل حد.
+function applyFreeShipping(policy, orderMeta, employee, collectBase, orderLabel) {
+  if (!policy.freeShipping) return { block: null, orderMeta, info: null };
+  const tag = orderLabel ? ` (${orderLabel})` : '';
+  if (policy.courierMissing) {
+    return { block: `⛔ الأوردر${tag} شحنه مجاني ومالوش مندوب على شوبيفاي — حدد المندوب الأول. العملية اتوقفت من غير أي كتابة.` };
+  }
+  if (!freeShippingAckOk(orderMeta?.freeShipping, policy)) {
+    return { block: `⛔ الأوردر${tag} شحنه مجاني ولازم موظف التحصيل يأكّده قبل التسجيل (${policy.courierKind === 'showroom' ? 'بدون خصم' : `خصم ${policy.courierFee} ج للمندوب`}). حدّث الصفحة وأكّده — العملية اتوقفت من غير أي كتابة.` };
+  }
+  return {
+    block: null,
+    orderMeta: { ...(orderMeta || {}), courierCollect: round2(collectBase - policy.courierFee) },
+    info: {
+      confirmed: true, confirmedBy: employee || null, confirmedAt: new Date().toISOString(),
+      courierKind: policy.courierKind, courierFee: policy.courierFee, shopifyShipping: 0,
+    },
+  };
+}
+// أوردر عادي (مش مسجّل مسبقًا): بيتطبّق على اللي قابل للتحصيل بس — الاسترداد (outstanding<0) والمدفوع مالهمش «تحصيل».
+function orderFeePolicy(orderData) {
+  if (!orderData || orderData.cancelled || !orderData.canMarkAsPaid) return courierFeePolicy({ hasReturn: true });
+  return courierFeePolicy({ courier: orderData.courier, shippingAmount: orderData.shippingAmount, hasReturn: orderData.hasReturn });
 }
 
 // ─── §SHOPIFY::classifyOrderKind (v3.9.0) ───
@@ -1283,6 +1362,7 @@ async function getPreRegPayState(token, env, numericId) {
       order(id: $id) {
         totalOutstandingSet { shopMoney { amount } }
         s2Meta: metafield(namespace: "custom", key: "status_2_r_e") { value }
+        courierMeta: metafield(namespace: "custom", key: "courier") { value }
         returns(first: 1) { nodes { id } }
       }
     }
@@ -1295,6 +1375,7 @@ async function getPreRegPayState(token, env, numericId) {
   return {
     outstanding: parseFloat(amt),
     s2:          order.s2Meta?.value || null,
+    courier:     order.courierMeta?.value || null,
     hasReturn:   (order.returns?.nodes || []).length > 0,
   };
 }
@@ -2007,6 +2088,8 @@ export default {
             saleTransactions: [], s1: orderData.s1, s2: null,
             s2Due: cls.s2Due != null ? cls.s2Due.toFixed(2) : null,
             preRegBlock: cls.block,
+            // 🆕 v3.14.0 — نفس مدخلات الحساب اللي الواجهة بتخصم منها (`pending.shippingAmount`) ومندوب الأوردر
+            ...courierFeeFields(courierFeePolicy({ courier: orderData.courier || pending.courier, shippingAmount: pending.shippingAmount, hasReturn: false })),
           }, 200, request);
         }
 
@@ -2021,6 +2104,7 @@ export default {
             returnedItems: orderData.returnedItems, saleTransactions: orderData.saleTransactions || [],
             orderKind: orderData.orderKind, cycleCount: orderData.cycleCount, multiCycle: orderData.multiCycle,
             s1: orderData.s1, s2: orderData.s2,
+            ...courierFeeFields(orderFeePolicy(orderData)),
           }, 200, request);
         }
 
@@ -2033,6 +2117,7 @@ export default {
           hasReturn: orderData.hasReturn, returnShipping: orderData.returnShipping, returnedItems: orderData.returnedItems,
           orderKind: orderData.orderKind, cycleCount: orderData.cycleCount, multiCycle: orderData.multiCycle,
           saleTransactions: orderData.saleTransactions || [], s1: orderData.s1, s2: orderData.s2,
+          ...courierFeeFields(orderFeePolicy(orderData)),
         }, 200, request);
       }
 
@@ -2081,8 +2166,15 @@ export default {
             }, 200, request);
           }
 
+          // 🆕 v3.14.0 — الشحن المجاني (نفس مدخلات `preview` بالحرف) — وقف قبل أي كتابة لو مفيش تأكيد
+          const fsPre = applyFreeShipping(
+            courierFeePolicy({ courier: state.courier || pending.courier, shippingAmount: pending.shippingAmount, hasReturn: false }),
+            orderMeta, employee, cls.preRegAmount, orderName || pending.orderName);
+          if (fsPre.block) return json({ success: false, status: 'error', blocked: true, error: fsPre.block, actions: [] }, 200, request);
+
           // Step 5A ⑤ — بتتملى أول بأول، مش بترجع من دالة في الآخر
           const actions = [`بدون أي تسجيل على شوبيفاي — المبلغ مسجّل مسبقًا (${cls.preRegAmount.toFixed(2)} ج)`];
+          if (fsPre.info) actions.push(fsPre.info.courierFee > 0 ? `شحن مجاني — اتخصم ${fsPre.info.courierFee} ج رسوم مندوب` : 'شحن مجاني (Showroom) — بدون خصم');
           if (cls.s2Due) actions.push(`متبقي S2 ${cls.s2Due.toFixed(2)} ج فاضل على شوبيفاي — بيتحصّل مع شحنة S2`);
 
           const cleared = await clearPendingPreReg(env, numericId);
@@ -2101,7 +2193,7 @@ export default {
               + (cls.s2Due ? ` — متبقي S2 ${cls.s2Due.toFixed(2)} ج على شوبيفاي` : '')
               + (warning ? ` — ⚠ ${warning}` : ''),
             extra: {
-              ...buildPayExtra({ batchId, sessionMeta, orderMeta, courier: pending.courier, isRefund: false, result: status, actions }),
+              ...buildPayExtra({ batchId, sessionMeta, orderMeta: fsPre.orderMeta, courier: pending.courier, isRefund: false, result: status, actions, freeShipping: fsPre.info }),
               shopifyCaptured: 0,
               preRegAmount:    cls.preRegAmount,
               s2Due:           cls.s2Due,
@@ -2119,15 +2211,27 @@ export default {
         const token = await getAccessToken(env);
         if (!token) return json({ success: false, status: 'error', error: 'Failed to get Shopify access token' }, 200, request);
 
+        // 🆕 v3.14.0 — الشحن المجاني: بنعيد قراءة الأوردر **قبل أي كتابة** (فشل القراءة = وقف، مش تخمين).
+        let fsNorm;
+        try {
+          const od = await getOrderDataById(env, numericId);
+          if (!od) return json({ success: false, status: 'error', error: 'الأوردر مش موجود على شوبيفاي — التحصيل اتوقف', actions: [] }, 200, request);
+          fsNorm = applyFreeShipping(orderFeePolicy(od), orderMeta, employee, parsedAmount, orderName || od.orderName);
+        } catch (e) {
+          return json({ success: false, status: 'error', error: `تعذّر التحقق من رسوم الشحن قبل التحصيل (${e.message}) — مفيش أي حاجة اتسجّلت، أعد المحاولة`, actions: [] }, 200, request);
+        }
+        if (fsNorm.block) return json({ success: false, status: 'error', blocked: true, error: fsNorm.block, actions: [] }, 200, request);
+
         const actions  = [];
         const txResult = await createTransaction(token, env, numericId, parsedAmount.toFixed(2));
         if (txResult.success) {
           actions.push(`تحصيل ${parsedAmount.toFixed(2)} ج على شوبيفاي`);
+          if (fsNorm.info) actions.push(fsNorm.info.courierFee > 0 ? `شحن مجاني — اتخصم ${fsNorm.info.courierFee} ج رسوم مندوب من تحصيل الخزنة` : 'شحن مجاني (Showroom) — بدون خصم');
           const { logged, logError } = await safeWriteLog(env.DB, {
             tool: TOOL_NAME, type: 'payment', employee: employee || null,
             orderId: numericId, orderName: orderName || null,
             valueAfter: parsedAmount, notes: null,
-            extra: buildPayExtra({ batchId, sessionMeta, orderMeta, courier: sessionMeta?.courier, isRefund: false, result: 'success', actions }),
+            extra: buildPayExtra({ batchId, sessionMeta, orderMeta: fsNorm.orderMeta, courier: sessionMeta?.courier, isRefund: false, result: 'success', actions, freeShipping: fsNorm.info }),
           });
           return json({ success: true, status: 'success', actions, logged, logError, orderId: numericId, transactionId: txResult.transactionId, amount: parsedAmount.toFixed(2) }, 200, request);
         }
