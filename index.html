@@ -426,6 +426,26 @@ tbody tr.order-row.refund-row.expanded { background:var(--red-hover); }
 tbody tr.order-row.extra-row    { background:var(--orange-light); border-right:3px solid var(--orange); }
 tbody tr.order-row.extra-row:hover { background:var(--orange-hover); }
 tbody tr.order-row.status-err-row { border-right:3px solid var(--red) !important; }
+/* §FREE-SHIP — شحن مجاني: تنبيه + تأكيد موظف التحصيل قبل التسجيل (Worker ≥ 3.14.0) */
+tbody tr.freeship-row td { padding:0 12px 10px; border-bottom:1px solid var(--border); }
+.fs-note { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 14px; border-radius:var(--radius-sm); border:1.5px solid var(--amber-border); background:var(--amber-light); font-size:12.5px; line-height:1.7; color:var(--text-secondary); }
+.fs-note.fs-ok  { border-color:var(--green-border); background:var(--green-light); }
+.fs-note.fs-err { border-color:var(--red-border);   background:var(--red-light); }
+.fs-ico  { font-size:18px; flex:none; }
+.fs-text { flex:1 1 360px; min-width:0; }
+.fs-text strong { color:var(--amber-dark); font-weight:800; }
+.fs-note.fs-ok  .fs-text strong { color:var(--green); }
+.fs-note.fs-err .fs-text strong { color:var(--red); }
+.fs-calc { display:inline-block; font-family:var(--font-mono); direction:ltr; unicode-bidi:isolate; font-weight:800; color:var(--amber-dark); }
+.fs-btn  { flex:none; padding:7px 16px; border-radius:var(--radius-sm); border:none; background:var(--amber); color:#fff; font-family:inherit; font-size:12.5px; font-weight:800; cursor:pointer; }
+.fs-btn:hover { filter:brightness(.93); }
+.fs-btn.fs-undo { background:transparent; color:var(--text-secondary); border:1px solid var(--border); font-weight:600; padding:5px 12px; }
+.fs-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:800; background:var(--amber-light); color:var(--amber-dark); border:1px solid var(--amber-border); white-space:nowrap; }
+.fs-chip.fs-ok  { background:var(--green-light); color:var(--green); border-color:var(--green-border); }
+.fs-chip.fs-err { background:var(--red-light);   color:var(--red);   border-color:var(--red-border); }
+tbody tr.order-row.freeship-pending-row { border-right:3px solid var(--amber); }
+.fs-cell { text-align:center; direction:rtl; white-space:normal; }
+.fs-sub  { display:block; margin-top:3px; font-size:10px; font-weight:700; color:var(--text-secondary); font-family:inherit; direction:rtl; }
 @keyframes rowIn { from{background:rgba(37,99,235,.08)} to{background:transparent} }
 tbody td { padding:10px 12px; vertical-align:middle; }
 .cell-order    { font-family:var(--font-mono); font-weight:600; font-size:13px; color:var(--text-secondary); }
@@ -1202,7 +1222,19 @@ tbody tr.detail-row td { padding:0 12px 12px; border-bottom:1px solid var(--bord
 
       <div class="cl-version-block">
         <div class="cl-version-row">
-          <span class="cl-ver-badge" id="clVerBadge">v3.7.1</span>
+          <span class="cl-ver-badge" id="clVerBadge">v3.8.0</span>
+          <span class="cl-ver-date">14-11-2026 · الشحن المجاني (Worker 3.14.0)</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span><span><strong>الأوردر اللي شحنه مجاني على شوبيفاي</strong> كان بيطلّع المندوب بيورّد الأوردر كامل، مع إن المندوب بياخد أجره في كل الأحوال (مثال #64603: 4,150 بدل 4,075).</span></li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span><span><strong>تنبيه + تأكيد من موظف التحصيل:</strong> الأوردر بشحن 0 بيظهر بشارة «🆓 مجاني» وسطر تحته بالأرقام، وزرار التسجيل <b>مقفول</b> لحد ما الموظف يضغط «أؤكد». المندوب العادي: <b>خصم 75 ج</b> ثابتة. مندوب Showroom: تأكيد <b>بدون خصم</b>. بلا مندوب على الأوردر: التسجيل ممنوع («حدد المندوب»).</span></li>
+          <li class="cl-item"><span class="cl-tag change">ملحوظة</span><span>بوسطة والأوردرات اللي شحنها أكبر من صفر <b>مفيش فيها تغيير</b>. الاسترجاع/الاستبدال بشحن مجاني مسألة عالقة. <strong>انشر الـ Worker (3.14.0) قبل الصفحة.</strong></span></li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block old">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge">v3.7.1</span>
           <span class="cl-ver-date">05-11-2026</span>
         </div>
         <ul class="cl-items">
@@ -1532,7 +1564,7 @@ const TOOL_NAME    = 'cod_payment';      // قيمة tool في جدول logs ب�
 //    في تاب تاني عند نفس المستخدم.
 
 // مصدر واحد لرقم نسخة الواجهة — الهيدر وبادج الـ Changelog ونص شاشة الدخول
-const TOOL_VERSION = 'v3.7.1';
+const TOOL_VERSION = 'v3.8.0';
 
 // 🔴 أقل نسخة Worker الواجهة دي بتشتغل معاها صح.
 //    v3.5.0 هي اللي بترجّع `status`/`actions`/`logged` و`cap`/`total`/`truncated`
@@ -1543,7 +1575,9 @@ const TOOL_VERSION = 'v3.7.1';
 // 🔴 v3.6.0 — Worker أقدم **بيسجّل المتبقي على شوبيفاي** لأي أوردر مسجّل مسبقًا
 //    (فرق استبدال S2 اتعلّم مدفوع من غير ما يتقبض — ١٤ أوردر لحد 26-09-2026)،
 //    ومابيرجّعش `preRegBlock`/`s2Due`. فالحارس لازم يمسك الـ Worker ده بالاسم.
-const MIN_WORKER_VERSION = '3.6.0';
+// 🔴 v3.8.0 — `3.14.0`: الواجهة بتقرا `freeShipping`/`courierFee` من `preview` وبتبعت `orderMeta.freeShipping` مع `pay`.
+//    Worker أقدم **مش هيرجّع خطأ** — الأوردر بشحن 0 هيتسجّل بالمبلغ كامل من غير تنبيه ولا خصم (العطل الأصلي).
+const MIN_WORKER_VERSION = '3.14.0';
 let workerVersion = null;
 
 // مقارنة رقمية — مش نصية. "10" أصغر من "9" لو اتقارنوا كنص.
@@ -2361,6 +2395,7 @@ async function addOrder(numericId) {
     isExtraShipping: false,
     s1: null, s2: null, statusError: null,
     s2Due: null, preRegBlock: null,
+    freeShipping: false, courierFee: null, courierKind: null, courierMissing: false, freeShipConfirmed: false,
   };
   orders.unshift(order);
   showTable(); updateStats(); renderTable();
@@ -2389,6 +2424,12 @@ async function addOrder(numericId) {
         order.returnedItems   = d.returnedItems || [];
         order.s1              = d.s1 || null;
         order.s2              = d.s2 || null;
+        // 🆕 Worker ≥ 3.14.0 — الشحن المجاني: الـ Worker هو اللي بيحدد (الواجهة بتعرض وبتطلب التأكيد بس)
+        order.freeShipping    = d.freeShipping === true;
+        order.courierFee      = d.courierFee != null ? Number(d.courierFee) : null;
+        order.courierKind     = d.courierKind || null;
+        order.courierMissing  = d.courierMissing === true;
+        order.freeShipConfirmed = false;
         // 🔴 v3.6.0 — أوردر مسجّل مسبقًا عليه متبقي مالوش تفسير (مفيش S2 ولا
         //    return) → `preRegBlock` من الـ Worker. بيتحط في `statusError` عن
         //    قصد: ده اللي بيقفل زرار التسجيل للجلسة **كلها** (`updatePayBtn`)
@@ -2594,8 +2635,79 @@ function calcCourierCollect(o) {
     return -((o.refundAmount || 0) + (parseFloat(o.returnShipping) || 0));
   }
   if (o.hasReturn) return (o.amount || 0) - (parseFloat(o.returnShipping) || 0);
-  if (o.amount != null && o.shippingAmount != null) return o.amount - o.shippingAmount;
+  if (o.amount != null && o.shippingAmount != null) {
+    // 🆕 الشحن المجاني: المندوب بياخد أجره (75 · أو 0 لـ Showroom) حتى لو شحن شوبيفاي صفر — الأجر بيتخصم من التحصيل.
+    //    بيتحسب من أول لحظة (مش بعد التأكيد) عشان صافي المندوب وطرق الدفع ما يتغيّروش تحت إيد الموظف.
+    const fee = freeShipFee(o);
+    return o.amount - (fee != null ? fee : o.shippingAmount);
+  }
   return null;
+}
+// ─── §FREE-SHIP — الشحن المجاني (Worker ≥ 3.14.0 · قرار أحمد 14-11-2026) ───
+// الأجر = 75 ثابتة لأي مندوب غير Bosta/Showroom، وShowroom بلا خصم، والـ Worker هو اللي بيقرر (preview) وبيفرض التأكيد (pay).
+// null = الأوردر مش «شحن مجاني» أو ناقص مندوب (مفيش رقم نخمّنه).
+function freeShipFee(o) {
+  return (o.freeShipping && !o.courierMissing && o.courierFee != null) ? o.courierFee : null;
+}
+function getFreeShipUnconfirmed() { return orders.filter(o => o.status === 'ready' && o.freeShipping && !o.courierMissing && !o.freeShipConfirmed); }
+function getFreeShipMissing()     { return orders.filter(o => o.status === 'ready' && o.freeShipping && o.courierMissing); }
+// رسالة واحدة تقفل زرار التسجيل (أو null) — نفس النص في الزرار وفي `confirmBulkPay` وفي إعادة التحقق وقت التنفيذ
+function getFreeShipError() {
+  const miss = getFreeShipMissing();
+  const ltr = o => '\u2066' + (o.orderName || o.id) + '\u2069';   // LTR isolate — بدونه «#65609» بتتعكس جوّه النص العربي
+  if (miss.length) return `شحن مجاني ومفيش مندوب على الأوردر — حدد المندوب على شوبيفاي: ${miss.map(ltr).join('، ')}`;
+  const pend = getFreeShipUnconfirmed();
+  if (pend.length) return `أكّد الشحن المجاني: ${pend.map(ltr).join('، ')}`;
+  return null;
+}
+function confirmFreeShip(idx, on) {
+  const o = orders[idx];
+  if (!o || isProcessing || o.status !== 'ready' || !o.freeShipping || o.courierMissing) return;
+  o.freeShipConfirmed = on !== false;
+  hideResult();   // رسالة «لا يمكن تسجيل الدفع» القديمة (لو اتعرضت) ماتفضلش بعد التأكيد
+  renderTable(); updatePayValidation(); updatePayBtn(); refocus();
+}
+// اللي بيتبعت للـ Worker مع `pay` — بيقارنه بحسابه هو (النوع والأجر لازم يطابقوا) وإلا بيوقف قبل أي كتابة
+function freeShipAck(o) {
+  return (o.freeShipping && !o.courierMissing && o.freeShipConfirmed) ? { confirmed: true, courierKind: o.courierKind, courierFee: o.courierFee } : null;
+}
+// سطر التنبيه + التأكيد تحت صف الأوردر
+function freeShipNoteHTML(o, i) {
+  if (!(o.freeShipping && (o.status === 'ready'))) return '';
+  const name = esc(o.orderName || ('#' + o.id));
+  if (o.courierMissing) {
+    return `<tr class="freeship-row" data-type="freeship" data-idx="${i}"><td colspan="11"><div class="fs-note fs-err">
+      <span class="fs-ico">⛔</span>
+      <div class="fs-text"><strong>شحن مجاني ومفيش مندوب على الأوردر ${name}</strong> — مش هينفع نحدد خصم مصاريف الشحن. حدد المندوب على شوبيفاي الأول وأضف الأوردر تاني.</div>
+    </div></td></tr>`;
+  }
+  const net = calcCourierCollect(o);
+  const isShow = o.courierKind === 'showroom';
+  const calc = isShow
+    ? `<span class="fs-calc">${fmt(o.amount)}</span> كما هو`
+    : `<span class="fs-calc">${fmt(o.amount)} − ${fmt(o.courierFee)} = ${fmt(net)}</span>`;
+  const text = isShow
+    ? `<strong>شحن مجاني في الأوردر ${name}</strong> — مندوب Showroom: <strong>مفيش خصم</strong> مصاريف شحن من التحصيل (${calc}).`
+    : `<strong>شحن مجاني في الأوردر ${name}</strong> — هيتم خصم <strong>${fmt(o.courierFee)} ج</strong> مصاريف شحن للمندوب من تحصيل الأوردر (${calc}).`;
+  if (o.freeShipConfirmed) {
+    return `<tr class="freeship-row" data-type="freeship" data-idx="${i}"><td colspan="11"><div class="fs-note fs-ok">
+      <span class="fs-ico">✅</span>
+      <div class="fs-text"><strong>تم التأكيد</strong> — ${text}</div>
+      <button class="fs-btn fs-undo" onclick="confirmFreeShip(${i}, false)">تراجع</button>
+    </div></td></tr>`;
+  }
+  return `<tr class="freeship-row" data-type="freeship" data-idx="${i}"><td colspan="11"><div class="fs-note">
+      <span class="fs-ico">🆓</span>
+      <div class="fs-text">${text}</div>
+      <button class="fs-btn" onclick="confirmFreeShip(${i})">${isShow ? 'أؤكد: شحن مجاني — بدون خصم' : `أؤكد: شحن مجاني — خصم ${fmt(o.courierFee)} ج`}</button>
+    </div></td></tr>`;
+}
+// خلية «شحن» للأوردر المجاني
+function freeShipCellHTML(o) {
+  if (!(o.freeShipping && (o.status === 'ready' || o.status === 'done'))) return null;
+  if (o.courierMissing) return `<span class="fs-chip fs-err">⛔ مجاني</span><span class="fs-sub">بلا مندوب</span>`;
+  const ok = o.freeShipConfirmed || o.status === 'done';
+  return `<span class="fs-chip${ok ? ' fs-ok' : ''}">🆓 مجاني</span><span class="fs-sub">${o.courierKind === 'showroom' ? 'بلا خصم' : `خصم ${fmt(o.courierFee)}`}</span>`;
 }
 function financialLabel(s) {
   return { PAID:'Paid', PARTIALLY_PAID:'Partially Paid', PENDING:'Pending', AUTHORIZED:'Authorized',
@@ -2679,6 +2791,8 @@ function renderTable() {
     if (isRefundStatus) rowClass += ' refund-row';
     else if (o.status === 'ready' || o.status === 'done') rowClass += ' ready-row';
     if (o.statusError) rowClass += ' status-err-row';
+    if (o.status === 'ready' && o.freeShipping && (o.courierMissing || !o.freeShipConfirmed)) rowClass += ' freeship-pending-row';
+    const fsCell = freeShipCellHTML(o);
 
     const isActiveOrder = (o.status === 'ready' || o.status === 'refund' || o.status === 'done' || o.status === 'refund-done');
     let s1Cell, s2Cell;
@@ -2697,7 +2811,7 @@ function renderTable() {
       </td>
       <td class="cell-courier">${courierDisplay}</td>
       <td class="cell-money">${courierCollect!=null?moneyCell(courierCollect,courierCollect<0?'var(--red)':null):`<span style="color:var(--text-muted)">—</span>`}</td>
-      <td class="cell-money">${displayShipping!=null?moneyCell(displayShipping):`<span style="color:var(--text-muted)">—</span>`}</td>
+      <td class="cell-money">${fsCell!=null?`<div class="fs-cell">${fsCell}</div>`:(displayShipping!=null?moneyCell(displayShipping):`<span style="color:var(--text-muted)">—</span>`)}</td>
       <td class="cell-money">${shopifyTotal!=null?moneyCell(shopifyTotal):`<span style="color:var(--text-muted)">—</span>`}</td>
       <td class="cell-center">${orderTypeCol}</td>
       <td class="cell-center">${paymentStatusDisplay}</td>
@@ -2725,6 +2839,8 @@ function renderTable() {
       </div>`;
     }
     rows.push(`<tr class="detail-row" data-idx="${i}"><td colspan="11">${hasDetails?detailContent:''}</td></tr>`);
+    const fsRow = freeShipNoteHTML(o, i);   // بعد صف التفاصيل مش قبله — `toggleRow` بيقرا الصف اللي بعد الأوردر مباشرةً
+    if (fsRow) rows.push(fsRow);
   });
 
   extraEntries.forEach((e, i) => {
@@ -2869,6 +2985,8 @@ function updatePayValidation() {
       textEl.textContent = `المجموع ${fmt(Math.abs(entered))} — ${dir}`;
     }
   }
+  const fsErr = getFreeShipError();   // شحن مجاني لسه ما اتأكدش — بيظهر في نفس مكان رسالة المبلغ
+  if (fsErr) { el.className = 'pay-validation mismatch'; textEl.textContent = '⚠ ' + fsErr; }
   updatePayBtn();
 }
 
@@ -2912,7 +3030,9 @@ function updatePayBtn() {
   const hasStatusErr = orders.some(o => o.statusError && (o.status==='ready'||o.status==='refund')) || extraEntries.some(e => e.statusError && e.status==='ok') || getExtraNotOk().length > 0;
   const btn = $('payBtn');
   const needsPayValid = hasReady;
-  btn.disabled = (!hasReady && !hasRefund) || !!courierErr || (needsPayValid && !isPayValid()) || isProcessing || hasStatusErr || (typeof entryFails !== 'undefined' && entryFails.length > 0);
+  const fsErr = getFreeShipError();   // شحن مجاني لسه ما اتأكدش (أو بلا مندوب) — Worker ≥ 3.14.0
+  btn.disabled = (!hasReady && !hasRefund) || !!courierErr || !!fsErr || (needsPayValid && !isPayValid()) || isProcessing || hasStatusErr || (typeof entryFails !== 'undefined' && entryFails.length > 0);
+  btn.title = fsErr || '';
   if (hasReady && hasRefund) { btn.textContent = '💵 تسجيل الدفع + 💸 تنفيذ الاسترداد'; btn.classList.add('has-refund'); }
   else if (hasRefund && !hasReady) { btn.textContent = '💸 تنفيذ الاسترداد'; btn.classList.add('has-refund'); }
   else { btn.textContent = '💵 تسجيل الدفع على شوبيفاي'; btn.classList.remove('has-refund'); }
@@ -2955,6 +3075,8 @@ async function confirmBulkPay() {
   if (courierErr) { showResult(false, '⚠ لا يمكن تسجيل الدفع', courierErr); return; }
   const extraErr = getExtraNotOkError();
   if (extraErr) { showResult(false, '⚠ لا يمكن تسجيل الدفع', extraErr); return; }
+  const fsErrBulk = getFreeShipError();
+  if (fsErrBulk) { showResult(false, '⚠ لا يمكن تسجيل الدفع', fsErrBulk); return; }
   if (readyOrders.length && !isPayValid()) { showResult(false, '⚠ طريقة الدفع غير مكتملة', ''); return; }
 
   const courierName = getReadyCourier();
@@ -2962,6 +3084,11 @@ async function confirmBulkPay() {
   const extraTotal = getTotalExtraShipping();
 
   const readyCollectOnly = readyOrders.reduce((s,o) => s + (calcCourierCollect(o)||0), 0);
+  // 🆕 الشحن المجاني: سطر مستقل في التأكيد بالعدد والخصم (الموظف أكّده على مستوى كل أوردر قبل كده)
+  const fsOrders = readyOrders.filter(o => freeShipFee(o) != null);
+  const fsDeduct = fsOrders.reduce((s,o) => s + freeShipFee(o), 0);
+  const freeShipFeeRow = fsOrders.length
+    ? `<div class="confirm-detail-row"><span class="confirm-detail-label">🆓 شحن مجاني (${fsOrders.length})</span><span class="confirm-detail-val" style="color:var(--amber);font-size:12px">${fsDeduct>0?`خصم ${fmt(fsDeduct)} جنيه رسوم مندوب`:'بدون خصم (Showroom)'}</span></div>` : '';
   const refundCollectOnly = refundOrders.reduce((s,o) => s + (calcCourierCollect(o)||0), 0);
   const totalNet = readyCollectOnly + refundCollectOnly - extraTotal;
 
@@ -2987,6 +3114,7 @@ async function confirmBulkPay() {
     <div class="confirm-detail-row"><span class="confirm-detail-label">الأوردرات</span><span class="confirm-detail-val" style="font-size:12px">${orderParts.join(' + ')}</span></div>
     <div class="confirm-detail-row"><span class="confirm-detail-label">تحصيل المندوب (اليوم)</span><span class="confirm-detail-val green">${fmtSigned(readyCollectOnly)} جنيه</span></div>
     ${refundOrders.length>0?`<div class="confirm-detail-row"><span class="confirm-detail-label">استرداد + شحن مرتجع</span><span class="confirm-detail-val red">− ${fmt(totalRefund+totalRetShip)} جنيه</span></div>`:''}
+    ${freeShipFeeRow}
     ${extraTotal>0?`<div class="confirm-detail-row"><span class="confirm-detail-label">شحن إضافي</span><span class="confirm-detail-val" style="color:var(--orange)">− ${fmt(extraTotal)} جنيه</span></div>`:''}
     <div style="background:${totalNet<0?'var(--red-light)':'var(--green-light)'};border:2px solid ${totalNet<0?'var(--red-border)':'var(--green-border)'};border-radius:var(--radius-sm);padding:8px 14px;margin:6px 0;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:13px;font-weight:700">الإجمالي المستحق</span>
@@ -3062,6 +3190,13 @@ async function doBulkPayAndRefund() {
   if (extraErrNow) {
     playBeep('error');
     showResult(false, '⛔ الجدول اتغيّر بعد التأكيد — مفيش أي عملية اتنفّذت', extraErrNow);
+    isProcessing = false; syncEntryLock(); updatePayBtn(); updatePayMethodsCard();
+    return;
+  }
+  const fsErrNow = getFreeShipError();
+  if (fsErrNow) {
+    playBeep('error');
+    showResult(false, '⛔ الجدول اتغيّر بعد التأكيد — مفيش أي عملية اتنفّذت', fsErrNow);
     isProcessing = false; syncEntryLock(); updatePayBtn(); updatePayMethodsCard();
     return;
   }
@@ -3158,7 +3293,7 @@ async function doBulkPayAndRefund() {
   for (const order of readyOrders) {
     order.status = 'loading'; renderTable();
     try {
-      const orderMeta = { lineItems:order.lineItems, returnedItems:order.returnedItems, orderDiscount:order.orderDiscount, preRegistered:order.preRegistered, hasReturn:order.hasReturn, returnShipping:order.returnShipping, courierCollect:calcCourierCollect(order), paymentSplit:splitOf.get(order) };
+      const orderMeta = { lineItems:order.lineItems, returnedItems:order.returnedItems, orderDiscount:order.orderDiscount, preRegistered:order.preRegistered, hasReturn:order.hasReturn, returnShipping:order.returnShipping, courierCollect:calcCourierCollect(order), freeShipping:freeShipAck(order), paymentSplit:splitOf.get(order) };
       const d = await apiPostLegacy('pay', { orderId:order.id, amount:order.amount.toFixed(2), orderName:order.orderName, batchId, sessionMeta, orderMeta, employee: sessionMeta.employee });
       if (d.success) { order.status = 'done'; order.financialStatus = 'PAID'; successPay++; absorbResult(order, d); }
       else { order.status = 'error'; order.result = 'error'; order.error = d.error||'فشل'; failPay++; if (d.blocked) blockedStop = `${order.orderName || '#'+order.id}: ${d.error||''}`; }
