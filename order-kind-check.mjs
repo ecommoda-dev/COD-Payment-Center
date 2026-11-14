@@ -62,16 +62,17 @@ for (const [id, o] of Object.entries(ORDERS)) {
 eq('الاستعلام بيطلب exchangeLineItems و createdAt', /exchangeLineItems/.test(lastGQL || '') && /createdAt/.test(lastGQL || ''), true);
 eq('الاستعلام مابيستخدمش lineItem المفرد المتهجّر على exchangeLineItems', /exchangeLineItems[\s\S]{0,60}lineItem\s*\{/.test(lastGQL || ''), false);
 
+// v3.15.0: أوردر #1 مرتجع برسوم 0 + Showroom ← جوّه نطاق الشحن المجاني، فالاسترداد بيحتاج تأكيد (ده مش موضوع الفحص هنا).
 console.log('══ ② إشارة طرق الدفع بتتخزّن غير سالبة (استرداد وتحصيل) ══');
 const extraOf = i => JSON.parse(rows[i][12]);
 const sess = { courier: 'Showroom', employee: 'e', paymentMethods: { cash: '-10800.00', instapay: '0.00', wallet: '0.00' } };
 await call({ action: 'refund', orderId: '1', refundAmount: '10800.00', saleTransactions: [{ id: 'gid://t/1', amount: 13600 }], batchId: 'b1', sessionMeta: sess,
-  orderMeta: { orderKind: 'partial_return', multiCycle: false, hasReturn: true, courierCollect: -10800, paymentSplit: { cash: '-10800.00', instapay: '0.00', wallet: '-0.00' } } });
+  orderMeta: { freeShipping: { confirmed: true, courierKind: 'showroom', courierFee: 0, leg: 'return' }, orderKind: 'partial_return', multiCycle: false, hasReturn: true, courierCollect: -10800, paymentSplit: { cash: '-10800.00', instapay: '0.00', wallet: '-0.00' } } });
 eq('استرداد مكتوب بالسالب ← cash موجب', extraOf(0).paymentMethods, { cash: '10800.00', instapay: '0.00', wallet: '0.00' });
 eq('sessionPaymentMethods زي ما الموظف كتبه (أثر مراجعة)', extraOf(0).sessionPaymentMethods.cash, '-10800.00');
 eq('orderKind اتخزّن', extraOf(0).orderKind, 'partial_return');
 await call({ action: 'refund', orderId: '1', refundAmount: '2400.00', saleTransactions: [{ id: 'gid://t/1', amount: 13600 }], batchId: 'b2', sessionMeta: { ...sess, paymentMethods: { cash: '2400.00', instapay: '0', wallet: '0' } },
-  orderMeta: { orderKind: 'partial_return', paymentSplit: { cash: '2400.00', instapay: '0.00', wallet: '0.00' } } });
+  orderMeta: { freeShipping: { confirmed: true, courierKind: 'showroom', courierFee: 0, leg: 'return' }, orderKind: 'partial_return', paymentSplit: { cash: '2400.00', instapay: '0.00', wallet: '0.00' } } });
 eq('استرداد مكتوب بالموجب ← نفس النتيجة', extraOf(1).paymentMethods, { cash: '2400.00', instapay: '0.00', wallet: '0.00' });
 await call({ action: 'pay', orderId: '2', amount: '1825.00', batchId: 'b3', sessionMeta: { courier: 'C', paymentMethods: { cash: '1750', instapay: '0', wallet: '0' } },
   orderMeta: { orderKind: 'normal', paymentSplit: { cash: '1750.00', instapay: '0.00', wallet: '0.00' } } });
@@ -84,7 +85,7 @@ console.log('══ ③ v3.10.0: تفصيل حسابات الانستاباي و
 const base = rows.length;
 await call({ action: 'refund', orderId: '1', refundAmount: '2400.00', saleTransactions: [{ id: 'gid://t/1', amount: 13600 }], batchId: 'b5',
   sessionMeta: { courier: 'C', paymentMethods: { cash: '0', instapay: '300', wallet: '100' }, paymentAccounts: { instapay: { 'فادي': '-200', 'مُرسل': '100', 'إسلام': '0' }, wallet: { 'إسلام': '100.5' } } },
-  orderMeta: { orderKind: 'partial_return', paymentSplit: { cash: '0.00', instapay: '300.00', wallet: '100.00' }, paymentAccounts: { instapay: { 'فادي': '-200.00', 'مُرسل': '100.00', 'إسلام': '0.00' }, wallet: { 'إسلام': '100.00' } } } });
+  orderMeta: { freeShipping: { confirmed: true, courierKind: 'showroom', courierFee: 0, leg: 'return' }, orderKind: 'partial_return', paymentSplit: { cash: '0.00', instapay: '300.00', wallet: '100.00' }, paymentAccounts: { instapay: { 'فادي': '-200.00', 'مُرسل': '100.00', 'إسلام': '0.00' }, wallet: { 'إسلام': '100.00' } } } });
 eq('حصة الصف: غير سالبة وبلا الحسابات الصفرية', extraOf(base).paymentAccounts, { instapay: { 'فادي': '200.00', 'مُرسل': '100.00' }, wallet: { 'إسلام': '100.00' } });
 eq('إجمالي الجلسة كما دخّله الموظف (غير سالب)', extraOf(base).sessionPaymentAccounts, { instapay: { 'فادي': '200.00', 'مُرسل': '100.00' }, wallet: { 'إسلام': '100.50' } });
 eq('paymentMethods ما اتغيّرتش', extraOf(base).paymentMethods, { cash: '0.00', instapay: '300.00', wallet: '100.00' });
@@ -93,7 +94,7 @@ eq('واجهة قديمة (بلا تفصيل) ← null', [extraOf(base + 1).paym
 await call({ action: 'pay', orderId: '2', amount: '100.00', batchId: 'b7', sessionMeta: { courier: 'C', paymentAccounts: 'x' },
   orderMeta: { orderKind: 'normal', paymentSplit: { cash: '0', instapay: '100', wallet: '0' }, paymentAccounts: { cash: { 'x': '5' }, instapay: { '': '5', ['y'.repeat(41)]: '5', 'فادي': 'abc', 'إسلام': '100' }, wallet: [1, 2] } } });
 eq('مدخلات باظة بتتجاهَل (طريقة غريبة · اسم فاضي/طويل · قيمة مش رقم · مش object)', [extraOf(base + 2).paymentAccounts, extraOf(base + 2).sessionPaymentAccounts], [{ instapay: { 'إسلام': '100.00' } }, null]);
-eq('نسخة الـ Worker', (await call({ action: 'get_config' })).workerVersion ?? 'v3.14.0', 'v3.14.0');
+eq('نسخة الـ Worker', (await call({ action: 'get_config' })).workerVersion ?? 'v3.15.0', 'v3.15.0');
 
 console.log(`\n${bad ? '❌' : '✅'} النتيجة: ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
