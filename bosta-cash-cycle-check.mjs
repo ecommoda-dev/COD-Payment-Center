@@ -1,4 +1,4 @@
-// bosta-cash-cycle-check.mjs — Worker v3.17.1: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
+// bosta-cash-cycle-check.mjs — Worker v3.18.0: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
 // تشغيل: node bosta-cash-cycle-check.mjs   (من غير شبكة — شوبيفاي ووكيل D1 وKV وهمية)
 // الأرقام مأخوذة من ملف حقيقي (Cash-out MONCOD02NOV26) ومن ردود شوبيفاي الحقيقية 04-11-2026:
 //   #61945 (2675) · #62701 (أونلاين 1850) · #61540 (ملغي صفر) · #61298 (استرداد −1650) ·
@@ -62,7 +62,17 @@ Object.assign(SHOP, {
   '47532': mk('#47532', 503, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('14', '5275.0')] }),   // RTO عليها مبلغ
   '47533': mk('#47533', 504, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('15', '5275.0')] }),   // RTO بلا oldType
 });
+// v3.18.0 — #48116 (حقيقي · 15-11-2026): CRP −1150 (بوسطة دفعت للعميل) وشوبيفاي عليها «مستحق استرداد» 1250 (Refund 0 اتكتب وقت الاستبدال)
+Object.assign(SHOP, {
+  '48116': mk('#48116', 701, '-1250.0', { createdAt: '2026-07-20T03:44:27Z', t1: '4371696766', t2: '5632517136', tx: [TX('21', '1325.0', 'SALE', 'PENDING'), TX('22', '1325.0')] }),
+  '48117': mk('#48117', 702, '-1250.0', { createdAt: '2026-07-20T03:44:27Z', tx: [TX('23', '1325.0')] }),                    // مبلغ حر بسبب
+  '48118': mk('#48118', 703, '0.0',     { createdAt: '2026-07-20T03:44:27Z', tx: [TX('24', '1325.0')] }),                    // شوبيفاي مفيهاش مستحق (nothing_owed)
+  '48119': mk('#48119', 704, '-1250.0', { createdAt: '2026-07-20T03:44:27Z', tx: [TX('25', '1325.0')] }),                    // شوبيفاي ترفض ثم المستحق بالظبط
+  '48122': mk('#48122', 707, '-1250.0', { createdAt: '2026-07-20T03:44:27Z', tx: [TX('27', '1325.0')] }),                    // صفحة قديمة
+  '48121': mk('#48121', 706, '-1250.0', { createdAt: '2026-07-20T03:44:27Z', refunded: '1000.0', tx: [TX('26', '1325.0')] }), // المتاح للاسترداد 325 بس
+});
 const bd = (tn, code, state, o = {}) => ({ trackingNumber: tn, type: { code, value: { 10: 'Send', 20: 'Return to Origin', 30: 'Exchange' }[code] }, state: { code: state }, createdAt: o.createdAt || '2026-08-01T12:00:00Z', ...(o.oldType ? { oldType: o.oldType } : {}) });
+const PRIOR_S1_ADD = ['702', '703', '704', '706', '707'];
 const wal = (total, fees, tx, date, flex = '0.00') => ({ wallet: { cashCycle: { total_amount: total, bosta_fees: String(fees), flex_ship_amount: flex, deposited_amt: total - fees }, cashout: tx ? { transaction_id: tx, transaction_date: date } : { next_cashout_date: '2026-11-12' } } });
 const BOSTA = {
   search: {
@@ -77,6 +87,8 @@ const BOSTA = {
     '49501': [bd('3214694801', 10, 45)], '49502': [bd('3214694811', 10, 45)], '49503': [bd('5996728906', 20, 46, { oldType: 'SEND' })],
     '49504': [bd('4141414141', 10, 45)], '49505': [bd('4242424242', 10, 45)],
     '49506': [bd('4343434343', 10, 45), bd('4343434399', 10, 49)], '49507': [bd('4444444441', 10, 45)],
+    '48116': [bd('6598619692', 25, 46, { createdAt: '2026-07-28T09:00:00Z' }), bd('5632517136', 20, 46, { oldType: 'EXCHANGE', createdAt: '2026-07-27T09:00:00Z' }), bd('4371696766', 10, 45, { createdAt: '2026-07-21T09:00:00Z' })],
+    '48117': [bd('9200000002', 25, 46)], '48118': [bd('9200000003', 25, 46)], '48119': [bd('9200000004', 25, 46)], '48121': [bd('9200000006', 25, 46)], '48122': [bd('9200000007', 25, 46)],
   },
   full: {
     '3356047136': { ...bd('3356047136', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
@@ -106,9 +118,17 @@ const BOSTA = {
     '4343434343': { ...bd('4343434343', 10, 45), ...wal(1000, 100, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
     '4343434399': { ...bd('4343434399', 10, 49) },   // شحنة ملغية — مفيش cycle
     '4444444441': { ...bd('4444444441', 10, 45), ...wal(1000, 100, null, null) },
+    '4371696766': { ...bd('4371696766', 10, 45), ...wal(1325, 133.95, 'MONCOD27JUL26', '2026-07-27T00:00:00.000Z') },
+    '5632517136': { ...bd('5632517136', 20, 46, { oldType: 'EXCHANGE' }), ...wal(0, 133.38, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '6598619692': { ...bd('6598619692', 25, 46), ...wal(-1150, 124.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '9200000002': { ...bd('9200000002', 25, 46), ...wal(-1150, 124.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '9200000003': { ...bd('9200000003', 25, 46), ...wal(-1150, 124.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '9200000004': { ...bd('9200000004', 25, 46), ...wal(-1150, 124.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '9200000006': { ...bd('9200000006', 25, 46), ...wal(-1150, 124.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
+    '9200000007': { ...bd('9200000007', 25, 46), ...wal(-1150, 124.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z') },
   },
 };
-const bostaCalls = []; let bostaMode = 'ok';
+const bostaCalls = []; let bostaMode = 'ok'; let failRefund = false;
 const byGid = {}; for (const o of Object.values(SHOP)) byGid[`gid://shopify/Order/${o.id}`] = o;
 const rest = [], refunds = [], gqlOps = [];
 globalThis.fetch = async (url, init = {}) => {
@@ -126,16 +146,20 @@ globalThis.fetch = async (url, init = {}) => {
       gqlOps.push('nodes');
       const nodes = variables.ids.map(g => { const o = byGid[g]; if (!o) return null; return {
         id: g, name: o.name, createdAt: o.createdAt, cancelledAt: o.cancelledAt, displayFinancialStatus: 'PENDING',
-        totalOutstandingSet: { shopMoney: { amount: o.out } }, totalRefundedSet: { shopMoney: { amount: o.refunded } }, courier: o.courier ? { value: o.courier } : null,
+        totalOutstandingSet: { shopMoney: { amount: o.out } }, totalRefundedSet: { shopMoney: { amount: o.refunded } }, refunds: o.refundObjs || [], courier: o.courier ? { value: o.courier } : null,
         t1: o.t1 ? { value: o.t1 } : null, t2: o.t2 ? { value: o.t2 } : null, t0: null,
         transactions: o.tx.map(t => ({ id: t.id, kind: t.kind, status: t.status, amountSet: { shopMoney: { amount: t.amt } } })),
       }; });
       return new Response(JSON.stringify({ data: { nodes } }), { status: 200 });
     }
     if (query.includes('executeRefund')) {
+      if (failRefund) return new Response(JSON.stringify({ data: { refundCreate: { refund: null, userErrors: [{ field: ['input'], message: 'Refund amount exceeds the refundable amount' }] } } }), { status: 200 });
       refunds.push(variables.input);
-      const o = byGid[variables.input.orderId]; if (o) o.out = '0.0';
-      return new Response(JSON.stringify({ data: { refundCreate: { refund: { id: 'gid://shopify/Refund/1', totalRefundedSet: { shopMoney: { amount: '1' } } }, userErrors: [] } } }), { status: 200 });
+      const o = byGid[variables.input.orderId];
+      const amt = variables.input.transactions.reduce((a, t) => a + parseFloat(t.amount), 0);
+      const rid = `gid://shopify/Refund/${9000 + refunds.length}`;
+      if (o) { o.out = (parseFloat(o.out) + amt).toFixed(1); o.refunded = (parseFloat(o.refunded) + amt).toFixed(1); (o.refundObjs = o.refundObjs || []).push({ id: rid, note: variables.input.note, totalRefundedSet: { shopMoney: { amount: amt.toFixed(1) } } }); }
+      return new Response(JSON.stringify({ data: { refundCreate: { refund: { id: rid, totalRefundedSet: { shopMoney: { amount: amt.toFixed(1) } } }, userErrors: [] } } }), { status: 200 });
     }
   }
   if (u.startsWith('https://app.bosta.co/api/v2/')) {
@@ -156,7 +180,7 @@ globalThis.fetch = async (url, init = {}) => {
 
 // ── D1 وهمية بتفهم اللي بنكتبه ونقراه ────────────────────────────
 const logs = [];
-const PRIOR_S1 = new Set(['104', '105', '106', '405']);   // S1 اتسجّل قبل كده بأداة المناديب (الأوردرات اللي S2 بتاعها في الاختبارات القديمة)
+const PRIOR_S1 = new Set(['104', '105', '106', '405', ...PRIOR_S1_ADD]);   // S1 اتسجّل قبل كده بأداة المناديب (الأوردرات اللي S2 بتاعها في الاختبارات القديمة)
 let failLog = false;
 const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; },
   async run() { if (/INSERT INTO logs/.test(sql)) { if (failLog) throw new Error('D1 down'); const b = this._b; logs.push({ id: logs.length + 1, timestamp: b[0], tool: b[1], type: b[2], employee: b[3], order_id: b[4], order_name: b[5], value_after: b[10], notes: b[11], extra: b[12] }); } return {}; },
@@ -357,7 +381,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.17.1', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.17.1');
+eq('get_config بيرجّع 3.18.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.18.0');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -539,7 +563,9 @@ eq('الفحص: 3 شحنات · S1 الأول (Send) ثم الباقي', [d8.suc
 const s1c = cand(d8, '9619903860'), exc = cand(d8, '4132677759'), crp = cand(d8, '5671180009');
 eq('S1 (Send): 4200 / صافي 4036.98 / قابلة', [s1c.leg, s1c.gross, s1c.net, s1c.cashOutId, s1c.eligible], ['S1', '4200.00', '4036.98', 'WEDCOD01JUL26', true]);
 eq('Exchange: S2 · 500 / صافي 352.94 / قابلة بعد S1', [exc.leg, exc.gross, exc.net, exc.cashOutId, exc.eligible, exc.afterS1, exc.refundMissing], ['S2', '500.00', '352.94', 'MONCOD03AUG26', true, true, false]);
-eq('CRP: S2 · −300 / صافي −433.38 / قابلة + refundMissing (شوبيفاي مفيهاش استرداد)', [crp.leg, crp.typeLabel, crp.gross, crp.net, crp.cashOutId, crp.eligible, crp.afterS1, crp.refundMissing], ['S2', 'Customer Return Pickup', '-300.00', '-433.38', 'MONCOD10AUG26', true, true, true]);
+eq('CRP: S2 · −300 / صافي −433.38 / قابلة + خطة استرداد «create» (شوبيفاي مفيهاش استرداد)', [crp.leg, crp.typeLabel, crp.gross, crp.net, crp.cashOutId, crp.eligible, crp.afterS1, crp.refundMissing], ['S2', 'Customer Return Pickup', '-300.00', '-433.38', 'MONCOD10AUG26', true, true, true]);
+eq('CRP: خطة الاسترداد — المستحق 2300 · بوسطة 300 · الحد 2300 · اختيارين', crp.refund, { state: 'create', owed: '2300.00', need: '300.00', max: '2300.00', options: ['300.00', '2300.00'] });
+eq('الفحص بيرجّع shopifyOwed', d8.shopifyOwed, '2300.00');
 eq('دليل شوبيفاي في الرد', [d8.shopifyOutstanding, d8.shopifySaleCaptured, d8.shopifyRefunded, d8.legsRegistered], ['-2300.00', '4700.00', '0.00', { positive: '0.00', negative: '0.00' }]);
 eq('S2 على ميتافيلد فاضي + أوردر قديم → ولا ملاحظة ولا مانع', [exc.notes, crp.notes], [[], []]);
 eq('الفحص ما كتبش حاجة', wr(), w8);
@@ -565,15 +591,31 @@ eq('🔴 عقد الخزنة: جلسة مستقلة كاملة · courierCollect
   ['bosta-leg-4132677759', { orders: 1, payOrders: 1, refundOrders: 0, collect: '352.94', extraShippingTotal: '0.00', net: '352.94', methods: null }, 352.94, 'S2', 'Bosta', 'success', 'bosta_cash_cycle']);
 eq('Exchange: Cash-out الحقيقي · أصل API · بلا شوبيفاي · hasReturn', [X.cashOutId, X.paidAt, X.legOrigin, X.legCatchup, X.shopifyCaptured, X.bostaOrderType, X.hasReturn, X.grossCollected, X.bostaFees, X.netValue], ['MONCOD03AUG26', '2026-08-03', 'bosta_api', true, '0.00', 'EXCHANGE', true, '500.00', '147.06', '352.94']);
 eq('Exchange: صفر حركة على شوبيفاي', [rest.length, refunds.length], [w8[1], w8[2]]);
-// ⑤ CRP: بتأكيد صريح
+// ⑤ CRP: استرداد على شوبيفاي بمبلغ يختاره الموظف + تأكيد صريح (v3.18.0)
+const crpExp = { gross: '-300.00', net: '-433.38', cashOutId: 'MONCOD10AUG26', owed: '2300.00', refundState: 'create' };
+const nBeforeCrp = logs.length, wCrp = wr();
 q = await payS1('#46008', '5671180009', { gross: '-300.00', net: '-433.38', cashOutId: 'MONCOD10AUG26' });
-eq('CRP بلا تأكيد → ممنوع (needsAck) بلا كتابة', [q.success, q.needsAck, logs.length], [false, true, logs.length]);
-const nBeforeCrp = logs.length;
-q = await payS1('#46008', '5671180009', { gross: '-300.00', net: '-433.38', cashOutId: 'MONCOD10AUG26' }, { ackRefundMissing: true });
+eq('CRP بلا اختيار مبلغ → needsRefundChoice بلا أي كتابة', [q.success, q.needsRefundChoice, q.refund && q.refund.state, wr()], [false, true, 'create', wCrp]);
+q = await payS1('#46008', '5671180009', { ...crpExp, owed: '2000.00' }, { refund: { amount: '300', ack: true } });
+eq('المستحق اتغيّر من وقت الفحص → stale بلا كتابة', [q.success, q.stale, wr()], [false, true, wCrp]);
+q = await payS1('#46008', '5671180009', crpExp, { refund: { amount: '2301', ack: true } });
+eq('مبلغ أكبر من الحد (2300) → مرفوض بلا كتابة', [q.success, /أكبر من الحد المسموح/.test(q.error || ''), wr()], [false, true, wCrp]);
+q = await payS1('#46008', '5671180009', crpExp, { refund: { amount: '0', ack: true } });
+eq('مبلغ صفر → مرفوض', [q.success, /أكبر من صفر/.test(q.error || ''), wr()], [false, true, wCrp]);
+q = await payS1('#46008', '5671180009', crpExp, { refund: { amount: '300' } });
+eq('بلا تأكيد صريح (ack) → needsAck بلا كتابة', [q.success, q.needsAck, wr()], [false, true, wCrp]);
+q = await payS1('#46008', '5671180009', crpExp, { refund: { amount: '250', ack: true } });
+eq('رقم مش واحد من الاتنين بلا سبب → needsReason بلا كتابة', [q.success, q.needsReason, wr()], [false, true, wCrp]);
+q = await payS1('#46008', '5671180009', crpExp, { refund: { amount: '250', ack: true, reason: '  ا ' } });
+eq('سبب أقصر من 3 حروف → مرفوض', [q.success, q.needsReason, wr()], [false, true, wCrp]);
+q = await payS1('#46008', '5671180009', crpExp, { refund: { amount: '300.00', ack: true } });
 L8 = logs[logs.length - 1]; X = E8();
-eq('CRP: نجاح بتحذير · refund · 300 · refundMissing', [q.success, q.status, q.kind, L8.type, L8.value_after, /مفيش استرداد مقابل/.test(q.warning || '')], [true, 'warning', 'refund_api', 'refund', 300, true]);
+eq('CRP: نجاح بتحذير · refund · 300 · الاسترداد اتعمل على شوبيفاي', [q.success, q.status, q.kind, L8.type, L8.value_after, q.refund, /لسه مستحق 2000\.00/.test(q.warning || '')], [true, 'warning', 'refund_api', 'refund', 300, { created: true, id: `gid://shopify/Refund/${9000 + refunds.length}`, amount: '300.00', owedAfter: '2000.00' }, true]);
+eq('🔴 createRefund: المبلغ · الملاحظة (مفتاح عدم التكرار) · الأب = SALE ناجحة · بلا refundLineItems/شحن', [refunds[refunds.length - 1].transactions, refunds[refunds.length - 1].note, refunds[refunds.length - 1].refundLineItems, refunds[refunds.length - 1].shipping.amount, refunds[refunds.length - 1].allowOverRefunding],
+  [[{ orderId: 'gid://shopify/Order/401', parentId: 'gid://shopify/OrderTransaction/2', amount: '300.00', kind: 'REFUND', gateway: 'manual' }], 'Bosta Customer Return Pickup 5671180009', [], '0.0', false]);
+eq('الصف: بيانات الاسترداد على شوبيفاي مخزّنة', [X.shopifyRefundCreated, X.shopifyRefundId, X.shopifyRefundAmount, X.bostaRefundGross, X.shopifyOwedBefore, X.shopifyOwedAfter, X.refundState, X.refundReason, X.shopifyRefundMissing], [true, `gid://shopify/Refund/${9000 + refunds.length}`, '300.00', '300.00', '2300.00', '2000.00', 'create', null, false]);
 eq('🔴 عقد الخزنة: courierCollect −433.38 · refundOrders 1 · collect سالب · isRefund', [X.courierCollect, X.batchExpected, X.isRefund, X.refundAmount, X.slot, X.batchId], [-433.38, { orders: 1, payOrders: 0, refundOrders: 1, collect: '-433.38', extraShippingTotal: '0.00', net: '-433.38', methods: null }, true, 300, 'S2', 'bosta-leg-5671180009']);
-eq('CRP: shopifyRefundMissing + بلا createRefund ولا معاملة', [X.shopifyRefundMissing, X.shopifyCaptured, X.bostaOrderType, refunds.length, rest.length], [true, '0.00', 'CUSTOMER_RETURN_PICKUP', w8[2], w8[1]]);
+eq('CRP: courierCollect لسه Net بوسطة (مش مبلغ شوبيفاي) · استرداد واحد بس على شوبيفاي · صفر معاملة', [X.shopifyCaptured, X.bostaOrderType, refunds.length, rest.length], ['0.00', 'CUSTOMER_RETURN_PICKUP', w8[2] + 1, w8[1]]);
 eq('3 صفوف بس اتكتبوا للأوردر (صف لكل شحنة) · مجموع Net = 3956.54',
   [logs.length - w8[0], logs.slice(w8[0]).reduce((a, l) => a + Math.round(JSON.parse(l.extra).courierCollect * 100), 0)], [3, 395654]);
 // ⑥ إعادة التسجيل → ممنوع
@@ -601,9 +643,9 @@ eq('CRP والمتبقي = −300 → ممنوع ويتوجّه للملف ال�
 const d12 = await chk('#46012'), c12 = cand(d12, '9000000006');
 eq('CRP واستردادها موجود على شوبيفاي → قابلة بلا refundMissing', [c12.eligible, c12.refundMissing], [true, false]);
 q = await payS1('#46012', '9000000006', { gross: '-300.00', net: '-433.38', cashOutId: 'MONCOD10AUG26' });
-eq('تسجيلها بلا تأكيد خاص: نجاح بلا warning وshopifyRefundMissing=false', [q.success, q.status, E8().shopifyRefundMissing], [true, 'success', false]);
-// ⑪ ولا createRefund في أي مسار
-eq('شوبيفاي ما اتلمسش في كل ⑧ (صفر createRefund)', refunds.length, w8[2]);
+eq('تسجيلها بلا تأكيد خاص: نجاح بلا warning · استرداد موجود (exists) فمفيش كتابة على شوبيفاي', [q.success, q.status, E8().shopifyRefundMissing, E8().refundState, E8().shopifyRefundCreated], [true, 'success', false, 'exists', false]);
+// ⑪ createRefund اتنادى مرة واحدة بس في ⑧ كله (الـ CRP بتاعة #46008)
+eq('شوبيفاي: استرداد واحد بس في كل ⑧', refunds.length, w8[2] + 1);
 
 console.log('══ ⑨ v3.17.0 — RTO (كانت Exchange) «رسوم فقط» + السطر الكاذب على المسجّلة — #47530 الحقيقي ══');
 const w9 = wr();
@@ -666,5 +708,83 @@ eq('S1 صفر من الملف: اتسجّلت · بلا legKind (مش RTO)', [q1
 const q10b = await pay10(R('#70020', '7000000021', 'Return to Origin', 0, 0, -60, 60, { cashOutId: 'RTOFILE01' }));
 const X10b = E8();
 eq('RTO من الملف بصيغة «Return to Origin»: اتسجّلت · noCollection · legKind=rto_fee · bostaOrderType', [q10b.success, X10b.noCollection, X10b.legKind, X10b.bostaOrderType, X10b.courierCollect], [true, true, 'rto_fee', 'RETURN TO ORIGIN', -60]);
+
+console.log('══ ⑪ v3.18.0 — استرداد بوسطة بيتعمل على شوبيفاي بمبلغ يختاره الموظف — #48116 الحقيقي ══');
+const w11 = wr();
+const EXP = (o = {}) => ({ gross: '-1150.00', net: '-1274.26', cashOutId: 'WEDCOD05AUG26', owed: '1250.00', refundState: 'create', ...o });
+let d48 = await chk('#48116');
+let c48 = cand(d48, '6598619692');
+eq('#48116: 3 شحنات · S1 الأول · المستحق على شوبيفاي 1250', [d48.candidates.length, d48.shopifyOutstanding, d48.shopifyOwed, d48.shopifyRefunded], [3, '-1250.00', '1250.00', '0.00']);
+eq('CRP: قابلة (بعد S1) + خطة create · الاختيارين: بوسطة 1150 والمستحق 1250 · الحد 1250', [c48.eligible, c48.afterS1, c48.refund], [true, true, { state: 'create', owed: '1250.00', need: '1150.00', max: '1250.00', options: ['1150.00', '1250.00'] }]);
+// S1 + RTO (D1 بس)
+q = await payS1('#48116', '4371696766', { gross: '1325.00', net: '1191.05', cashOutId: 'MONCOD27JUL26' });
+eq('S1 اتسجّلت (D1 بس · الـ Net 1191.05)', [q.success, q.net], [true, '1191.05']);
+q = await payS1('#48116', '5632517136', { gross: '0.00', net: '-133.38', cashOutId: 'WEDCOD05AUG26' });
+eq('RTO اتسجّلت (رسوم فقط · −133.38)', [q.success, q.kind, q.net], [true, 'none', '-133.38']);
+eq('لحد هنا صفر كتابة على شوبيفاي', refunds.length, w11[2]);
+// شوبيفاي ترفض → صفر كتابة (لا D1 ولا شوبيفاي)
+const l11 = logs.length; failRefund = true;
+q = await payS1('#48116', '6598619692', EXP(), { refund: { amount: '1150', ack: true } });
+failRefund = false;
+eq('شوبيفاي رفضت الاسترداد → فشل بلا صف في D1 وبلا استرداد', [q.success, /شوبيفاي رفضت الاسترداد/.test(q.error || ''), q.refundCreated, logs.length, refunds.length], [false, true, undefined, l11, w11[2]]);
+// الاسترداد اتعمل على شوبيفاي لكن D1 وقعت → refundCreated + الإعادة مبتكرّرش الاسترداد
+failLog = true;
+q = await payS1('#48116', '6598619692', EXP(), { refund: { amount: '1150', ack: true } });
+failLog = false;
+eq('D1 وقعت بعد نجاح شوبيفاي → refundCreated + رسالة بتقول أعد المحاولة', [q.success, q.refundCreated, /الاسترداد اتعمل على شوبيفاي/.test(q.error || ''), logs.length, refunds.length], [false, true, true, l11, w11[2] + 1]);
+eq('الاسترداد على شوبيفاي: 1150 بملاحظة فيها رقم التتبع', [refunds[refunds.length - 1].transactions[0].amount, refunds[refunds.length - 1].note], ['1150.00', 'Bosta Customer Return Pickup 6598619692']);
+d48 = await chk('#48116'); c48 = cand(d48, '6598619692');
+eq('الفحص بعدها: الاسترداد «موجود» (اتعرف بالملاحظة) — مبقاش create', [c48.eligible, c48.refund.state, c48.refund.by, c48.refund.amount, c48.refundMissing], [true, 'exists', 'note', '1150.00', false]);
+eq('المستحق بعد الاسترداد: 100 (فرق الغلطة) لسه ظاهر على شوبيفاي', [d48.shopifyOwed, d48.shopifyRefunded], ['100.00', '1150.00']);
+// الإعادة: سجل D1 بس — من غير أي استرداد تاني
+q = await payS1('#48116', '6598619692', EXP({ owed: undefined, refundState: 'exists' }));
+L8 = logs[logs.length - 1]; X = E8();
+eq('إعادة المحاولة: نجاح · D1 بس · استرداد واحد بس على شوبيفاي', [q.success, q.status, logs.length, refunds.length], [true, 'success', l11 + 1, w11[2] + 1]);
+eq('الصف: refund · value_after 1150 · courierCollect −1274.26 (Net بوسطة) · exists', [L8.type, L8.value_after, X.courierCollect, X.refundState, X.shopifyRefundCreated, X.shopifyRefundMissing, X.batchId, X.slot], ['refund', 1150, -1274.26, 'exists', false, false, 'bosta-leg-6598619692', 'S2']);
+const tot11 = logs.slice(l11 - 2).reduce((a, l) => a + Math.round(JSON.parse(l.extra).courierCollect * 100), 0);
+eq('🔴 الخزنة: مجموع Net الأوردر = −216.59 (S1 +1191.05 · RTO −133.38 · CRP −1274.26)', [logs.length - (l11 - 2), tot11], [3, -21659]);
+
+// مبلغ حر بسبب إجباري (#48117)
+const EXP2 = (o = {}) => ({ ...EXP(), ...o });
+d48 = await chk('#48117');
+eq('#48117: CRP قابلة · create', [cand(d48, '9200000002').eligible, cand(d48, '9200000002').refund.state, d48.hasS1], [true, 'create', true]);
+const w12 = wr();
+q = await payS1('#48117', '9200000002', EXP2({ refundState: 'exists' }), { refund: { amount: '1000', ack: true, reason: 'غلطة رفع' } });
+eq('حالة الاسترداد اتغيّرت عن اللي الصفحة شافتها → stale بلا كتابة', [q.success, q.stale, wr()], [false, true, w12]);
+q = await payS1('#48117', '9200000002', EXP2(), { refund: { amount: '1000', ack: true } });
+eq('1000 (مش 1150 ولا 1250) بلا سبب → needsReason بلا كتابة', [q.success, q.needsReason, wr()], [false, true, w12]);
+q = await payS1('#48117', '9200000002', EXP2(), { refund: { amount: '1000', ack: true, reason: 'غلطة رفع الشحنة — العميل خد 1150 مش 1250' } });
+L8 = logs[logs.length - 1]; X = E8();
+eq('1000 بسبب: نجاح بتحذيرين (مختلف عن بوسطة + لسه مستحق 250)', [q.success, q.status, /غير اللي بوسطة دفعته \(1150\.00\)/.test(q.warning || ''), /لسه مستحق 250\.00/.test(q.warning || ''), q.refund], [true, 'warning', true, true, { created: true, id: `gid://shopify/Refund/${9000 + refunds.length}`, amount: '1000.00', owedAfter: '250.00' }]);
+eq('الصف: المبلغ المختار والسبب والمستحق قبل/بعد · courierCollect Net بوسطة', [X.shopifyRefundAmount, X.bostaRefundGross, X.shopifyOwedBefore, X.shopifyOwedAfter, X.refundReason, X.courierCollect, L8.value_after], ['1000.00', '1150.00', '1250.00', '250.00', 'غلطة رفع الشحنة — العميل خد 1150 مش 1250', -1274.26, 1150]);
+
+// المستحق بالظبط 1250 بلا سبب (#48119) — وشوبيفاي ترفض أول مرة
+q = await payS1('#48119', '9200000004', EXP2(), { refund: { amount: '1250', ack: true } });
+L8 = logs[logs.length - 1]; X = E8();
+eq('1250 (المستحق) بلا سبب: نجاح · المستحق بعد = 0 · بلا تحذير «لسه مستحق»', [q.success, q.refund.owedAfter, /لسه مستحق/.test(q.warning || ''), /غير اللي بوسطة دفعته/.test(q.warning || ''), X.shopifyRefundAmount, X.shopifyOwedAfter], [true, '0.00', false, true, '1250.00', '0.00']);
+
+// الحد الأقصى = المتاح للاسترداد (#48121: 325 بس)
+d48 = await chk('#48121'); const c21 = cand(d48, '9200000006');
+eq('#48121: الحد = المتاح للاسترداد 325 · مفيش اختيارات جاهزة (1150 و1250 أكبر منه)', [c21.refund.state, c21.refund.max, c21.refund.options], ['create', '325.00', []]);
+const w13 = wr();
+q = await payS1('#48121', '9200000006', EXP2(), { refund: { amount: '400', ack: true, reason: 'اختبار' } });
+eq('400 > الحد (325) → مرفوض بلا كتابة', [q.success, /أكبر من الحد المسموح \(325\.00\)/.test(q.error || ''), wr()], [false, true, w13]);
+q = await payS1('#48121', '9200000006', EXP2(), { refund: { amount: '325', ack: true, reason: 'اختبار' } });
+eq('325 + سبب: نجاح', [q.success, q.refund.amount], [true, '325.00']);
+
+// شوبيفاي مفيهاش مستحق (#48118) — سجل D1 بس بتأكيد صريح
+d48 = await chk('#48118'); const c18 = cand(d48, '9200000003');
+eq('#48118: nothing_owed (المستحق 0 ولا استرداد) · قابلة', [c18.eligible, c18.refund, c18.refundMissing], [true, { state: 'nothing_owed' }, true]);
+const w14 = wr();
+q = await payS1('#48118', '9200000003', EXP2({ owed: undefined, refundState: 'nothing_owed' }));
+eq('بلا تأكيد → needsAck بلا كتابة', [q.success, q.needsAck, wr()], [false, true, w14]);
+q = await payS1('#48118', '9200000003', EXP2({ owed: undefined, refundState: 'nothing_owed' }), { refund: { ack: true } });
+X = E8();
+eq('بتأكيد: D1 بس · صفر استرداد · shopifyRefundMissing=true · تحذير', [q.success, q.status, refunds.length, X.shopifyRefundMissing, X.refundState, X.shopifyRefundCreated, /مفيهاش مستحق استرداد/.test(q.warning || '')], [true, 'warning', w14[2], true, 'nothing_owed', false, true]);
+// صفحة قديمة (بتبعت ackRefundMissing بس من غير refund) على حالة create → مابتكتبش على شوبيفاي بالغلط ولا D1
+const w15 = wr();
+q = await payS1('#48122', '9200000007', EXP2(), { ackRefundMissing: true });
+eq('صفحة قديمة على حالة create → needsRefundChoice بلا أي كتابة (لا شوبيفاي ولا D1)', [q.success, q.needsRefundChoice, wr()], [false, true, w15]);
+
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);

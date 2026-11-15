@@ -1,6 +1,30 @@
 /**
- * cod-payment-center-worker  (v3.17.1)
+ * cod-payment-center-worker  (v3.18.0)
  * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 15-11-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.18.0 — استرداد بوسطة (Customer Return Pickup) من نافذة «فحص شحنات بوسطة» **بيتعمل على شوبيفاي فعلاً** بمبلغ يختاره الموظف — 15-11-2026:
+ *   🔴 الحالة (#48116): CRP إجماليها −1150 (بوسطة دفعت للعميل 1150 نقدًا) وشوبيفاي عليها «مستحق استرداد» 1250 (Refund 0 اتكتب وقت الاستبدال
+ *      وبعدين اتعدّل الأوردر بصفر). مسار الملف مابيقبلش (−1150 ≠ −1250) ومسار النافذة كان بيسجّل في D1 بس (قرار 14-11 «أ») فشوبيفاي
+ *      كانت بتفضل «مستحق 1250» بلا أي استرداد. **قرار أحمد 15-11-2026 بيلغي «أ»:** الأداة هي اللي بتعمل الاسترداد على شوبيفاي (`createRefund`)،
+ *      بعد تنبيه وتأكيد يدوي، والموظف **بيختار** المبلغ (أو بيكتب رقم بسبب إجباري) — فرق الـ 100 غلطة رفع شحنة من عندنا.
+ *   🆕 `bostaS1Check`: كل شحنة S2 سالبة بتاخد `refund` = حالة خطة الاسترداد (كشف بالمستحق `totalOutstanding` مش `totalRefunded` بس):
+ *        · `exists`       — استرداد مقابل موجود (مسجّل بملاحظة فيها رقم التتبع، أو المسجّل على شوبيفاي ≥ المطلوب) → سجل D1 بس، بلا كتابة على شوبيفاي.
+ *        · `create`       — شوبيفاي عليها مستحق استرداد ≠ اللي بوسطة دفعته → استرداد على شوبيفاي بمبلغ يختاره الموظف: `options` (دفعة بوسطة · المستحق)
+ *                           أو رقم حر ≤ `max` (= min(المتاح للاسترداد، الأكبر بين المستحق والمدفوع)) بسبب إجباري لو مش واحد من الاتنين.
+ *        · `nothing_owed` — شوبيفاي مفيهاش مستحق استرداد ولا استرداد (ممكن اتحسب جوّه استبدال) → سجل D1 بس بتأكيد صريح (بيعالج التحذير الكاذب).
+ *        (المستحق == المدفوع بالظبط لسه «سجّله بملف الـ Cash-out العادي» — مسار الملف بيعمل createRefund.)
+ *   🆕 `bostaPayS1` بياخد `refund: { amount, reason, ack }` — حالة `create` من غيره = `needsRefundChoice` بلا أي كتابة (صفحة قديمة مابتكتبش على شوبيفاي
+ *      بالغلط). `expected.owed`/`expected.refundState` بيتقارنوا بالحالي (`stale` لو خدمة العملاء عدّلت). ترتيب الكتابة: **شوبيفاي الأول** (`createRefund`
+ *      وملاحظة الاسترداد `Bosta <النوع> <رقم التتبع>` = مفتاح عدم التكرار) ثم D1. شوبيفاي فشلت = صفر كتابة. D1 فشلت بعد نجاح شوبيفاي =
+ *      `refundCreated:true` والإعادة آمنة (الاسترداد بيتعرف بالملاحظة فمبيتكررش).
+ *   ✅ الخزنة ما اتأثرتش: `courierCollect` لسه **Net بوسطة** (−1274.26) — مبلغ شوبيفاي المختار منفصل ومخزّن في `extra`
+ *      (`shopifyRefundId` · `shopifyRefundAmount` · `bostaRefundGross` · `shopifyOwedBefore` · `shopifyOwedAfter` · `refundReason` · `refundState`).
+ *      `shopifyRefundMissing` بقى `true` بس في حالة `nothing_owed` (مفيش حد بيقراه خارج الأداة — مفحوص).
+ *   🔴 `codPayment.min = 3.18.0` — انشر الـ Worker قبل الصفحة. الفحص: `node bosta-cash-cycle-check.mjs` §⑪.
+ *   ⚠️ ما اتجرّبش على شوبيفاي حقيقية. `allocateRefundTransactions` بتحسب سقف كل SALE من مبلغها الأصلي (مش المتبقي بعد استردادات سابقة) —
+ *      بيفشل بأمان (شوبيفاي بترفض). مفيش قيد UNIQUE ضد ضغطتين متوازيتين (زي مسار الملف).
+ *
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.17.1 — `extra.legKind='rto_fee'` على صفوف الـ RTO «بدون تحصيل» من **ملف** الـ Cash-out كمان — 15-11-2026:
@@ -367,7 +391,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.17.1';
+const WORKER_VERSION = 'v3.18.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1561,7 +1585,7 @@ function allocateRefundTransactions(saleTransactions, totalAmount) {
   return { alloc, remaining };
 }
 
-async function createRefund(token, env, numericOrderId, saleTransactions, amount, currency) {
+async function createRefund(token, env, numericOrderId, saleTransactions, amount, currency, note = '') {
   const orderId      = `gid://shopify/Order/${numericOrderId}`;
   const totalAmount  = parseFloat(amount);
   const { alloc, remaining } = allocateRefundTransactions(saleTransactions || [], totalAmount);
@@ -1588,7 +1612,7 @@ async function createRefund(token, env, numericOrderId, saleTransactions, amount
       orderId, currency,
       allowOverRefunding: false,
       notify:             false,
-      note:               '',
+      note:               String(note || ''),   // v3.18.0 — بوسطة: «Bosta <النوع> <رقم التتبع>» = مفتاح عدم التكرار
       refundLineItems:    [],
       shipping:           { amount: '0.0' },
       transactions: alloc.map(a => ({ orderId, parentId: a.parentId, amount: a.amount, kind: 'REFUND', gateway: 'manual' })),
@@ -1704,6 +1728,7 @@ const Q_BOSTA_ORDERS = `query bostaOrders($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Order {
     id name createdAt cancelledAt displayFinancialStatus
     totalOutstandingSet { shopMoney { amount } } totalRefundedSet { shopMoney { amount } }
+    refunds { id note totalRefundedSet { shopMoney { amount } } }
     courier: metafield(namespace: "custom", key: "courier") { value }
     t1: metafield(namespace: "custom", key: "bosta_tracking_number_s1") { value }
     t2: metafield(namespace: "custom", key: "bosta_tracking_number_s2") { value }
@@ -2039,6 +2064,9 @@ async function bostaS1Evaluate(env, orderRef) {
   const courier = nd.courier?.value || null;
   const hasS1 = (await bostaOrdersWithS1(env.DB, [orderId])).has(String(orderId));
   const refundedP = bostaPiastres(nd.totalRefundedSet?.shopMoney?.amount) || 0;
+  const owedP = out !== null && out < 0 ? -out : 0;                 // 🆕 v3.18.0 — «مستحق استرداد» عند شوبيفاي (Refund owed)
+  const maxRefundP = Math.max(0, saleSum - refundedP);              // المتاح للاسترداد (maximumRefundable)
+  const refundsList = Array.isArray(nd.refunds) ? nd.refunds : [];
   const legs = await bostaOrderLegs(env.DB, orderId);
   let pend = null; try { pend = await checkPendingPreReg(env, orderId); } catch { pend = null; }
 
@@ -2054,7 +2082,7 @@ async function bostaS1Evaluate(env, orderRef) {
     const c = bostaShapeCandidate(d, full, err);
     const b = c.blockers;
     // 🆕 v3.16.0 — الشحنة S1 (Send / RTO كانت Send) أو S2 (Exchange · Customer Return Pickup)
-    c.leg = c.isS1Type ? 'S1' : 'S2'; c.notes = []; c.afterS1 = false; c.refundMissing = false;
+    c.leg = c.isS1Type ? 'S1' : 'S2'; c.notes = []; c.afterS1 = false; c.refundMissing = false; c.refund = null;
     if (c.isRtoFee) {
       // 🆕 v3.17.0 — RTO فاشلة (كانت Exchange/CRP): S2 «رسوم فقط». أي مبلغ عليها (إجمالي أو أونلاين) = مش الحالة دي → بنمنع ونسمّي السبب
       c.legKind = 'rto_fee';
@@ -2085,8 +2113,18 @@ async function bostaS1Evaluate(env, orderRef) {
       if (out !== null && out === c._p.gross) b.push('المتبقي على شوبيفاي = قيمة الاسترداد — سجّله بملف الـ Cash-out العادي (بيعمل الاسترداد على شوبيفاي)');
       else {
         if (saleSum < need) b.push(`معاملات SALE الناجحة على شوبيفاي (${bostaFmt(saleSum)}) أقل من الاسترداد (${bostaFmt(need)})`);
-        // قرار أحمد 14-11-2026 «أ»: مفيش createRefund — لو شوبيفاي مفيهاش استرداد مقابل بنعلّم ونطلب تأكيد صريح
-        if (refundedP < legs.neg + need) c.refundMissing = true;
+        // 🆕 v3.18.0 (قرار أحمد 15-11-2026 — بيلغي «أ» بتاعة 14-11): خطة الاسترداد على شوبيفاي — الأداة هي اللي بتعمل createRefund بمبلغ يختاره الموظف
+        const hit = refundsList.find(rf => String(rf?.note || '').includes(c.trackingNumber));
+        if (hit) c.refund = { state: 'exists', refundId: String(hit.id || ''), amount: bostaFmt(bostaPiastres(hit.totalRefundedSet?.shopMoney?.amount) || 0), by: 'note' };
+        else if (refundedP >= legs.neg + need) c.refund = { state: 'exists', refundId: null, amount: bostaFmt(refundedP), by: 'total' };
+        else if (owedP === 0) c.refund = { state: 'nothing_owed' };
+        else {
+          const max = Math.min(maxRefundP, Math.max(owedP, need));
+          c._r = { owed: owedP, need, max };
+          c.refund = { state: 'create', owed: bostaFmt(owedP), need: bostaFmt(need), max: bostaFmt(max), options: [...new Set([need, owedP].filter(v => v > 0 && v <= max))].map(bostaFmt) };
+          if (max <= 0) b.push('مفيش رصيد قابل للاسترداد على شوبيفاي (المحصَّل − المسترد = صفر)');
+        }
+        c.refundMissing = c.refund.state === 'create' || c.refund.state === 'nothing_owed';   // اسم قديم — الصفحة الجديدة بتقرا `refund.state`
       }
     }
     if (c.trackingNumber) {
@@ -2109,11 +2147,11 @@ async function bostaS1Evaluate(env, orderRef) {
   const preReg = pend ? { amount: pend.amount ?? null, transactionId: pend.transactionId != null ? String(pend.transactionId) : null } : null;
   return {
     found: true, orderId: String(orderId), orderName: nd.name, courier, financialStatus: nd.displayFinancialStatus,
-    shopifyOutstanding: out === null ? null : bostaFmt(out), shopifySaleCaptured: bostaFmt(saleSum), shopifyRefunded: bostaFmt(refundedP), legsRegistered: { positive: bostaFmt(legs.pos), negative: bostaFmt(legs.neg) }, t1, t2, hasS1, preRegistered: !!pend, preReg, trackingUnverifiedOrder: !!legacy,
+    shopifyOutstanding: out === null ? null : bostaFmt(out), shopifyOwed: bostaFmt(owedP), shopifySaleCaptured: bostaFmt(saleSum), shopifyRefunded: bostaFmt(refundedP), legsRegistered: { positive: bostaFmt(legs.pos), negative: bostaFmt(legs.neg) }, t1, t2, hasS1, preRegistered: !!pend, preReg, trackingUnverifiedOrder: !!legacy,
     candidates: cands, _sales: sales, _pend: pend,
   };
 }
-const bostaS1Public = e => { const { _sales, _pend, candidates, ...pub } = e; return { ...pub, candidates: (candidates || []).map(({ _p, ...c }) => c) }; };
+const bostaS1Public = e => { const { _sales, _pend, candidates, ...pub } = e; return { ...pub, candidates: (candidates || []).map(({ _p, _r, ...c }) => c) }; };
 
 // ══════════════════════════════════════════════════════
 // §HANDLER
@@ -2758,7 +2796,7 @@ export default {
       // ── ACTION: bostaPayS1 (v3.13.0) — تسجيل S1 من بوسطة في D1 بس (صفر كتابة على شوبيفاي) ──
       // بيعيد التقييم كامل لحظة الكتابة، وبيرفض لو الأرقام اللي الموظف شافها (expected) اتغيّرت.
       if (action === 'bostaPayS1') {
-        const { orderRef, trackingNumber, employee, expected, s2Tracking, ackRefundMissing } = bodyData;
+        const { orderRef, trackingNumber, employee, expected, s2Tracking, refund: refundIn } = bodyData;
         const ref = String(orderRef ?? '').trim(), tn = String(trackingNumber ?? '').trim();
         if (!/^#?\d{1,10}$/.test(ref)) return json({ error: 'orderRef غير صالح' }, 400, request);
         if (!/^\d{5,15}$/.test(tn)) return json({ error: 'trackingNumber غير صالح' }, 400, request);
@@ -2777,10 +2815,37 @@ export default {
         const isS1 = c.leg === 'S1';
         // 🆕 v3.16.0 — بوابة S1 صارمة لحظة الكتابة (الفحص بيسمح بالاختيار مع S1 في نفس الدفعة، لكن الكتابة بترتيب S1 الأول)
         if (!isS1 && !e.hasS1) return json({ success: false, status: 'error', needsS1: true, actions: [], error: 'S1 بتاع الأوردر لسه ما اتسجّلش — سجّله الأول (الـ Net بتاعه لازم يدخل الخزنة قبل S2)' }, 200, request);
-        // 🆕 قرار أحمد 14-11-2026 «أ»: استرداد بوسطة بلا مقابل على شوبيفاي بيتسجّل في D1 بس — بتأكيد صريح
-        if (c.refundMissing && ackRefundMissing !== true) {
+        // 🆕 v3.18.0 (قرار أحمد 15-11-2026): استرداد بوسطة على شوبيفاي بيتعمل من الأداة بمبلغ يختاره الموظف — بعد تنبيه وتأكيد صريح
+        const rp = c.refund, rIn = (refundIn && typeof refundIn === 'object') ? refundIn : null;
+        let rAmountP = null, rReason = null;
+        if (rp && expected.refundState !== undefined && String(expected.refundState) !== rp.state) {
+          return json({ success: false, status: 'error', stale: true, actions: [],
+            error: `حالة الاسترداد على شوبيفاي اتغيّرت من وقت الفحص (دلوقتي: ${rp.state}) — أعد الفحص وراجع` }, 200, request);
+        }
+        if (rp?.state === 'create') {
+          if (!rIn || rIn.amount === undefined || rIn.amount === null || String(rIn.amount).trim() === '') {
+            return json({ success: false, status: 'error', needsRefundChoice: true, actions: [], refund: rp,
+              error: `الاسترداد هيتعمل على شوبيفاي — اختار المبلغ (المستحق ${rp.owed} · بوسطة دفعت ${rp.need}) وأكّد` }, 200, request);
+          }
+          if (String(expected.owed ?? '') !== rp.owed) {
+            return json({ success: false, status: 'error', stale: true, actions: [],
+              error: `المستحق على شوبيفاي اتغيّر من وقت الفحص (دلوقتي ${rp.owed}) — أعد الفحص وراجع المبلغ` }, 200, request);
+          }
+          rAmountP = bostaPiastres(rIn.amount);
+          if (rAmountP === null || rAmountP <= 0) return json({ success: false, status: 'error', actions: [], error: 'مبلغ الاسترداد لازم يكون رقم أكبر من صفر' }, 200, request);
+          if (rAmountP > c._r.max) return json({ success: false, status: 'error', actions: [], error: `مبلغ الاسترداد (${bostaFmt(rAmountP)}) أكبر من الحد المسموح (${rp.max}) — الحد = الأقل بين المتاح للاسترداد على شوبيفاي والأكبر بين المستحق والمدفوع` }, 200, request);
+          if (rIn.ack !== true) {
+            return json({ success: false, status: 'error', needsAck: true, actions: [],
+              error: 'الاسترداد هيتكتب على شوبيفاي ومفيش منه رجوع من الأداة — محتاج تأكيد صريح' }, 200, request);
+          }
+          if (rAmountP !== c._r.need && rAmountP !== c._r.owed) {
+            rReason = String(rIn.reason ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+            if (rReason.length < 3) return json({ success: false, status: 'error', needsReason: true, actions: [],
+              error: `المبلغ (${bostaFmt(rAmountP)}) مش واحد من الاتنين (المستحق ${rp.owed} · بوسطة ${rp.need}) — لازم تكتب السبب` }, 200, request);
+          }
+        } else if (rp?.state === 'nothing_owed' && !(rIn && rIn.ack === true)) {
           return json({ success: false, status: 'error', needsAck: true, actions: [],
-            error: 'شوبيفاي مفيهاش استرداد مقابل الشحنة دي — التسجيل في السجل بس (بلا createRefund) ومحتاج تأكيد صريح' }, 200, request);
+            error: 'شوبيفاي مفيهاش مستحق استرداد ولا استرداد مسجّل (ممكن اتحسب جوّه استبدال) — التسجيل في السجل بس ومحتاج تأكيد صريح' }, 200, request);
         }
         const p = c._p, actions = [];
         // مطابقة التسجيل المسبق: مبلغ + معاملة SALE ناجحة بنفس الـ id — وقتها المفتاح بيتمسح بعد نجاح السجل (S1 بس)
@@ -2798,30 +2863,52 @@ export default {
           ? `S1 اتحصّل قبل كده على شوبيفاي (${bostaFmt(p.gross)} ج — معاملات SALE ناجحة ${e.shopifySaleCaptured} ج) — تسجيل في السجل فقط (الـ Net للخزنة) من بوسطة مباشرة · Cash-out ${c.cashOutId}`
           : `S1 بدون تحصيل — رسوم بوسطة (Net ${c.net}) اتسجّلت من بوسطة مباشرة · Cash-out ${c.cashOutId}`);
         else if (p.gross > 0) actions.push(`${c.typeLabel} (S2) اتحصّل قبل كده على شوبيفاي (${bostaFmt(p.gross)} ج — معاملات SALE ناجحة ${e.shopifySaleCaptured} ج) — تسجيل في السجل فقط (الـ Net للخزنة) من بوسطة مباشرة · Cash-out ${c.cashOutId}`);
-        else if (p.gross < 0) actions.push(`${c.typeLabel} (S2) استرداد ${bostaFmt(-p.gross)} ج — تسجيل في السجل فقط (الـ Net للخزنة) من بوسطة مباشرة · Cash-out ${c.cashOutId}`
-          + (c.refundMissing ? ' — ⚠ مفيش استرداد مقابله على شوبيفاي (قرار أحمد: بلا createRefund)' : ''));
+        else if (p.gross < 0) actions.push(`${c.typeLabel} (S2) استرداد ${bostaFmt(-p.gross)} ج — تسجيل في السجل (الـ Net للخزنة) من بوسطة مباشرة · Cash-out ${c.cashOutId}`
+          + (rp?.state === 'create' ? ` · استرداد ${bostaFmt(rAmountP)} ج على شوبيفاي (المستحق كان ${rp.owed})` : rp?.state === 'nothing_owed' ? ' — ⚠ شوبيفاي مفيهاش مستحق استرداد: سجل بس بلا كتابة على شوبيفاي' : rp?.state === 'exists' ? ' — استرداد مقابل موجود على شوبيفاي (بلا كتابة)' : ''));
         else if (c.legKind === 'rto_fee') actions.push(`${c.typeLabel} (كانت ${c.oldType} · S2) — محاولات توصيل فاشلة: رسوم بوسطة ${bostaFmt(p.fees)} ج${p.flex ? ` − FlexShip ${bostaFmt(p.flex)} ج (اتحصّل من العميل)` : ''} = Net ${c.net} ج — تسجيل في السجل فقط (بلا أي حركة على شوبيفاي) · Cash-out ${c.cashOutId}`);
         else actions.push(`${c.typeLabel} (S2) بدون تحصيل — رسوم بوسطة (Net ${c.net}) اتسجّلت من بوسطة مباشرة · Cash-out ${c.cashOutId}`);
         const extend = {
           legOrigin: 'bosta_api',
           ...(isS1
             ? { s1Origin: 'bosta_api', s1Catchup: true, s1CatchupForTracking: /^\d{5,15}$/.test(String(s2Tracking || '')) ? String(s2Tracking) : null }
-            : { legCatchup: true, shopifyRefundMissing: c.refundMissing === true, ...(c.legKind === 'rto_fee' ? { legKind: 'rto_fee', originalType: c.oldType } : {}) }),
+            : { legCatchup: true, shopifyRefundMissing: rp?.state === 'nothing_owed',
+                ...(rp ? { refundState: rp.state, shopifyRefundCreated: false, bostaRefundGross: bostaFmt(Math.abs(p.gross)) } : {}),
+                ...(c.legKind === 'rto_fee' ? { legKind: 'rto_fee', originalType: c.oldType } : {}) }),
           bostaTypeCode: c.typeCode, bostaStateCode: c.stateCode, onlineStatus: c.onlineStatus, onlineProvider: c.onlineProvider,
           preRegCaptured: preRegTx ? bostaFmt(p.gross) : null, preRegTransactionId: preRegTx,
         };
+        // 🆕 v3.18.0 — الاسترداد على شوبيفاي **الأول** (فشله = صفر كتابة)، وبعده سجل D1. ملاحظة الاسترداد = مفتاح عدم التكرار لو D1 فشلت بعدها.
+        let rfInfo = null;
+        if (rp?.state === 'create') {
+          const tokenR = await getAccessToken(env);
+          if (!tokenR) return json({ success: false, status: 'error', error: 'Failed to get Shopify access token', actions: [] }, 200, request);
+          const saleTx = (e._sales || []).map(t => ({ id: `gid://shopify/OrderTransaction/${t.id}`, amount: t.p / 100 }));
+          const rf = await createRefund(tokenR, env, e.orderId, saleTx, bostaFmt(rAmountP), 'EGP', `Bosta ${c.typeLabel} ${tn}`);
+          if (!rf.success) return json({ success: false, status: 'error', error: `شوبيفاي رفضت الاسترداد: ${rf.error} — مفيش حاجة اتكتبت (لا شوبيفاي ولا السجل)`, actions: [] }, 200, request);
+          rfInfo = { id: rf.refundId, amount: bostaFmt(rAmountP), owedAfter: bostaFmt(Math.max(0, c._r.owed - rAmountP)) };
+          actions.push(`شوبيفاي: اتعمل استرداد ${rfInfo.amount} ج (${rf.refundId}) — المستحق قبل ${rp.owed} · بعد ${rfInfo.owedAfter}`);
+          Object.assign(extend, { shopifyRefundCreated: true, shopifyRefundId: rf.refundId, shopifyRefundAmount: rfInfo.amount, shopifyOwedBefore: rp.owed, shopifyOwedAfter: rfInfo.owedAfter, refundReason: rReason });
+        }
         const { logged, logError } = await safeWriteLog(env.DB, {
           tool: TOOL_NAME, type: p.gross < 0 ? 'refund' : 'payment', employee, orderId: e.orderId, orderName: e.orderName, valueAfter: Math.abs(p.gross) / 100,
           notes: `${c.legKind === 'rto_fee' ? 'رسوم' : p.gross < 0 ? 'استرداد' : 'تحصيل'} بوسطة (${isS1 ? 'S1' : c.typeLabel + (c.legKind === 'rto_fee' ? ' كانت ' + c.oldType : '') + ' · S2'} من بوسطة مباشرة) — ${c.cashOutId}`,
           extra: buildBostaExtra({ n, r, ctx: sctx, result: 'success', actions, batchId: isS1 ? `bosta-s1-${tn}` : `bosta-leg-${tn}`, extend }),
         });
-        // السجل فشل = مفيش حاجة اتغيّرت (لا KV ولا شوبيفاي) → إعادة المحاولة آمنة
-        if (!logged) return json({ success: false, status: 'error', error: `السجل فشل (${logError || 'D1'}) — مفيش حاجة اتغيّرت، أعد المحاولة`, actions: [] }, 200, request);
+        // السجل فشل = لا KV ولا شوبيفاي اتغيّروا (إلا الاسترداد لو اتعمل — بيتعرف بالملاحظة فالإعادة مبتكرّرهوش) → إعادة المحاولة آمنة
+        if (!logged) {
+          if (rfInfo) return json({ success: false, status: 'error', refundCreated: true, refundId: rfInfo.id, actions,
+            error: `الاسترداد اتعمل على شوبيفاي (${rfInfo.amount} ج · ${rfInfo.id}) لكن السجل فشل (${logError || 'D1'}) — أعد المحاولة: الاسترداد هيتعرف ومش هيتكرّر وهيتكتب السجل بس` }, 200, request);
+          return json({ success: false, status: 'error', error: `السجل فشل (${logError || 'D1'}) — مفيش حاجة اتغيّرت، أعد المحاولة`, actions: [] }, 200, request);
+        }
         let preRegCleared = false, warning = null;
         if (preRegTx) ({ preRegCleared, warning } = await bostaClearPreReg(env, e.orderId, preRegTx, actions));
         else if (isS1 && e._pend) warning = 'فيه تسجيل مسبق على الأوردر مش مطابق لإجمالي S1 — ما اتمسحش. راجعه.';
-        if (c.refundMissing) warning = (warning ? warning + ' · ' : '') + 'مفيش استرداد مقابل على شوبيفاي — الأوردر لسه محتاج مراجعة خدمة العملاء';
-        return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, preRegCleared, orderId: e.orderId, kind: r.kind, leg: c.leg, amount: bostaFmt(Math.abs(p.gross)), net: c.net }, 200, request);
+        const addW = t => { warning = (warning ? warning + ' · ' : '') + t; };
+        if (rfInfo && rAmountP !== p.gross * -1) addW(`مبلغ الاسترداد على شوبيفاي (${rfInfo.amount}) غير اللي بوسطة دفعته (${bostaFmt(-p.gross)})`);
+        if (rfInfo && Number(rfInfo.owedAfter) > 0) addW(`لسه مستحق ${rfInfo.owedAfter} ج للعميل على شوبيفاي — خدمة العملاء تراجعه`);
+        if (rp?.state === 'nothing_owed') addW('شوبيفاي مفيهاش مستحق استرداد — السجل اتكتب بس (راجع الأوردر لو لسه العميل ليه فلوس)');
+        return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, preRegCleared, orderId: e.orderId, kind: r.kind, leg: c.leg, amount: bostaFmt(Math.abs(p.gross)), net: c.net,
+          refund: rfInfo ? { created: true, id: rfInfo.id, amount: rfInfo.amount, owedAfter: rfInfo.owedAfter } : (rp ? { created: false, state: rp.state } : null) }, 200, request);
       }
 
       // ── ACTION: get_config ────────────────────────────────────────
