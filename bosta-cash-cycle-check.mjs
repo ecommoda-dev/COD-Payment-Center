@@ -1,4 +1,4 @@
-// bosta-cash-cycle-check.mjs — Worker v3.17.0: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
+// bosta-cash-cycle-check.mjs — Worker v3.17.1: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
 // تشغيل: node bosta-cash-cycle-check.mjs   (من غير شبكة — شوبيفاي ووكيل D1 وKV وهمية)
 // الأرقام مأخوذة من ملف حقيقي (Cash-out MONCOD02NOV26) ومن ردود شوبيفاي الحقيقية 04-11-2026:
 //   #61945 (2675) · #62701 (أونلاين 1850) · #61540 (ملغي صفر) · #61298 (استرداد −1650) ·
@@ -57,6 +57,7 @@ Object.assign(SHOP, {
 // v3.17.0 — #47530 (حقيقي · 15-11-2026): Send 5275 + Exchange 100 + RTO (كانت Exchange) رسوم 181.26 − FlexShip 100 = −81.26. شوبيفاي: SALE ناجحة 5275 · المتبقي 75
 Object.assign(SHOP, {
   '47530': mk('#47530', 501, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('11', '5275.0', 'SALE', 'PENDING'), TX('12', '5275.0')] }),
+  '70020': mk('#70020', 601, '0.0', { createdAt: '2026-10-20T10:00:00Z', t1: '7000000020', t2: '7000000021' }),   // v3.17.1 — S1 صفر + RTO صفر من ملف الـ Cash-out
   '47531': mk('#47531', 502, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('13', '5275.0')] }),   // RTO بلا S1 مسجّلة ولا S1 قابلة (S1 مش في بوسطة)
   '47532': mk('#47532', 503, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('14', '5275.0')] }),   // RTO عليها مبلغ
   '47533': mk('#47533', 504, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('15', '5275.0')] }),   // RTO بلا oldType
@@ -356,7 +357,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.17.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.17.0');
+eq('get_config بيرجّع 3.17.1', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.17.1');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -656,5 +657,14 @@ const d33 = await chk('#47533');
 eq('RTO بلا oldType → لسه «نوع مش مدعوم»', [cand(d33, '9100000002').eligible, cand(d33, '9100000002').legKind, /مش مدعوم/.test(cand(d33, '9100000002').blockers.join())], [false, undefined, true]);
 eq('ولا createRefund في أي مسار', refunds.length, w9[2]);
 
+console.log('══ ⑩ v3.17.1 — legKind=rto_fee على صف RTO «بدون تحصيل» من ملف الـ Cash-out (الخزنة بتقراه) ══');
+const ctx10 = { cashOutId: 'RTOFILE01', paidAt: PAID, rowsTotal: 2, netTotal: '-70.00', payOrders: 2, refundOrders: 0 };
+const pay10 = async row => (await call({ action: 'bostaPay', row, ctx: ctx10, employee: 'Ahmed_Ibraheem' })).body;
+const q10a = await pay10(R('#70020', '7000000020', 'SEND', 0, 0, -10, 10, { cashOutId: 'RTOFILE01' }));
+const X10a = E8();
+eq('S1 صفر من الملف: اتسجّلت · بلا legKind (مش RTO)', [q10a.success, X10a.noCollection, X10a.legKind], [true, true, null]);
+const q10b = await pay10(R('#70020', '7000000021', 'Return to Origin', 0, 0, -60, 60, { cashOutId: 'RTOFILE01' }));
+const X10b = E8();
+eq('RTO من الملف بصيغة «Return to Origin»: اتسجّلت · noCollection · legKind=rto_fee · bostaOrderType', [q10b.success, X10b.noCollection, X10b.legKind, X10b.bostaOrderType, X10b.courierCollect], [true, true, 'rto_fee', 'RETURN TO ORIGIN', -60]);
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
