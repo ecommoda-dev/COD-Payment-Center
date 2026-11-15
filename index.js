@@ -1,6 +1,15 @@
 /**
- * cod-payment-center-worker  (v3.17.0)
- * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 14-11-2026
+ * cod-payment-center-worker  (v3.17.1)
+ * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 15-11-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.17.1 — `extra.legKind='rto_fee'` على صفوف الـ RTO «بدون تحصيل» من **ملف** الـ Cash-out كمان — 15-11-2026:
+ *   🔴 السبب: الخزنة (`Treasury-Ledger` ≥ 1.8.0) بتقرا `extra.legKind` وتكتب لشحنة الـ RTO ملاحظة مميّزة («صافي بوسطة — رسوم شحنة راجعة (RTO)»).
+ *      المفتاح كان بيتكتب في مسار «فحص شحنات من بوسطة» بس (`bostaPayS1`)؛ دلوقتي `buildBostaExtra` بيكتبه كمان لصف الملف لو
+ *      `Order Type` = RETURN_TO_ORIGIN/RTO **و**الصف بدون تحصيل (`noCollection`). صفر تغيير في أي رقم ولا في سلوك التسجيل.
+ *   ⚠️ شكل قيمة `Order Type` للـ RTO في ملف بوسطة الحقيقي **ما اتأكدش** (مفيش عيّنة) — المطابقة على `RETURN_TO_ORIGIN`/`RTO` بعد `toUpperCase`
+ *      وتحويل المسافة لـ `_`. لو الملف بيكتبها بشكل تاني الصف بيتسجّل عادي بلا `legKind` (الخزنة بتكتب الملاحظة الافتراضية).
+ *   ✅ `min` ما اتغيّرش (3.17.0) — الصفحة ما اعتمدتش على سلوك جديد.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.17.0 — شحنة RTO (كانت Exchange/CRP) = «رسوم فقط» في D1 بس · إصلاح سطر الدليل الكاذب — 15-11-2026:
@@ -358,7 +367,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.17.0';
+const WORKER_VERSION = 'v3.17.1';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1886,6 +1895,8 @@ function buildBostaExtra({ n, r, ctx, result, actions, batchId = null, extend = 
     // 🔴 v3.12.0 — S1 اتحصّل قبل كده بالتسجيل المسبق: الفلوس على شوبيفاي من أداة التسجيل المسبق (transactionId ده)، والصف هنا للـ Net بس
     preRegCaptured: r.kind === 'prereg_s1' ? bostaFmt(gross) : null, preRegTransactionId: r.kind === 'prereg_s1' ? r.preRegTx : null,
     trackingUnverified: r.trackingUnverified === true,
+    // 🆕 v3.17.1 — RTO بدون تحصيل من ملف الـ Cash-out: نفس علامة مسار bostaPayS1 (الخزنة بتقراها). `extend` بيغلب لو ظبطها.
+    ...(r.kind === 'none' && /^(RETURN_TO_ORIGIN|RTO)$/.test(String(n.orderType || '').toUpperCase().replace(/[\s-]+/g, '_')) ? { legKind: 'rto_fee' } : {}),
     ...(extend || {}),
   };
 }
