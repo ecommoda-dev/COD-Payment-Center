@@ -351,12 +351,12 @@ let v6 = await val6([S1_49395], ctx6);
 eq('S1 مسجّل مسبقًا: ready رغم إن المستحق 1225 ≠ 4975', [v6[0].status, v6[0].kind, v6[0].preRegistered], ['ready', 'prereg_s1', true]);
 yes('الرد العام مفيهوش preRegTx الداخلي', !('preRegTx' in v6[0]));
 v6 = await val6([S2_49395], { ...ctx6, s1Orders: [] });
-eq('S2 لوحده (S1 مش متسجّل ولا في الملف) → error بسبب S1', [v6[0].status, /S1 بتاع الأوردر ده لسه ما اتسجّلش/.test(v6[0].reasons.join())], ['error', true]);
+eq('S2 لوحده (S1 مش متسجّل ولا في الملف) → error بسبب S1', [v6[0].status, /لم يتم تسجيل التحصيل الخاص بالشحنة الأولى \(S1\) لهذا الأوردر\./.test(v6[0].reasons.join())], ['error', true]);
 v6 = await val6([S2_49395], ctx6);
 eq('S2 وS1 بتاعه في نفس الملف → ready في الفحص', v6[0].status, 'ready');
 const wrN = [logs.length, restN(), kvDeletes.length];
 let p6 = await pay6(S2_49395);
-eq('bostaPay صارم: S2 قبل S1 → رفض بلا أي كتابة', [p6.success, /S1 بتاع/.test(p6.error || ''), [logs.length, restN(), kvDeletes.length]], [false, true, wrN]);
+eq('bostaPay صارم: S2 قبل S1 → رفض بلا أي كتابة', [p6.success, /الشحنة الأولى \(S1\)/.test(p6.error || ''), [logs.length, restN(), kvDeletes.length]], [false, true, wrN]);
 
 // السجل واقع → مفيش حاجة تتغيّر (لا KV ولا شوبيفاي) وإعادة المحاولة آمنة
 failLog = true; p6 = await pay6(S1_49395); failLog = false;
@@ -414,7 +414,7 @@ const restBefore7 = rest.length, refBefore7 = refunds.length;
 
 // بوابة S2 تدّي كود يتعرّف عليه الواجهة
 const s2mis = (await val6([R('#49500', '8145633099', 'EXCHANGE', 1225, 0, 1052.86, 172.14, { rowNo: 301 })], { ...ctx6, s1Orders: [] }))[0];
-eq('S2 الممنوع: code = S1_MISSING + الرسالة بتدل على زرار الفحص', [s2mis.status, s2mis.code, /فحص شحنات من بوسطة/.test(s2mis.reasons.join())], ['error', 'S1_MISSING', true]);
+eq('S2 الممنوع: code = S1_MISSING + الرسالة «لم يتم تسجيل التحصيل الخاص بالشحنة الأولى (S1)»', [s2mis.status, s2mis.code, /لم يتم تسجيل التحصيل الخاص بالشحنة الأولى \(S1\)/.test(s2mis.reasons.join())], ['error', 'S1_MISSING', true]);
 
 // ① #49395 الحقيقي: كل الشحنات بتتعرض، S1 قابلة للتسجيل (Net 4791.74 — الرقم الحقيقي من داشبورد بوسطة)
 const w0 = [logs.length, rest.length, refunds.length, kvDeletes.length];
