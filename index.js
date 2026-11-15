@@ -1,6 +1,19 @@
 /**
- * cod-payment-center-worker  (v3.16.0)
+ * cod-payment-center-worker  (v3.17.0)
  * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 14-11-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.17.0 — شحنة RTO (كانت Exchange/CRP) = «رسوم فقط» في D1 بس · إصلاح سطر الدليل الكاذب — 15-11-2026:
+ *   🔴 الحالة (#47530): S2 الأولى (3505408529) بوسطة قفلتها Return to Origin بعد محاولات توصيل فاشلة وحاسبتنا عليها (رسوم 181.26)،
+ *      واتعملت S2 تانية بدلها. النوع 20 مع `oldType ≠ SEND` كان بيتمنع بـ«نوع مش مدعوم» — فرسوم بوسطة ما بتدخلش الخزنة.
+ *   🆕 `bostaS1Check`/`bostaPayS1`: النوع 20 + `oldType` غير SEND (EXCHANGE/CUSTOMER_RETURN_PICKUP) = `legKind='rto_fee'` (S2) —
+ *        · بشرط إجمالي صفر وأونلاين صفر (أي مبلغ عليها = منع بسبب صريح — الأونلاين على الراجع ما اتقاسش).
+ *        · الصف D1 بس (`payment` بـ`value_after=0` · `noCollection=true`) · `courierCollect` = **Net** مش الرسوم: Net = إجمالي + FlexShip − رسوم،
+ *          والـ FlexShip (اتحصّل من العميل على الفاشلة) داخل في Net — #47530: رسوم 181.26 − FlexShip 100 = −81.26 (اللي بوسطة خصمته فعلًا).
+ *          الرسوم والـ FlexShip متخزّنين في `extra` (`bostaFees` · `flexShipAmount` · `netValue`) + `legKind` · `originalType`.
+ *        · صفر كتابة على شوبيفاي · بوابة S1 زي باقي الـ S2 · جلسة مستقلة `bosta-leg-<تتبع>`.
+ *   ✅ الشحنة المسجّلة قبل كده: سبب واحد بس («اتسجّلت قبل كده») — دليل SALE ما بيتحسبش عليها (كان بيعدّ تسجيلها هي نفسها: 5275 < 5275 + 5275).
+ *   🔴 `codPayment.min = 3.17.0` — انشر الـ Worker قبل الصفحة. الفحص: `node bosta-cash-cycle-check.mjs` §⑨.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.16.0 — تسجيل **أي** شحنة من بوسطة (S1 + Exchange + Customer Return Pickup) في D1 بس — 14-11-2026:
@@ -345,7 +358,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.16.0';
+const WORKER_VERSION = 'v3.17.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1953,6 +1966,8 @@ function bostaShapeCandidate(d, full, err) {
   return {
     trackingNumber: String(d.trackingNumber ?? ''), typeCode, typeLabel: BOSTA_TYPE[typeCode] || d.type?.value || String(typeCode ?? '—'), oldType,
     isS1Type: typeCode === 10 || (typeCode === 20 && oldType === 'SEND'),
+    // 🆕 v3.17.0 — RTO كانت Exchange/CRP (بوسطة قفلتها بعد محاولات فاشلة): شحنة «رسوم فقط» — بتتسجّل في D1 بس بشرط إجمالي صفر
+    isRtoFee: typeCode === 20 && !!oldType && oldType !== 'SEND',
     stateCode: d.state?.code ?? null, stateLabel: BOSTA_STATE[d.state?.code] || d.state?.value || '—',
     createdAt: d.createdAt ?? null, detailsOk: !!full, detailsError: full ? null : (err || null),
     collection: !full ? 'unknown' : !cy ? 'no_cycle' : cashOutId ? 'cashed_out' : 'awaiting_cashout',
@@ -2029,7 +2044,11 @@ async function bostaS1Evaluate(env, orderRef) {
     const b = c.blockers;
     // 🆕 v3.16.0 — الشحنة S1 (Send / RTO كانت Send) أو S2 (Exchange · Customer Return Pickup)
     c.leg = c.isS1Type ? 'S1' : 'S2'; c.notes = []; c.afterS1 = false; c.refundMissing = false;
-    if (!c.isS1Type && !BOSTA_S2_TYPES.has(c.typeCode)) b.push(`نوع الشحنة «${c.typeLabel}»${c.oldType ? ` (كانت ${c.oldType})` : ''} مش مدعوم للتسجيل من بوسطة`);
+    if (c.isRtoFee) {
+      // 🆕 v3.17.0 — RTO فاشلة (كانت Exchange/CRP): S2 «رسوم فقط». أي مبلغ عليها (إجمالي أو أونلاين) = مش الحالة دي → بنمنع ونسمّي السبب
+      c.legKind = 'rto_fee';
+      if (c._p && (c._p.gross !== 0 || c._p.online !== 0)) b.push(`شحنة «${c.typeLabel}» (كانت ${c.oldType}) عليها مبلغ (إجمالي ${bostaFmt(c._p.gross)} · أونلاين ${bostaFmt(c._p.online)}) — مش حالة «رسوم فقط»، راجعها`);
+    } else if (!c.isS1Type && !BOSTA_S2_TYPES.has(c.typeCode)) b.push(`نوع الشحنة «${c.typeLabel}»${c.oldType ? ` (كانت ${c.oldType})` : ''} مش مدعوم للتسجيل من بوسطة`);
     if (!c.detailsOk) b.push(`تعذّر جلب تفاصيل الشحنة من بوسطة${c.detailsError ? ': ' + c.detailsError : ''}`);
     else if (c.collection === 'no_cycle') b.push('مفيش Cash Cycle على الشحنة دي في بوسطة (لسه ما دخلتش الـ wallet أو ملغية)');
     else if (c.collection === 'awaiting_cashout') b.push('اتحصّلت في بوسطة ولسه ما اتحوّلتش في Cash-out — استنى التحويل وارفع ملفه');
@@ -2061,7 +2080,9 @@ async function bostaS1Evaluate(env, orderRef) {
     }
     if (c.trackingNumber) {
       const hit = await bostaFindByTracking(env.DB, c.trackingNumber);
-      if (hit) { c.registered = { cashOutId: hit.co, at: String(hit.timestamp).slice(0, 16).replace('T', ' '), viaApi: hit.s1o === 'bosta_api' }; b.push(`اتسجّلت قبل كده (Cash-out ${hit.co || '—'})`); }
+      // 🆕 v3.17.0 — الشحنة المسجّلة قبل كده: السبب الوحيد هو التسجيل نفسه. باقي الأدلة (SALE · المتبقي …) ملهاش معنى عليها —
+      // دليل SALE كان بيعدّ تسجيلها هي نفسها فيطلع سطر أحمر كاذب (5275 < 5275 + 5275).
+      if (hit) { c.registered = { cashOutId: hit.co, at: String(hit.timestamp).slice(0, 16).replace('T', ' '), viaApi: hit.s1o === 'bosta_api' }; b.splice(0, b.length, `اتسجّلت قبل كده (Cash-out ${hit.co || '—'})`); }
     }
     c.eligible = b.length === 0;
     return c;
@@ -2069,7 +2090,7 @@ async function bostaS1Evaluate(env, orderRef) {
   // بوابة S1: شحنة S2 تتسجّل بعد S1 — الفحص بيسمح باختيارها مع S1 قابلة في نفس الدفعة (`afterS1`)، و`bostaPayS1` صارم لحظة الكتابة
   const s1Ready = cands.some(x => x.leg === 'S1' && x.eligible);
   for (const x of cands) {
-    if (x.leg !== 'S2' || hasS1) continue;
+    if (x.leg !== 'S2' || hasS1 || x.registered) continue;
     if (s1Ready) { if (x.eligible) x.afterS1 = true; }
     else { x.blockers.push('S1 بتاع الأوردر لسه ما اتسجّلش ومفيش شحنة S1 قابلة للتسجيل — سجّل S1 الأول'); x.eligible = false; }
   }
@@ -2757,7 +2778,7 @@ export default {
           const tid = String(e._pend.transactionId || '');
           if (tid && bostaPiastres(e._pend.amount) === p.gross && e._sales.some(t => t.id === tid && t.p === p.gross)) preRegTx = tid;
         }
-        const orderType = isS1 ? 'SEND' : (c.typeCode === 25 ? 'CUSTOMER_RETURN_PICKUP' : 'EXCHANGE');
+        const orderType = isS1 ? 'SEND' : c.legKind === 'rto_fee' ? 'RETURN_TO_ORIGIN' : (c.typeCode === 25 ? 'CUSTOMER_RETURN_PICKUP' : 'EXCHANGE');
         const n = { rowNo: null, tracking: tn, orderRef: ref, orderType, orderStatus: String(c.stateLabel || '').toUpperCase(), cod: p.cod, online: p.online, net: p.net, fees: p.fees, flex: p.flex };
         const kind = p.gross === 0 ? 'none' : isS1 ? 's1_api' : p.gross > 0 ? 'leg_api' : 'refund_api';
         const r = { kind, slot: c.leg, preRegistered: isS1 && !!e.preRegistered, trackingUnverified: c.trackingUnverified === true };
@@ -2768,18 +2789,19 @@ export default {
         else if (p.gross > 0) actions.push(`${c.typeLabel} (S2) اتحصّل قبل كده على شوبيفاي (${bostaFmt(p.gross)} ج — معاملات SALE ناجحة ${e.shopifySaleCaptured} ج) — تسجيل في السجل فقط (الـ Net للخزنة) من بوسطة مباشرة · Cash-out ${c.cashOutId}`);
         else if (p.gross < 0) actions.push(`${c.typeLabel} (S2) استرداد ${bostaFmt(-p.gross)} ج — تسجيل في السجل فقط (الـ Net للخزنة) من بوسطة مباشرة · Cash-out ${c.cashOutId}`
           + (c.refundMissing ? ' — ⚠ مفيش استرداد مقابله على شوبيفاي (قرار أحمد: بلا createRefund)' : ''));
+        else if (c.legKind === 'rto_fee') actions.push(`${c.typeLabel} (كانت ${c.oldType} · S2) — محاولات توصيل فاشلة: رسوم بوسطة ${bostaFmt(p.fees)} ج${p.flex ? ` − FlexShip ${bostaFmt(p.flex)} ج (اتحصّل من العميل)` : ''} = Net ${c.net} ج — تسجيل في السجل فقط (بلا أي حركة على شوبيفاي) · Cash-out ${c.cashOutId}`);
         else actions.push(`${c.typeLabel} (S2) بدون تحصيل — رسوم بوسطة (Net ${c.net}) اتسجّلت من بوسطة مباشرة · Cash-out ${c.cashOutId}`);
         const extend = {
           legOrigin: 'bosta_api',
           ...(isS1
             ? { s1Origin: 'bosta_api', s1Catchup: true, s1CatchupForTracking: /^\d{5,15}$/.test(String(s2Tracking || '')) ? String(s2Tracking) : null }
-            : { legCatchup: true, shopifyRefundMissing: c.refundMissing === true }),
+            : { legCatchup: true, shopifyRefundMissing: c.refundMissing === true, ...(c.legKind === 'rto_fee' ? { legKind: 'rto_fee', originalType: c.oldType } : {}) }),
           bostaTypeCode: c.typeCode, bostaStateCode: c.stateCode, onlineStatus: c.onlineStatus, onlineProvider: c.onlineProvider,
           preRegCaptured: preRegTx ? bostaFmt(p.gross) : null, preRegTransactionId: preRegTx,
         };
         const { logged, logError } = await safeWriteLog(env.DB, {
           tool: TOOL_NAME, type: p.gross < 0 ? 'refund' : 'payment', employee, orderId: e.orderId, orderName: e.orderName, valueAfter: Math.abs(p.gross) / 100,
-          notes: `${p.gross < 0 ? 'استرداد' : 'تحصيل'} بوسطة (${isS1 ? 'S1' : c.typeLabel + ' · S2'} من بوسطة مباشرة) — ${c.cashOutId}`,
+          notes: `${c.legKind === 'rto_fee' ? 'رسوم' : p.gross < 0 ? 'استرداد' : 'تحصيل'} بوسطة (${isS1 ? 'S1' : c.typeLabel + (c.legKind === 'rto_fee' ? ' كانت ' + c.oldType : '') + ' · S2'} من بوسطة مباشرة) — ${c.cashOutId}`,
           extra: buildBostaExtra({ n, r, ctx: sctx, result: 'success', actions, batchId: isS1 ? `bosta-s1-${tn}` : `bosta-leg-${tn}`, extend }),
         });
         // السجل فشل = مفيش حاجة اتغيّرت (لا KV ولا شوبيفاي) → إعادة المحاولة آمنة

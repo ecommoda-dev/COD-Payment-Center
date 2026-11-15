@@ -1,4 +1,4 @@
-// bosta-cash-cycle-check.mjs — Worker v3.16.0: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
+// bosta-cash-cycle-check.mjs — Worker v3.17.0: تحصيل بوسطة من ملف Cash Cycles (§BOSTA).
 // تشغيل: node bosta-cash-cycle-check.mjs   (من غير شبكة — شوبيفاي ووكيل D1 وKV وهمية)
 // الأرقام مأخوذة من ملف حقيقي (Cash-out MONCOD02NOV26) ومن ردود شوبيفاي الحقيقية 04-11-2026:
 //   #61945 (2675) · #62701 (أونلاين 1850) · #61540 (ملغي صفر) · #61298 (استرداد −1650) ·
@@ -54,19 +54,38 @@ Object.assign(SHOP, {
   '46011': mk('#46011', 404, '-300.0',  { createdAt: '2026-06-26T16:36:25Z', tx: [TX('6', '4200.0')] }),      // المتبقي = الاسترداد
   '46012': mk('#46012', 405, '-100.0',  { createdAt: '2026-06-26T16:36:25Z', refunded: '300.0', tx: [TX('7', '4200.0')] }),   // الاسترداد موجود على شوبيفاي
 });
-const bd = (tn, code, state, o = {}) => ({ trackingNumber: tn, type: { code, value: { 10: 'Send', 20: 'Return to Origin', 30: 'Exchange' }[code] }, state: { code: state }, createdAt: '2026-08-01T12:00:00Z', ...(o.oldType ? { oldType: o.oldType } : {}) });
+// v3.17.0 — #47530 (حقيقي · 15-11-2026): Send 5275 + Exchange 100 + RTO (كانت Exchange) رسوم 181.26 − FlexShip 100 = −81.26. شوبيفاي: SALE ناجحة 5275 · المتبقي 75
+Object.assign(SHOP, {
+  '47530': mk('#47530', 501, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('11', '5275.0', 'SALE', 'PENDING'), TX('12', '5275.0')] }),
+  '47531': mk('#47531', 502, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('13', '5275.0')] }),   // RTO بلا S1 مسجّلة ولا S1 قابلة (S1 مش في بوسطة)
+  '47532': mk('#47532', 503, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('14', '5275.0')] }),   // RTO عليها مبلغ
+  '47533': mk('#47533', 504, '75.0', { createdAt: '2026-07-14T14:54:17Z', tx: [TX('15', '5275.0')] }),   // RTO بلا oldType
+});
+const bd = (tn, code, state, o = {}) => ({ trackingNumber: tn, type: { code, value: { 10: 'Send', 20: 'Return to Origin', 30: 'Exchange' }[code] }, state: { code: state }, createdAt: o.createdAt || '2026-08-01T12:00:00Z', ...(o.oldType ? { oldType: o.oldType } : {}) });
 const wal = (total, fees, tx, date, flex = '0.00') => ({ wallet: { cashCycle: { total_amount: total, bosta_fees: String(fees), flex_ship_amount: flex, deposited_amt: total - fees }, cashout: tx ? { transaction_id: tx, transaction_date: date } : { next_cashout_date: '2026-11-12' } } });
 const BOSTA = {
   search: {
     '46008': [bd('5671180009', 25, 46), bd('4132677759', 30, 46), bd('9619903860', 10, 45)],
     '46009': [bd('9000000001', 10, 45), bd('9000000002', 30, 46)], '46010': [bd('9000000003', 30, 46)],
     '46011': [bd('9000000004', 10, 45), bd('9000000005', 25, 46)], '46012': [bd('9000000006', 25, 46)],
+    '47530': [bd('3505408529', 20, 46, { oldType: 'EXCHANGE', createdAt: '2026-08-02T09:00:00Z' }), bd('7217235847', 30, 46, { createdAt: '2026-08-06T09:00:00Z' }), bd('3356047136', 10, 45, { createdAt: '2026-07-15T09:00:00Z' })],
+    '47531': [bd('9100000010', 20, 46, { oldType: 'EXCHANGE' })],
+    '47532': [bd('9100000001', 20, 46, { oldType: 'EXCHANGE' }), bd('9100000011', 10, 45)],
+    '47533': [bd('9100000002', 20, 46), bd('9100000012', 10, 45)],
     '49500': [bd('8145633099', 30, 46), bd('6579132699', 10, 45)],
     '49501': [bd('3214694801', 10, 45)], '49502': [bd('3214694811', 10, 45)], '49503': [bd('5996728906', 20, 46, { oldType: 'SEND' })],
     '49504': [bd('4141414141', 10, 45)], '49505': [bd('4242424242', 10, 45)],
     '49506': [bd('4343434343', 10, 45), bd('4343434399', 10, 49)], '49507': [bd('4444444441', 10, 45)],
   },
   full: {
+    '3356047136': { ...bd('3356047136', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
+    '7217235847': { ...bd('7217235847', 30, 46), ...wal(100, 149.34, 'MONCOD10AUG26', '2026-08-10T00:00:00.000Z') },
+    '3505408529': { ...bd('3505408529', 20, 46, { oldType: 'EXCHANGE' }), ...wal(100, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
+    '9100000010': { ...bd('9100000010', 20, 46, { oldType: 'EXCHANGE' }), ...wal(100, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
+    '9100000001': { ...bd('9100000001', 20, 46, { oldType: 'EXCHANGE' }), ...wal(150, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
+    '9100000011': { ...bd('9100000011', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
+    '9100000002': { ...bd('9100000002', 20, 46), ...wal(100, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
+    '9100000012': { ...bd('9100000012', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
     '9619903860': { ...bd('9619903860', 10, 45), ...wal(4200, 163.02, 'WEDCOD01JUL26', '2026-07-01T00:00:00.000Z') },
     '4132677759': { ...bd('4132677759', 30, 46), ...wal(500, 147.06, 'MONCOD03AUG26', '2026-08-03T00:00:00.000Z') },
     '5671180009': { ...bd('5671180009', 25, 46), ...wal(-300, 133.38, 'MONCOD10AUG26', '2026-08-10T00:00:00.000Z') },
@@ -337,7 +356,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.16.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.16.0');
+eq('get_config بيرجّع 3.17.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.17.0');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -584,6 +603,58 @@ q = await payS1('#46012', '9000000006', { gross: '-300.00', net: '-433.38', cash
 eq('تسجيلها بلا تأكيد خاص: نجاح بلا warning وshopifyRefundMissing=false', [q.success, q.status, E8().shopifyRefundMissing], [true, 'success', false]);
 // ⑪ ولا createRefund في أي مسار
 eq('شوبيفاي ما اتلمسش في كل ⑧ (صفر createRefund)', refunds.length, w8[2]);
+
+console.log('══ ⑨ v3.17.0 — RTO (كانت Exchange) «رسوم فقط» + السطر الكاذب على المسجّلة — #47530 الحقيقي ══');
+const w9 = wr();
+let d47 = await chk('#47530');
+let s47 = cand(d47, '3356047136'), x47 = cand(d47, '7217235847'), r47 = cand(d47, '3505408529');
+eq('الفحص: 3 شحنات · hasS1=false', [d47.success, d47.candidates.length, d47.hasS1], [true, 3, false]);
+eq('RTO: S2 · legKind rto_fee · إجمالي 0 · FlexShip 100 · رسوم 181.26 · Net −81.26 · Cash-out WEDCOD05AUG26',
+  [r47.leg, r47.legKind, r47.typeLabel, r47.oldType, r47.gross, r47.flexShipAmount, r47.fees, r47.net, r47.cashOutId], ['S2', 'rto_fee', 'Return to Origin', 'EXCHANGE', '0.00', '100.00', '181.26', '-81.26', 'WEDCOD05AUG26']);
+eq('RTO قابلة (بعد S1 القابلة في نفس الدفعة)', [r47.eligible, r47.afterS1, r47.blockers], [true, true, []]);
+eq('S1 قابلة · Net 5108.84', [s47.eligible, s47.net, s47.gross], [true, '5108.84', '5275.00']);
+// بوابة S1 صارمة لحظة الكتابة
+let q9 = await payS1('#47530', '3505408529', { gross: '0.00', net: '-81.26', cashOutId: 'WEDCOD05AUG26' });
+eq('RTO قبل S1 → needsS1 بلا كتابة', [q9.success, q9.needsS1, wr()], [false, true, w9]);
+q9 = await payS1('#47530', '3356047136', { gross: '5275.00', net: '5108.84', cashOutId: 'MONCOD20JUL26' });
+eq('S1 اتسجّلت', [q9.success, q9.status], [true, 'success']);
+// ✅ السطر الكاذب: الشحنة المسجّلة = سبب واحد بس
+d47 = await chk('#47530'); s47 = cand(d47, '3356047136'); r47 = cand(d47, '3505408529');
+x47 = cand(d47, '7217235847');
+eq('Exchange +100 بعد S1: ممنوعة بدليل SALE (5275 مصروفة على S1) — قرار أحمد: مؤجّلة، ما اتغيّرتش', [x47.eligible, /مفيش معاملة SALE ناجحة/.test(x47.blockers.join())], [false, true]);
+eq('S1 المسجّلة: سبب واحد بس (اتسجّلت قبل كده) — بلا سطر SALE الكاذب', [s47.eligible, s47.blockers.length, /اتسجّلت قبل كده/.test(s47.blockers[0]), s47.registered.cashOutId], [false, 1, true, 'MONCOD20JUL26']);
+eq('RTO بعد S1: قابلة بلا afterS1', [r47.eligible, r47.afterS1], [true, false]);
+// stale
+q9 = await payS1('#47530', '3505408529', { gross: '0.00', net: '-181.26', cashOutId: 'WEDCOD05AUG26' });
+eq('Net غلط (−181.26 الرسوم بس) → رفض stale', [q9.success, q9.stale], [false, true]);
+const n9 = logs.length;
+q9 = await payS1('#47530', '3505408529', { gross: '0.00', net: '-81.26', cashOutId: 'WEDCOD05AUG26' });
+const L9 = logs[logs.length - 1], X9 = E8(L9);
+eq('RTO اتسجّلت: نجاح · payment · value_after 0 · kind none', [q9.success, q9.status, q9.kind, q9.leg, q9.net, L9.type, L9.value_after, L9.order_name], [true, 'success', 'none', 'S2', '-81.26', 'payment', 0, '#47530']);
+eq('🔴 عقد الخزنة: جلسة مستقلة · courierCollect = Net −81.26 · batchExpected كامل', [X9.batchId, X9.courierCollect, X9.batchExpected, X9.courier, X9.result, X9.source, X9.slot],
+  ['bosta-leg-3505408529', -81.26, { orders: 1, payOrders: 1, refundOrders: 0, collect: '-81.26', extraShippingTotal: '0.00', net: '-81.26', methods: null }, 'Bosta', 'success', 'bosta_cash_cycle', 'S2']);
+eq('الصف: الرسوم والـ FlexShip والـ Net كلهم متخزّنين', [X9.bostaFees, X9.flexShipAmount, X9.netValue, X9.grossCollected, X9.codAmount, X9.onlineAmount], ['181.26', '100.00', '-81.26', '0.00', '0.00', '0.00']);
+eq('الصف: noCollection · legKind · originalType · نوع RETURN_TO_ORIGIN · hasReturn · صفر شوبيفاي', [X9.noCollection, X9.legKind, X9.originalType, X9.bostaOrderType, X9.hasReturn, X9.shopifyCaptured, X9.legOrigin, X9.legCatchup], [true, 'rto_fee', 'EXCHANGE', 'RETURN_TO_ORIGIN', true, '0.00', 'bosta_api', true]);
+eq('الأكشن بيشرح الرسوم − FlexShip = Net', [/181\.26/.test(X9.actions[0]), /FlexShip 100\.00/.test(X9.actions[0]), /-81\.26/.test(X9.actions[0]), /بلا أي حركة على شوبيفاي/.test(X9.actions[0])], [true, true, true, true]);
+eq('صفر معاملة/استرداد على شوبيفاي · صفّين بس اتكتبوا', [rest.length, refunds.length, logs.length - w9[0]], [w9[1], w9[2], 2]);
+eq('مجموع Net الأوردر (S1 + RTO) = 5027.58 · ومعاهم Exchange المؤجّلة = 4978.24 (ما اتسجّلتش)',
+  [logs.slice(w9[0]).reduce((a, l) => a + Math.round(JSON.parse(l.extra).courierCollect * 100), 0), 510884 - 4934 - 8126], [502758, 497824]);
+// إعادة التسجيل
+q9 = await payS1('#47530', '3505408529', { gross: '0.00', net: '-81.26', cashOutId: 'WEDCOD05AUG26' });
+eq('تسجيل RTO تاني → ممنوع بلا صف', [q9.success, /اتسجّلت قبل كده/.test(q9.error || ''), logs.length - n9], [false, true, 1]);
+d47 = await chk('#47530');
+eq('بعد التسجيل: RTO مسجّلة بسبب واحد', [cand(d47, '3505408529').blockers.length, cand(d47, '3505408529').registered.viaApi], [1, true]);
+// ملف الـ cash-out بتاعها بعد كده → done + catchUp
+const fRto = (await val6([R('#47530', '3505408529', 'RETURN TO ORIGIN', 0, 0, -81.26, 181.26, { rowNo: 1, cashOutId: 'WEDCOD05AUG26', paidAt: '2026-08-05', flexShipAmount: 100 })], { cashOutId: 'WEDCOD05AUG26', paidAt: '2026-08-05', rowsTotal: 1, netTotal: '-81.26', payOrders: 1, refundOrders: 0 }))[0];
+eq('ملف WEDCOD05AUG26: صف الـ RTO → done + catchUp', [fRto.status, fRto.catchUp], ['done', true]);
+// حواجز
+const d31 = await chk('#47531');
+eq('RTO بلا S1 مسجّلة ولا قابلة → ممنوعة (سجّل S1 الأول)', [cand(d31, '9100000010').eligible, /سجّل S1 الأول/.test(cand(d31, '9100000010').blockers.join())], [false, true]);
+const d32 = await chk('#47532');
+eq('RTO عليها مبلغ → ممنوعة بسبب صريح', [cand(d32, '9100000001').eligible, /عليها مبلغ/.test(cand(d32, '9100000001').blockers.join())], [false, true]);
+const d33 = await chk('#47533');
+eq('RTO بلا oldType → لسه «نوع مش مدعوم»', [cand(d33, '9100000002').eligible, cand(d33, '9100000002').legKind, /مش مدعوم/.test(cand(d33, '9100000002').blockers.join())], [false, undefined, true]);
+eq('ولا createRefund في أي مسار', refunds.length, w9[2]);
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
