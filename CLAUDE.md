@@ -1,10 +1,10 @@
 # مركز تحصيل الأوردرات COD (`COD-Payment-Center`)
 
-![version](https://img.shields.io/badge/worker-v3.18.0-blue)
+![version](https://img.shields.io/badge/worker-v3.19.0-blue)
 
 **بتعمل إيه:** الموظف بيسجّل تحصيل/استرداد فلوس أوردرات الدفع عند الاستلام لكل مندوب، ويشوف سجل الحركة كامل.
 **مين بيستخدمها:** حسابات · مخزن
-**الإصدار:** Worker `v3.18.0` — **الريبو ده Worker وبس** (الواجهة في ريبو المركز، ونسختها `v1.89.0` = `TOOL_VERSION` بتاع الهب)
+**الإصدار:** Worker `v3.19.0` — **الريبو ده Worker وبس** (الواجهة في ريبو المركز، ونسختها `v1.89.0` = `TOOL_VERSION` بتاع الهب)
 
 ## 🔴 الريبو ده Worker وبس — الواجهة في `Delivery-COD-Operations-Center` (14-11-2026)
 
@@ -58,6 +58,29 @@
 
 > ⚠️ **وعدّاد `login` بتاع `tool='cod_payment'` واقف عند رقمه** (مفيش واجهة بتكتبه) — مش عطل، بس أي استعلام
 > بيعدّ دخول الأداة دي لازم يعرف. صفوف `payment`/`refund` **ما اتغيّرتش**.
+
+## 🪙 Worker v3.19.0 — «استرداد جزئي بوسطة» (15-11-2026)
+
+- 🔴 **الفكرة (قرار أحمد):** بوسطة بتدفع للعميل **2000 كاش بس** على استرداد CRP/Exchange (`errorCode 3008` فوق −2000 — مقيس) والباقي بيحوّله **موظف التحصيل** (انستاباي/محفظة). أداة «رفع بوسطة» بتقص الـ `cod` عند −2000 وبتسجّل `codClipped`/`codRemainder` في D1 (`tool='bosta_exchange_export'`) — **ده مصدر الطابور** (CRP **و**Exchange، من 17-09-2026؛ 56 حالة استرجاع لحد 15-11 ومفيش استبدال اتقصّ لسه).
+- 🆕 **`bostaPartialList`** (قراءة): كل رفعة مقصوصة مجمّعة بالأوردر (#57833 ليه 3 رفعات ناجحة) + الحالة الحية من شوبيفاي (`Q_PARTIAL_LIST` بلا transactions — سقف التكلفة، 25 أوردر/نداء) + D1. الحالات:
+  | `state` | معناها |
+  |---|---|
+  | `ready` | S1 = `Delivered` · S2 ∈ `Shipped`/`In-Return`/`Returned` · مندوب Bosta · فيه باقي |
+  | `exists` | استرداد الباقي موجود على شوبيفاي (ملاحظة `Bosta partial refund <تتبع>`) ولسه ما اتسجّلش في D1 → D1 بس |
+  | `blocked` | سبب مكتوب (S1/S2 مش في المسموح · ملغي · مفيش مستحق/باقي · مندوب مش Bosta · الباقي أكبر من المتاح) |
+  | `done` | صف `bosta_partial_refund` لنفس رقم التتبع في D1 |
+  `Returned` مسموح **بتحذير** (العميل غالبًا أخد فلوسه فعلًا — قرار أحمد 15-11).
+- **الباقي (مصدره الـ Worker مش المتصفح):** `المستحق الحالي على شوبيفاي − 2000` لو جزء بوسطة لسه ما اتسجّلش، و`= المستحق` لو اتسجّل (D1: صف `bosta_cash_cycle` بـ`grossCollected` ≤ −2000). لو ≠ `codRemainder` وقت الرفع ⇒ `needsReason` (سبب إجباري ≥ 3 حروف) والرقمين بيتعرضوا.
+- 🆕 **`bostaPartialCheck`** (قراءة، transactions كاملة) و**`bostaPartialPay`**: **حاجتين بس** — `createRefund` بالباقي (شوبيفاي الأول؛ فشلها = صفر كتابة) ثم صف D1 `refund`. مفيش صف بوسطة ولا لمس لجزء الـ 2000.
+  - الصف: `extra.source='bosta_partial_refund'` · `courier` = اسم الموظف من `employee` (`Ahmed_Ibraheem` ← «Ahmed Ibraheem») · `courierCollect` سالب = الباقي · `batchId='bosta-partial-<تتبع>'` · `batchExpected {orders:1, payOrders:0, refundOrders:1, collect:-X, net:-X}` · `trackingNumber` · `slot='S2'` · `partialRefund {…}` (السقف · المستحق قبل · `codRemainderRecorded` · S1/S2 · السبب · `shopifyRefundId`).
+  - **طرق الدفع:** `paymentMethods {instapay, wallet}` فقط (**نقدي مرفوض**) ومجموعها = الباقي بالظبط، و`paymentAccounts` (لو اتبعتت) كل طريقة مجموع حساباتها = مبلغها.
+  - `expected {remainder, owed, s2}` بيتقارنوا بالحالي (`stale`) · `ack:true` إلزامي (`needsAck`) · `reason` لو `needsReason`.
+  - D1 وقعت بعد نجاح شوبيفاي ⇒ `refundCreated:true` والإعادة آمنة (الاسترداد بيتعرف بالملاحظة = حالة `exists`، D1 بس).
+- 🔴 **حارس `bostaS1Check` (قرار أحمد):** لو اللي بوسطة دفعته = 2000 والمستحق أكبر ⇒ `refund.max = 2000` و`options = [2000]` و`cappedByBosta:true` (+`partialRemainder`) — مفيش اختيار 2500 بالغلط؛ الزيادة من التاب الجديدة. أي حالة تانية (زي #48116: 1150/1250) ما اتغيّرتش.
+- 🔴 **عقد الخزنة:** `Treasury-Ledger` ≥ **v1.9.0** بتقرا `extra.source='bosta_partial_refund'` (ملاحظة «استرداد جزئي بوسطة» + عيلة بوسطة في المقارنة). **انشر الخزنة قبل أول تسجيل.** `courierCollect` السالب = الخزنة بتدفع للموظف.
+- 🔴 **`codPayment.min = 3.19.0` في هب الشحن — انشر الـ Worker قبل الصفحة.**
+- ⚠️ **المقيس 15-11-2026 على شوبيفاي:** من 49 أوردر مقصوص: 9 `In-Return` · 40 `Returned` (أغلبهم لسه عليهم المستحق كامل ومفيش استرداد اتسجّل) — يعني الطابور هيبدأ بـ 9 `ready` و40 `ready` بتحذير Returned. ⚠️ **ما اتجرّبش على شوبيفاي/D1 حقيقيين** — أول تسجيل حقيقي = #63994 (باقي 500).
+- الفحص: `node bosta-partial-check.mjs` **73 بند** (الطابور · كل الحالات · الاسترداد بالباقي فقط · الصف والخزنة · stale/ack/سبب/طرق دفع · شوبيفاي رفضت · D1 وقعت · حارس bostaS1Check) · `bosta-cash-cycle-check` 243 · `order-kind-check` 25 · `free-shipping-check` 52 · `log-filters-check` 19 · `check-log-values` ✓.
 
 ## 💸 Worker v3.18.0 — استرداد بوسطة (CRP) بيتعمل على شوبيفاي من نافذة «فحص شحنات بوسطة» بمبلغ يختاره الموظف (15-11-2026)
 
@@ -280,6 +303,7 @@
 | `getCourierValues` · `getCourierOrders` · `getCourierOrdersToday` | POST | أوردرات المندوب + استيراد تسليمات اليوم |
 | `bostaValidate` · `bostaPay` | POST | 🆕 v3.11.0 — فحص/تسجيل صفوف ملف Cash Cycles (بوسطة) |
 | `bostaS1Check` · `bostaPayS1` | POST | 🆕 v3.13.0 — فحص S1 من بوسطة مباشرة (قراءة) وتسجيله في D1 بس (بتأكيد الموظف) |
+| `bostaPartialList` · `bostaPartialCheck` · `bostaPartialPay` | POST | 🆕 v3.19.0 — «استرداد جزئي بوسطة»: الطابور · الفحص · استرداد الباقي (شوبيفاي + صف D1 معلّم) |
 
 ## D1
 
@@ -524,4 +548,4 @@ git show 505f84b:3.0.html
 - **متغيرات وأسرار ملغاة لسه في الداشبورد** — شوف قسم «المضبوط فعليًا». `?action=diag` بيعدّها.
 - **`extra_shipping`** — قيمة مسجّلة في `ecommoda-constants` §7 والكود مابيكتبهاش. محتاجة قرار: تتشال من الجدول ولا تتعلّم «تاريخية» زي `bosta_tracker`؟
 
-آخر تحديث: 15-11-2026 — **Worker v3.18.0: استرداد بوسطة (CRP) بيتعمل على شوبيفاي بمبلغ يختاره الموظف · #48116** — الشرح في قسم v3.18.0. السابق: 14-11-2026 — **Worker v3.16.0: تسجيل أي شحنة من بوسطة (Exchange/CRP) في D1 بس · #46008** — الشرح في قسم v3.16.0. السابق: 14-11-2026 — **الريبو بقى Worker وبس (`index.html` اتحذف · الواجهة في `Delivery-COD-Operations-Center` v1.89.0) · صفر تعديل في منطق الـ Worker.** السابق: 14-11-2026 — Worker v3.15.0 · الواجهة v3.9.0 (الشحن المجاني على الاسترجاع/الاستبدال S2: أجر 75 بعد تأكيد الموظف · `refund` بقى بحارس · `feeLeg` + `extra.freeShipping.leg`). السابق: 14-11-2026 — Worker v3.14.0 · الواجهة v3.8.0 (الشحن المجاني: تنبيه وتأكيد وخصم رسوم المندوب 75 · Showroom بلا خصم · `freeShipping` في `extra`). السابق: 10-11-2026 — Worker v3.13.0 (S1 من بوسطة مباشرة · `bostaS1Check`/`bostaPayS1` · Secret `BOSTA_API_KEY`). السابق: 10-11-2026 — Worker v3.12.0 (S1 المسجّل مسبقًا + بوابة S2). السابق: 04-11-2026 — Worker v3.11.0 (تحصيل بوسطة · bostaValidate/bostaPay · Net Value للخزنة). السابق: 10:20 (Worker v3.10.1 · توثيق عقد قراءة Treasury-Ledger + تعليق فوق `buildPayExtra` · صفر تغيير سلوك)
+آخر تحديث: 15-11-2026 — **Worker v3.19.0: «استرداد جزئي بوسطة» (حد بوسطة 2000 والباقي من موظف التحصيل · `bosta_partial_refund`)** — الشرح في قسم v3.19.0. السابق: 15-11-2026 — **Worker v3.18.0: استرداد بوسطة (CRP) بيتعمل على شوبيفاي بمبلغ يختاره الموظف · #48116** — الشرح في قسم v3.18.0. السابق: 14-11-2026 — **Worker v3.16.0: تسجيل أي شحنة من بوسطة (Exchange/CRP) في D1 بس · #46008** — الشرح في قسم v3.16.0. السابق: 14-11-2026 — **الريبو بقى Worker وبس (`index.html` اتحذف · الواجهة في `Delivery-COD-Operations-Center` v1.89.0) · صفر تعديل في منطق الـ Worker.** السابق: 14-11-2026 — Worker v3.15.0 · الواجهة v3.9.0 (الشحن المجاني على الاسترجاع/الاستبدال S2: أجر 75 بعد تأكيد الموظف · `refund` بقى بحارس · `feeLeg` + `extra.freeShipping.leg`). السابق: 14-11-2026 — Worker v3.14.0 · الواجهة v3.8.0 (الشحن المجاني: تنبيه وتأكيد وخصم رسوم المندوب 75 · Showroom بلا خصم · `freeShipping` في `extra`). السابق: 10-11-2026 — Worker v3.13.0 (S1 من بوسطة مباشرة · `bostaS1Check`/`bostaPayS1` · Secret `BOSTA_API_KEY`). السابق: 10-11-2026 — Worker v3.12.0 (S1 المسجّل مسبقًا + بوابة S2). السابق: 04-11-2026 — Worker v3.11.0 (تحصيل بوسطة · bostaValidate/bostaPay · Net Value للخزنة). السابق: 10:20 (Worker v3.10.1 · توثيق عقد قراءة Treasury-Ledger + تعليق فوق `buildPayExtra` · صفر تغيير سلوك)

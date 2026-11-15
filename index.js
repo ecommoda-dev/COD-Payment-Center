@@ -1,8 +1,18 @@
 /**
- * cod-payment-center-worker  (v3.18.0)
+ * cod-payment-center-worker  (v3.19.0)
  * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 15-11-2026
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * v3.19.0 — «استرداد جزئي بوسطة» (15-11-2026 · قرار أحمد): بوسطة بتدفع للعميل 2000 كاش بس (حد بوسطة `3008`) والباقي بيحوّله موظف التحصيل (انستاباي/محفظة).
+ *   🆕 `bostaPartialList` (قراءة): الطابور من سجل «رفع بوسطة» (`tool='bosta_exchange_export'` · `extra.codClipped=1` · من 17-09 · CRP **و**Exchange) + الحالة الحية
+ *      من شوبيفاي (S1 = Delivered · S2 ∈ Shipped/In-Return/Returned · المستحق) + حالة D1. الحالات: `ready` · `exists` (استرداد شوبيفاي موجود بالملاحظة) · `blocked` (بسببه) · `done`.
+ *   🆕 `bostaPartialCheck` (قراءة): نفس الحكم بالمعاملات الكاملة. الباقي = المستحق الحالي − 2000 (لو جزء بوسطة لسه ما اتسجّلش) — أو = المستحق لو اتسجّل. `needsReason` لو ≠ `codRemainder` المسجّل وقت الرفع.
+ *   🆕 `bostaPartialPay`: **اتنين بس** — `createRefund` بالباقي (ملاحظة `Bosta partial refund <تتبع>` = مفتاح عدم التكرار) ثم صف D1 `refund` بـ `extra.source='bosta_partial_refund'`
+ *      · `courier` = اسم الموظف · `courierCollect` سالب · `batchId='bosta-partial-<تتبع>'` · طرق دفع انستاباي/محفظة بس (مجموعها = الباقي، مفيش نقدي). شوبيفاي الأول — فشلها = صفر كتابة.
+ *      D1 وقعت بعد نجاح شوبيفاي ⇒ `refundCreated:true` والإعادة آمنة (حالة `exists`). مفيش لمس لجزء الـ 2000 (بمساره: ملف الـ Cash-out / «فحص شحنات بوسطة»).
+ *   🔴 **حارس `bostaS1Check`:** لو اللي بوسطة دفعته = 2000 والمستحق أكبر ⇒ `max` = 2000 (مفيش اختيار 2500 بالغلط) و`refund.cappedByBosta=true` — الزيادة من التاب الجديدة.
+ *   🔴 **عقد الخزنة:** `Treasury-Ledger` ≥ v1.9.0 بتقرا `extra.source='bosta_partial_refund'` — انشرها قبل أول تسجيل. و`codPayment.min = 3.19.0` — انشر الـ Worker قبل الصفحة.
+ *
  * v3.18.0 — استرداد بوسطة (Customer Return Pickup) من نافذة «فحص شحنات بوسطة» **بيتعمل على شوبيفاي فعلاً** بمبلغ يختاره الموظف — 15-11-2026:
  *   🔴 الحالة (#48116): CRP إجماليها −1150 (بوسطة دفعت للعميل 1150 نقدًا) وشوبيفاي عليها «مستحق استرداد» 1250 (Refund 0 اتكتب وقت الاستبدال
  *      وبعدين اتعدّل الأوردر بصفر). مسار الملف مابيقبلش (−1150 ≠ −1250) ومسار النافذة كان بيسجّل في D1 بس (قرار 14-11 «أ») فشوبيفاي
@@ -391,7 +401,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.18.0';
+const WORKER_VERSION = 'v3.19.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1733,6 +1743,8 @@ const Q_BOSTA_ORDERS = `query bostaOrders($ids: [ID!]!) {
     t1: metafield(namespace: "custom", key: "bosta_tracking_number_s1") { value }
     t2: metafield(namespace: "custom", key: "bosta_tracking_number_s2") { value }
     t0: metafield(namespace: "custom", key: "bosta_tracking_number") { value }
+    s1: metafield(namespace: "custom", key: "manual_status") { value }
+    s2: metafield(namespace: "custom", key: "status_2_r_e") { value }
     transactions(first: 20) { id kind status amountSet { shopMoney { amount } } }
   } }
 }`;
@@ -2119,9 +2131,13 @@ async function bostaS1Evaluate(env, orderRef) {
         else if (refundedP >= legs.neg + need) c.refund = { state: 'exists', refundId: null, amount: bostaFmt(refundedP), by: 'total' };
         else if (owedP === 0) c.refund = { state: 'nothing_owed' };
         else {
-          const max = Math.min(maxRefundP, Math.max(owedP, need));
+          // 🆕 v3.19.0 (قرار أحمد 15-11-2026) — حد بوسطة: لو اللي بوسطة دفعته = السقف (2000) والمستحق أكبر، الزيادة مش من اختصاص الـ CRP هنا —
+          //    بتتسجّل من تاب «استرداد جزئي بوسطة» (موظف التحصيل بيحوّلها). فالحد = اللي بوسطة دفعته بالظبط (مفيش اختيار 2500 بالغلط).
+          const cappedByBosta = need === BOSTA_CASH_REFUND_CAP && owedP > need;
+          const max = Math.min(maxRefundP, cappedByBosta ? need : Math.max(owedP, need));
           c._r = { owed: owedP, need, max };
-          c.refund = { state: 'create', owed: bostaFmt(owedP), need: bostaFmt(need), max: bostaFmt(max), options: [...new Set([need, owedP].filter(v => v > 0 && v <= max))].map(bostaFmt) };
+          c.refund = { state: 'create', owed: bostaFmt(owedP), need: bostaFmt(need), max: bostaFmt(max), options: [...new Set([need, owedP].filter(v => v > 0 && v <= max))].map(bostaFmt),
+            ...(cappedByBosta ? { cappedByBosta: true, partialRemainder: bostaFmt(owedP - need) } : {}) };
           if (max <= 0) b.push('مفيش رصيد قابل للاسترداد على شوبيفاي (المحصَّل − المسترد = صفر)');
         }
         c.refundMissing = c.refund.state === 'create' || c.refund.state === 'nothing_owed';   // اسم قديم — الصفحة الجديدة بتقرا `refund.state`
@@ -2151,6 +2167,183 @@ async function bostaS1Evaluate(env, orderRef) {
     candidates: cands, _sales: sales, _pend: pend,
   };
 }
+// ══════════════════════════════════════════════════════
+// §BOSTA-PARTIAL — «استرداد جزئي بوسطة» (v3.19.0 · 15-11-2026 · قرار أحمد)
+// ══════════════════════════════════════════════════════
+// بوسطة بتدفع للعميل 2000 كاش بس على استرداد CRP/Exchange (`errorCode 3008` فوق −2000) والباقي بيحوّله **موظف التحصيل** (انستاباي/محفظة).
+// أداة «رفع بوسطة» بتقص الـ cod عند −2000 وبتسجّل `codClipped`/`codRemainder` في D1 (`tool='bosta_exchange_export'`) — ده مصدر الطابور.
+// اللي التاب بتكتبه حاجتين بس:
+//   ① استرداد على شوبيفاي بالباقي (المستحق − 2000) ② صف D1 واحد `refund` معلّم `extra.source='bosta_partial_refund'` (الخزنة بتقراه وبتكتب «استرداد جزئي بوسطة»).
+//   ⛔ مفيش صف بوسطة هنا ولا لمس لجزء الـ 2000 — ده بمساره (ملف الـ Cash-out / «فحص شحنات بوسطة»).
+// 🔴 عقد الخزنة: `courier` = اسم الموظف اللي حوّل · `courierCollect` سالب = الباقي (الخزنة بتدفع للموظف) · جلسة مستقلة `bosta-partial-<تتبع>`.
+const BOSTA_CASH_REFUND_CAP = 200000;                       // 2000 ج بالقروش — حد بوسطة (مقيس: 3008 «less than or equal -2000»)
+const BOSTA_PARTIAL_SOURCE  = 'bosta_partial_refund';
+const BOSTA_UPLOAD_TOOL     = 'bosta_exchange_export';      // tool أداة رفع بوسطة لـ R/E (قيمة تاريخية)
+const BOSTA_UPLOAD_START    = '2026-09-17T00:00:00Z';       // أول صف codClipped في D1 — حد أدنى لاستعلام idx_logs_tool_ts
+const PARTIAL_S1_OK         = 'Delivered';
+const PARTIAL_S2_OK         = new Set(['Shipped', 'In-Return', 'Returned']);   // Returned: العميل غالبًا أخد فلوسه — بتحذير (قرار أحمد 15-11-2026)
+const PARTIAL_LIST_CHUNK    = 25;                           // أوردر/نداء (من غير transactions — سقف تكلفة شوبيفاي)
+const PARTIAL_LIST_MAX      = 100;
+const partialNote = tn => `Bosta partial refund ${tn}`;     // مفتاح عدم التكرار على شوبيفاي
+
+const Q_PARTIAL_LIST = `query partialList($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on Order {
+    id name cancelledAt
+    totalOutstandingSet { shopMoney { amount } } totalRefundedSet { shopMoney { amount } }
+    refunds { id note totalRefundedSet { shopMoney { amount } } }
+    courier: metafield(namespace: "custom", key: "courier") { value }
+    s1: metafield(namespace: "custom", key: "manual_status") { value }
+    s2: metafield(namespace: "custom", key: "status_2_r_e") { value }
+  } }
+}`;
+
+// رفعات R/E اللي اتقصّت (codClipped) — لأوردر واحد (orderId) أو كلها. order_id في سجل الرفع بيتخزّن gid، وفي سجل التحصيل رقمي.
+async function partialUploads(db, orderId = null) {
+  const q = `SELECT id, timestamp, type, employee, order_id, order_name, extra FROM logs
+      WHERE tool = ? AND timestamp >= ? AND type IN ('upload_re_return','upload_re_exchange')
+        AND CASE WHEN json_valid(extra) THEN json_extract(extra,'$.codClipped') END = 1`
+    + (orderId ? ` AND order_id IN (?, ?)` : '') + ` ORDER BY id`;
+  const binds = [BOSTA_UPLOAD_TOOL, BOSTA_UPLOAD_START, ...(orderId ? [`gid://shopify/Order/${orderId}`, String(orderId)] : [])];
+  const { results } = await db.prepare(q).bind(...binds).all();
+  const by = new Map();
+  for (const r of results || []) {
+    let e = null; try { e = JSON.parse(r.extra || '{}'); } catch { e = null; }
+    if (!e || e.result === 'error' || !/^\d{5,15}$/.test(String(e.tracking_number || ''))) continue;   // رفعة فاشلة/بلا شحنة
+    const oid = String(r.order_id || '').replace('gid://shopify/Order/', '');
+    if (!/^\d+$/.test(oid)) continue;
+    if (!by.has(oid)) by.set(oid, { orderId: oid, orderName: r.order_name || null, uploads: [] });
+    const g = by.get(oid);
+    g.uploads.push({ tracking: String(e.tracking_number), kind: r.type === 'upload_re_exchange' ? 'exchange' : 'return', codRemainderP: bostaPiastres(e.codRemainder), at: r.timestamp, employee: r.employee || null });
+  }
+  for (const g of by.values()) g.uploads.sort((a, b) => String(b.at).localeCompare(String(a.at)));   // الأحدث أولًا
+  return by;
+}
+
+// صفوف «استرداد جزئي» المسجّلة (tracking لكل صف) + مجموع استردادات بوسطة المسجّلة (قروش) لكل أوردر — extra بيتقرا في JS (json_extract بترمي على JSON باظ)
+async function partialLedgerState(db, orderIds) {
+  const partial = new Map(), bostaNeg = new Map();
+  const list = [...new Set(orderIds.map(String))];
+  for (let i = 0; i < list.length; i += 40) {
+    const part = list.slice(i, i + 40);
+    const { results } = await db.prepare(
+      `SELECT id, timestamp, type, order_id, extra FROM logs WHERE tool = ? AND timestamp >= ? AND type IN ('payment','refund')
+          AND order_id IN (${part.map(() => '?').join(',')})`
+    ).bind(TOOL_NAME, BOSTA_TOOL_START, ...part).all();
+    for (const r of results || []) {
+      let e = null; try { e = JSON.parse(r.extra || '{}'); } catch { e = null; }
+      if (!e) continue;
+      const oid = String(r.order_id);
+      if (e.source === BOSTA_PARTIAL_SOURCE && r.type === 'refund') {
+        if (!partial.has(oid)) partial.set(oid, []);
+        partial.get(oid).push({ id: r.id, tracking: String(e.trackingNumber || ''), at: r.timestamp });
+      } else if (e.source === BOSTA_SOURCE) {
+        const g = bostaPiastres(e.grossCollected) || 0;
+        if (g < 0) bostaNeg.set(oid, (bostaNeg.get(oid) || 0) + -g);
+      }
+    }
+  }
+  return { partial, bostaNeg };
+}
+
+// الحساب الواحد (للقايمة وللفحص وللكتابة) — node من شوبيفاي (transactions اختيارية) + سجل D1
+function partialShape(node, g, led) {
+  const oid = String(node.id).replace('gid://shopify/Order/', '');
+  const owedRaw = bostaPiastres(node.totalOutstandingSet?.shopMoney?.amount);
+  const owedP = owedRaw !== null && owedRaw < 0 ? -owedRaw : 0;
+  const refundedP = bostaPiastres(node.totalRefundedSet?.shopMoney?.amount) || 0;
+  const sales = (node.transactions || []).filter(t => t.kind === 'SALE' && t.status === 'SUCCESS').map(t => ({ id: String(t.id).split('/').pop(), p: bostaPiastres(t.amountSet?.shopMoney?.amount) || 0 }));
+  const saleSum = node.transactions ? sales.reduce((a, t) => a + t.p, 0) : null;
+  const up = g.uploads[0];                                       // الأحدث
+  const tn = up.tracking;
+  const s1 = node.s1?.value || null, s2 = node.s2?.value || null, courier = node.courier?.value || null;
+  const bostaNegP = led.bostaNeg.get(oid) || 0;
+  const bostaPartP = bostaNegP >= BOSTA_CASH_REFUND_CAP ? 0 : BOSTA_CASH_REFUND_CAP;   // جزء بوسطة اللي لسه ما اتسجّلش على شوبيفاي
+  const remainderP = owedP - bostaPartP;
+  const refundsList = Array.isArray(node.refunds) ? node.refunds : [];
+  const hit = refundsList.find(rf => String(rf?.note || '').includes(partialNote(tn)));
+  const rows = led.partial.get(oid) || [];
+  const done = rows.find(r => r.tracking === tn) || null;
+  const blockers = [], warnings = [];
+  let state;
+  if (done) state = 'done';
+  else if (hit) state = 'exists';
+  else {
+    if (node.cancelledAt) blockers.push('الأوردر ملغي');
+    if (courier !== BOSTA_COURIER) blockers.push(`المندوب على شوبيفاي «${courier || 'فاضي'}» مش ${BOSTA_COURIER}`);
+    if (s1 !== PARTIAL_S1_OK) blockers.push(`S1 = «${s1 || 'فاضي'}» — لازم ${PARTIAL_S1_OK}`);
+    if (!PARTIAL_S2_OK.has(s2)) blockers.push(`S2 = «${s2 || 'فاضي'}» — لازم Shipped أو In-Return أو Returned`);
+    if (owedP === 0) blockers.push('مفيش مستحق استرداد على شوبيفاي');
+    else if (remainderP <= 0) blockers.push(bostaPartP === 0 ? 'مفيش باقي بعد جزء بوسطة المسجّل' : `المستحق (${bostaFmt(owedP)}) مش أكبر من حد بوسطة (${bostaFmt(BOSTA_CASH_REFUND_CAP)}) — مفيش باقي`);
+    if (saleSum !== null && remainderP > 0 && remainderP > saleSum - refundedP) blockers.push(`الباقي (${bostaFmt(remainderP)}) أكبر من المتاح للاسترداد على شوبيفاي (${bostaFmt(Math.max(0, saleSum - refundedP))})`);
+    state = blockers.length ? 'blocked' : 'ready';
+    if (s2 === 'Returned') warnings.push('الشحنة رجعت (Returned) — العميل غالبًا أخد الباقي فعلًا من خارج الأداة. تأكد قبل ما تسجّل.');
+  }
+  const mismatch = up.codRemainderP !== null && remainderP > 0 && up.codRemainderP !== remainderP;
+  if (mismatch && state === 'ready') warnings.push(`الباقي الحالي (${bostaFmt(remainderP)}) غير المسجّل وقت الرفع (${bostaFmt(up.codRemainderP)}) — لازم تكتب السبب`);
+  if (g.uploads.length > 1) warnings.push(`الأوردر ليه ${g.uploads.length} رفعات استرجاع/استبدال — الباقي بيتحسب من المستحق الحالي على شوبيفاي`);
+  const fm = p => p === null ? null : bostaFmt(p);
+  return {
+    orderId: oid, orderName: node.name || g.orderName, tracking: tn, kind: up.kind, uploadedAt: up.at,
+    uploads: g.uploads.map(u => ({ tracking: u.tracking, kind: u.kind, at: u.at, codRemainder: fm(u.codRemainderP) })),
+    codRemainder: fm(up.codRemainderP), s1, s2, courier, owed: bostaFmt(owedP), bostaCap: bostaFmt(BOSTA_CASH_REFUND_CAP),
+    bostaRegistered: bostaPartP === 0, remainder: bostaFmt(Math.max(0, remainderP)),
+    max: saleSum === null ? null : bostaFmt(Math.max(0, Math.min(remainderP, saleSum - refundedP))),
+    state, blockers, warnings, needsReason: !!mismatch,
+    existing: hit ? { refundId: String(hit.id || ''), amount: bostaFmt(bostaPiastres(hit.totalRefundedSet?.shopMoney?.amount) || 0) } : null,
+    registered: done ? { at: String(done.at).slice(0, 16).replace('T', ' ') } : null,
+    _p: { owedP, remainderP, refundedP, saleSum, bostaPartP, existingP: hit ? (bostaPiastres(hit.totalRefundedSet?.shopMoney?.amount) || 0) : null, sales },
+  };
+}
+const partialPublic = ({ _p, ...x }) => x;
+
+// القايمة الكاملة: كل رفعة مقصوصة + حالتها الحية
+async function partialList(env) {
+  const token = await getAccessToken(env);
+  if (!token) throw new Error('Failed to get Shopify access token');
+  const groups = await partialUploads(env.DB);
+  const all = [...groups.values()];
+  const truncated = all.length > PARTIAL_LIST_MAX;
+  const gs = all.slice(0, PARTIAL_LIST_MAX);
+  const led = await partialLedgerState(env.DB, gs.map(g => g.orderId));
+  const nodes = new Map();
+  for (let i = 0; i < gs.length; i += PARTIAL_LIST_CHUNK) {
+    const part = gs.slice(i, i + PARTIAL_LIST_CHUNK);
+    const data = await shopifyGQL(env, token, Q_PARTIAL_LIST, { ids: part.map(g => `gid://shopify/Order/${g.orderId}`) }, 'partialList');
+    for (const nd of data.data?.nodes || []) if (nd?.id) nodes.set(String(nd.id).replace('gid://shopify/Order/', ''), nd);
+  }
+  const items = [];
+  for (const g of gs) {
+    const nd = nodes.get(g.orderId);
+    if (!nd) { items.push({ orderId: g.orderId, orderName: g.orderName, tracking: g.uploads[0].tracking, state: 'blocked', blockers: ['شوبيفاي ما رجّعتش بيانات الأوردر'], warnings: [], uploads: [] }); continue; }
+    items.push(partialPublic(partialShape(nd, g, led)));
+  }
+  const rank = { ready: 0, exists: 1, blocked: 2, done: 3 };
+  items.sort((a, b) => (rank[a.state] ?? 9) - (rank[b.state] ?? 9) || String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')));
+  const counts = items.reduce((m, x) => { m[x.state] = (m[x.state] || 0) + 1; return m; }, {});
+  return { items, counts, truncated, total: all.length, cap: bostaFmt(BOSTA_CASH_REFUND_CAP) };
+}
+
+// فحص أوردر واحد (بالمعاملات الكاملة) — بيستخدمه الفحص وكتابة التسجيل
+async function partialEvaluate(env, orderRef, trackingWanted = null) {
+  const token = await getAccessToken(env);
+  if (!token) throw new Error('Failed to get Shopify access token');
+  const orderId = await bostaFindOrderId(env, token, orderRef);
+  if (!orderId) return { found: false, error: `الأوردر ${String(orderRef).startsWith('#') ? orderRef : '#' + orderRef} مش موجود على شوبيفاي` };
+  const groups = await partialUploads(env.DB, orderId);
+  const g = groups.get(String(orderId));
+  if (!g) return { found: false, error: 'الأوردر ده مفيهوش رفعة استرجاع/استبدال اتقصّ فيها المبلغ (حد بوسطة) في سجل الرفع' };
+  if (trackingWanted) {
+    const i = g.uploads.findIndex(u => u.tracking === trackingWanted);
+    if (i < 0) return { found: false, error: 'رقم التتبع مش من رفعات الأوردر ده' };
+    g.uploads.unshift(...g.uploads.splice(i, 1));
+  }
+  const data = await shopifyGQL(env, token, Q_BOSTA_ORDERS, { ids: [`gid://shopify/Order/${orderId}`] }, 'bostaOrders');
+  const nd = (data.data?.nodes || [])[0];
+  if (!nd?.id) return { found: false, error: 'شوبيفاي ما رجّعتش بيانات الأوردر' };
+  const led = await partialLedgerState(env.DB, [orderId]);
+  return { found: true, shape: partialShape(nd, g, led), token };
+}
+
 const bostaS1Public = e => { const { _sales, _pend, candidates, ...pub } = e; return { ...pub, candidates: (candidates || []).map(({ _p, _r, ...c }) => c) }; };
 
 // ══════════════════════════════════════════════════════
@@ -2909,6 +3102,109 @@ export default {
         if (rp?.state === 'nothing_owed') addW('شوبيفاي مفيهاش مستحق استرداد — السجل اتكتب بس (راجع الأوردر لو لسه العميل ليه فلوس)');
         return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, preRegCleared, orderId: e.orderId, kind: r.kind, leg: c.leg, amount: bostaFmt(Math.abs(p.gross)), net: c.net,
           refund: rfInfo ? { created: true, id: rfInfo.id, amount: rfInfo.amount, owedAfter: rfInfo.owedAfter } : (rp ? { created: false, state: rp.state } : null) }, 200, request);
+      }
+
+      // ── ACTION: bostaPartialList (v3.19.0) — طابور «استرداد جزئي بوسطة» (قراءة بس: D1 + شوبيفاي) ──
+      if (action === 'bostaPartialList') {
+        const out = await partialList(env);
+        return json({ success: true, ...out }, 200, request);
+      }
+
+      // ── ACTION: bostaPartialCheck (v3.19.0) — فحص أوردر واحد بالمعاملات الكاملة (قراءة بس) ──
+      if (action === 'bostaPartialCheck') {
+        const ref = String(bodyData.orderRef ?? '').trim();
+        if (!/^#?\d{1,10}$/.test(ref)) return json({ error: 'orderRef غير صالح' }, 400, request);
+        const tnW = bodyData.trackingNumber ? String(bodyData.trackingNumber).trim() : null;
+        if (tnW && !/^\d{5,15}$/.test(tnW)) return json({ error: 'trackingNumber غير صالح' }, 400, request);
+        const ev = await partialEvaluate(env, ref, tnW);
+        if (!ev.found) return json({ success: false, error: ev.error }, 200, request);
+        return json({ success: true, ...partialPublic(ev.shape) }, 200, request);
+      }
+
+      // ── ACTION: bostaPartialPay (v3.19.0) — استرداد الباقي على شوبيفاي + صف D1 معلّم «استرداد جزئي بوسطة» ──
+      // بيعيد التقييم كامل لحظة الكتابة. شوبيفاي الأول (فشله = صفر كتابة)، وبعده D1. ملاحظة الاسترداد = مفتاح عدم التكرار لو D1 فشلت بعدها.
+      if (action === 'bostaPartialPay') {
+        const { orderRef, trackingNumber, employee, expected, ack, reason, paymentMethods: pmIn, paymentAccounts: paIn } = bodyData;
+        const ref = String(orderRef ?? '').trim(), tn = String(trackingNumber ?? '').trim();
+        if (!/^#?\d{1,10}$/.test(ref)) return json({ error: 'orderRef غير صالح' }, 400, request);
+        if (!/^\d{5,15}$/.test(tn)) return json({ error: 'trackingNumber غير صالح' }, 400, request);
+        if (!employee) return json({ error: 'employee is required' }, 400, request);
+        if (!expected || typeof expected !== 'object') return json({ error: 'expected is required' }, 400, request);
+        const fail = (extra) => json({ success: false, status: 'error', actions: [], ...extra }, 200, request);
+
+        const ev = await partialEvaluate(env, ref, tn);
+        if (!ev.found) return fail({ error: ev.error });
+        const sh = ev.shape, P = sh._p;
+        if (sh.state === 'done') return fail({ error: `اتسجّل قبل كده (${sh.registered?.at || ''}) — مفيش حاجة تتكرر` });
+        if (sh.state === 'blocked') return fail({ error: sh.blockers.join(' • ') });
+        if (String(expected.remainder ?? '') !== sh.remainder || String(expected.owed ?? '') !== sh.owed || String(expected.s2 ?? '') !== String(sh.s2 ?? '')) {
+          return fail({ stale: true, error: `الأرقام اتغيّرت من وقت الفحص (المستحق ${sh.owed} · الباقي ${sh.remainder} · S2 ${sh.s2 || '—'}) — أعد الفحص وراجع` });
+        }
+        // مبلغ الاسترداد = الباقي المحسوب في الـ Worker (مش من المتصفح). حالة `exists` (استرداد شوبيفاي موجود بالملاحظة) = D1 بس بمبلغه.
+        const amountP = sh.state === 'exists' ? P.existingP : P.remainderP;
+        if (!Number.isInteger(amountP) || amountP <= 0) return fail({ error: 'مبلغ الاسترداد مش صالح' });
+        if (sh.state === 'ready' && P.saleSum !== null && amountP > P.saleSum - P.refundedP) return fail({ error: `الباقي (${bostaFmt(amountP)}) أكبر من المتاح للاسترداد (${bostaFmt(P.saleSum - P.refundedP)})` });
+        if (ack !== true) return fail({ needsAck: true, error: sh.state === 'exists'
+          ? 'الاسترداد موجود على شوبيفاي — هيتسجّل في السجل بس ومحتاج تأكيد صريح'
+          : 'الاسترداد هيتكتب على شوبيفاي ومفيش منه رجوع من الأداة — محتاج تأكيد صريح' });
+        let rReason = null;
+        if (sh.needsReason) {
+          rReason = String(reason ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+          if (rReason.length < 3) return fail({ needsReason: true, error: `الباقي الحالي (${sh.remainder}) غير المسجّل وقت الرفع (${sh.codRemainder}) — لازم تكتب السبب` });
+        }
+        // طرق الدفع: انستاباي/محفظة بس (مفيش نقدي) ومجموعهم = الباقي بالظبط
+        const pmI = bostaPiastres(pmIn?.instapay) || 0, pmW = bostaPiastres(pmIn?.wallet) || 0, pmC = bostaPiastres(pmIn?.cash) || 0;
+        if (pmC !== 0) return fail({ error: 'الاسترداد الجزئي بالانستاباي أو المحفظة فقط — مفيش نقدي' });
+        if (pmI < 0 || pmW < 0 || pmI + pmW !== amountP) return fail({ needsPayment: true, error: `طرق الدفع (انستاباي ${bostaFmt(pmI)} + محفظة ${bostaFmt(pmW)}) لازم مجموعها ${bostaFmt(amountP)} بالظبط` });
+        const accNorm = normalizePaymentAccounts(paIn);
+        if (accNorm) for (const [m, tot] of [['instapay', pmI], ['wallet', pmW]]) {
+          const sum = Object.values(accNorm[m] || {}).reduce((a, v) => a + (bostaPiastres(v) || 0), 0);
+          if (accNorm[m] && sum !== tot) return fail({ needsPayment: true, error: `تفصيل حسابات ${m === 'instapay' ? 'الانستاباي' : 'المحفظة'} (${bostaFmt(sum)}) ≠ المبلغ (${bostaFmt(tot)})` });
+        }
+
+        const actions = [], collectorName = String(employee).replace(/_/g, ' ').trim();
+        let rf = null;
+        if (sh.state === 'ready') {
+          const saleTx = P.sales.map(t => ({ id: `gid://shopify/OrderTransaction/${t.id}`, amount: t.p / 100 }));
+          const r = await createRefund(ev.token, env, sh.orderId, saleTx, bostaFmt(amountP), 'EGP', partialNote(tn));
+          if (!r.success) return fail({ error: `شوبيفاي رفضت الاسترداد: ${r.error} — مفيش حاجة اتكتبت (لا شوبيفاي ولا السجل)` });
+          rf = { id: r.refundId, amount: bostaFmt(amountP) };
+          actions.push(`شوبيفاي: اتعمل استرداد ${rf.amount} ج (${r.refundId}) — الباقي بعد حد بوسطة (${sh.bostaCap}) · المستحق قبل ${sh.owed}`);
+        } else {
+          rf = { id: sh.existing.refundId, amount: sh.existing.amount };
+          actions.push(`استرداد الباقي موجود على شوبيفاي (${rf.amount} ج · ${rf.id || '—'}) — تسجيل في السجل فقط`);
+        }
+        const net = bostaFmt(amountP);
+        const split = { cash: '0.00', instapay: bostaFmt(pmI), wallet: bostaFmt(pmW) };
+        actions.push(`تحويل ${net} ج للعميل بواسطة ${collectorName} (انستاباي ${split.instapay} · محفظة ${split.wallet}) — الخزنة بتدفع للموظف`);
+        const extra = {
+          ...buildPayExtra({
+            batchId: `bosta-partial-${tn}`,
+            sessionMeta: { courier: collectorName, paymentMethods: split, paymentAccounts: accNorm,
+              batchExpected: { orders: 1, payOrders: 0, refundOrders: 1, collect: `-${net}`, extraShippingTotal: '0.00', net: `-${net}` }, extraShipping: null, extraShippingTotal: '0.00' },
+            orderMeta: { paymentSplit: split, paymentAccounts: accNorm, courierCollect: -(amountP / 100), hasReturn: true },
+            courier: collectorName, isRefund: true, refundAmount: net, result: 'success', actions,
+          }),
+          source: BOSTA_PARTIAL_SOURCE, trackingNumber: tn, slot: 'S2', legOrigin: 'bosta_partial',
+          partialRefund: {
+            bostaCap: sh.bostaCap, bostaPartRegistered: sh.bostaRegistered, remainder: net, owedBefore: sh.owed, codRemainderRecorded: sh.codRemainder,
+            jobKind: sh.kind, s1: sh.s1, s2: sh.s2, reason: rReason, collector: collectorName,
+            shopifyRefundCreated: sh.state === 'ready', shopifyRefundId: rf.id,
+          },
+        };
+        const { logged, logError } = await safeWriteLog(env.DB, {
+          tool: TOOL_NAME, type: 'refund', employee, orderId: sh.orderId, orderName: sh.orderName, valueAfter: amountP / 100,
+          notes: `استرداد جزئي بوسطة (باقي بعد حد ${sh.bostaCap}) — تتبع ${tn} — حوّلها ${collectorName}`, extra,
+        });
+        if (!logged) {
+          if (sh.state === 'ready') return json({ success: false, status: 'error', refundCreated: true, refundId: rf.id, actions,
+            error: `الاسترداد اتعمل على شوبيفاي (${rf.amount} ج · ${rf.id}) لكن السجل فشل (${logError || 'D1'}) — أعد المحاولة: الاسترداد هيتعرف ومش هيتكرر وهيتكتب السجل بس` }, 200, request);
+          return fail({ error: `السجل فشل (${logError || 'D1'}) — أعد المحاولة` });
+        }
+        const owedAfter = bostaFmt(Math.max(0, P.owedP - (sh.state === 'ready' ? amountP : 0)));
+        const warning = sh.warnings.length ? sh.warnings.join(' · ') : null;
+        return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, orderId: sh.orderId, amount: net, courier: collectorName,
+          refund: { created: sh.state === 'ready', id: rf.id, amount: rf.amount, owedAfter } }, 200, request);
       }
 
       // ── ACTION: get_config ────────────────────────────────────────
