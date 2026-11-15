@@ -71,6 +71,11 @@ Object.assign(SHOP, {
   '48122': mk('#48122', 707, '-1250.0', { createdAt: '2026-07-20T03:44:27Z', tx: [TX('27', '1325.0')] }),                    // صفحة قديمة
   '48121': mk('#48121', 706, '-1250.0', { createdAt: '2026-07-20T03:44:27Z', refunded: '1000.0', tx: [TX('26', '1325.0')] }), // المتاح للاسترداد 325 بس
 });
+// v3.20.0 — #47530 النهارده (15-11-2026): SALE ناجحة 5275 (COD) + 75 (manual) = 5350 · المتبقي 0 · Exchange +100 → فرق تغطية 25
+Object.assign(SHOP, {
+  '47534': mk('#47534', 801, '0.0', { createdAt: '2026-07-14T14:54:17Z', t1: '9300000001', tx: [TX('31', '5275.0', 'SALE', 'PENDING'), TX('32', '5275.0'), TX('33', '75.0')] }),
+  '47535': mk('#47535', 802, '0.0', { createdAt: '2026-07-14T14:54:17Z', t1: '9300000011', tx: [TX('34', '5275.0')] }),   // مفيش أي دليل زيادة على S1 → منع
+});
 const bd = (tn, code, state, o = {}) => ({ trackingNumber: tn, type: { code, value: { 10: 'Send', 20: 'Return to Origin', 30: 'Exchange' }[code] }, state: { code: state }, createdAt: o.createdAt || '2026-08-01T12:00:00Z', ...(o.oldType ? { oldType: o.oldType } : {}) });
 const PRIOR_S1_ADD = ['702', '703', '704', '706', '707'];
 const wal = (total, fees, tx, date, flex = '0.00') => ({ wallet: { cashCycle: { total_amount: total, bosta_fees: String(fees), flex_ship_amount: flex, deposited_amt: total - fees }, cashout: tx ? { transaction_id: tx, transaction_date: date } : { next_cashout_date: '2026-11-12' } } });
@@ -80,6 +85,8 @@ const BOSTA = {
     '46009': [bd('9000000001', 10, 45), bd('9000000002', 30, 46)], '46010': [bd('9000000003', 30, 46)],
     '46011': [bd('9000000004', 10, 45), bd('9000000005', 25, 46)], '46012': [bd('9000000006', 25, 46)],
     '47530': [bd('3505408529', 20, 46, { oldType: 'EXCHANGE', createdAt: '2026-08-02T09:00:00Z' }), bd('7217235847', 30, 46, { createdAt: '2026-08-06T09:00:00Z' }), bd('3356047136', 10, 45, { createdAt: '2026-07-15T09:00:00Z' })],
+    '47534': [bd('9300000001', 10, 45, { createdAt: '2026-07-15T09:00:00Z' }), bd('9300000002', 30, 46, { createdAt: '2026-08-06T09:00:00Z' })],
+    '47535': [bd('9300000011', 10, 45, { createdAt: '2026-07-15T09:00:00Z' }), bd('9300000012', 30, 46, { createdAt: '2026-08-06T09:00:00Z' })],
     '47531': [bd('9100000010', 20, 46, { oldType: 'EXCHANGE' })],
     '47532': [bd('9100000001', 20, 46, { oldType: 'EXCHANGE' }), bd('9100000011', 10, 45)],
     '47533': [bd('9100000002', 20, 46), bd('9100000012', 10, 45)],
@@ -94,6 +101,10 @@ const BOSTA = {
     '3356047136': { ...bd('3356047136', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
     '7217235847': { ...bd('7217235847', 30, 46), ...wal(100, 149.34, 'MONCOD10AUG26', '2026-08-10T00:00:00.000Z') },
     '3505408529': { ...bd('3505408529', 20, 46, { oldType: 'EXCHANGE' }), ...wal(100, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
+    '9300000001': { ...bd('9300000001', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
+    '9300000002': { ...bd('9300000002', 30, 46), ...wal(100, 149.34, 'MONCOD10AUG26', '2026-08-10T00:00:00.000Z') },
+    '9300000011': { ...bd('9300000011', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
+    '9300000012': { ...bd('9300000012', 30, 46), ...wal(100, 149.34, 'MONCOD10AUG26', '2026-08-10T00:00:00.000Z') },
     '9100000010': { ...bd('9100000010', 20, 46, { oldType: 'EXCHANGE' }), ...wal(100, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
     '9100000001': { ...bd('9100000001', 20, 46, { oldType: 'EXCHANGE' }), ...wal(150, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
     '9100000011': { ...bd('9100000011', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
@@ -381,7 +392,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.19.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.19.0');
+eq('get_config بيرجّع 3.20.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.20.0');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -785,6 +796,41 @@ eq('بتأكيد: D1 بس · صفر استرداد · shopifyRefundMissing=true 
 const w15 = wr();
 q = await payS1('#48122', '9200000007', EXP2(), { ackRefundMissing: true });
 eq('صفحة قديمة على حالة create → needsRefundChoice بلا أي كتابة (لا شوبيفاي ولا D1)', [q.success, q.needsRefundChoice, wr()], [false, true, w15]);
+
+console.log('══ ⑫ v3.20.0 — فرق تغطية شوبيفاي على Exchange (#47530 النهارده: 100 مقابل 75) — إقرار صريح بلا سقف ══');
+const w20 = wr();
+let d34 = await chk('#47534'), x34 = cand(d34, '9300000002');
+eq('#47534: شوبيفاي SALE 5350 · المتبقي 0', [d34.shopifySaleCaptured, d34.shopifyOutstanding], ['5350.00', '0.00']);
+const s34pay = await payS1('#47534', '9300000001', { gross: '5275.00', net: '5108.84', cashOutId: 'MONCOD20JUL26' });
+eq('S1 اتسجّلت', [s34pay.success, s34pay.status], [true, 'success']);
+d34 = await chk('#47534'); x34 = cand(d34, '9300000002');
+eq('Exchange +100: قابلة بإقرار (مش ممنوعة) · الفرق 25 · المغطّى 75', [x34.eligible, x34.needsCaptureAck, x34.captureGap, x34.blockers], [true, true, { gap: '25.00', proven: '75.00', gross: '100.00' }, []]);
+eq('الملاحظة بتقول الفرق', /الفرق 25\.00/.test(x34.notes.join()), true);
+const EXP12 = (o = {}) => ({ gross: '100.00', net: '-49.34', cashOutId: 'MONCOD10AUG26', captureGap: '25.00', ...o });
+const w20b = wr();
+let q12 = await payS1('#47534', '9300000002', EXP12());
+eq('بلا إقرار → needsCaptureAck بلا أي كتابة', [q12.success, q12.needsCaptureAck, q12.captureGap.gap, wr()], [false, true, '25.00', w20b]);
+q12 = await payS1('#47534', '9300000002', EXP12(), { captureGap: { ack: true } });
+eq('إقرار بلا سبب → needsReason بلا كتابة', [q12.success, q12.needsReason, wr()], [false, true, w20b]);
+q12 = await payS1('#47534', '9300000002', EXP12(), { captureGap: { ack: true, reason: 'ab' } });
+eq('سبب أقصر من 3 حروف → needsReason', [q12.success, q12.needsReason, wr()], [false, true, w20b]);
+q12 = await payS1('#47534', '9300000002', EXP12({ captureGap: '30.00' }), { captureGap: { ack: true, reason: 'شحنة اترفعت بـ100 مقابل 75' } });
+eq('expected.captureGap غلط → stale بلا كتابة', [q12.success, q12.stale, wr()], [false, true, w20b]);
+q12 = await payS1('#47534', '9300000002', EXP12(), { captureGap: { ack: true, reason: 'شحنة اترفعت بـ100 مقابل 75' } });
+const L12 = logs[logs.length - 1], X12 = E8(L12);
+eq('بإقرار وسبب: نجاح · warning · payment · value_after 100', [q12.success, q12.status, q12.kind, q12.leg, L12.type, L12.value_after], [true, 'warning', 'leg_api', 'S2', 'payment', 100]);
+eq('🔴 الخزنة: courierCollect = Net −49.34 · جلسة مستقلة · batchExpected كامل', [X12.courierCollect, X12.batchId, X12.batchExpected.collect, X12.courier, X12.source], [-49.34, 'bosta-leg-9300000002', '-49.34', 'Bosta', 'bosta_cash_cycle']);
+eq('extra: shopifyCaptureShort · الفرق · المغطّى · السبب', [X12.shopifyCaptureShort, X12.shopifyCaptureGap, X12.shopifyCaptureProven, X12.captureGapReason], [true, '25.00', '75.00', 'شحنة اترفعت بـ100 مقابل 75']);
+eq('التحذير بيسمّي الفرق + الأكشن بيسجّله', [/الفرق 25\.00/.test(q12.warning || ''), X12.actions.some(a => /الفرق 25\.00/.test(a))], [true, true]);
+eq('صفر كتابة على شوبيفاي · صفّين D1 بس (S1 + Exchange)', [rest.length, refunds.length, logs.length - w20[0]], [w20[1], w20[2], 2]);
+q12 = await payS1('#47534', '9300000002', EXP12(), { captureGap: { ack: true, reason: 'تاني' } });
+eq('إعادة التسجيل → ممنوع بلا صف', [q12.success, /اتسجّلت قبل كده/.test(q12.error || '')], [false, true]);
+// بلا أي دليل زيادة على المسجّل قبل كده → منع زي ما هو (مفيش تساهل)
+await payS1('#47535', '9300000011', { gross: '5275.00', net: '5108.84', cashOutId: 'MONCOD20JUL26' });
+const d35 = await chk('#47535'), x35 = cand(d35, '9300000012');
+eq('#47535 (SALE 5275 بس = S1): Exchange ممنوعة · بلا captureGap', [x35.eligible, x35.captureGap, /مفيش معاملة SALE ناجحة/.test(x35.blockers.join())], [false, undefined, true]);
+q12 = await payS1('#47535', '9300000012', EXP12(), { captureGap: { ack: true, reason: 'محاولة' } });
+eq('الإقرار مابيفتحش الممنوعة', [q12.success, /مفيش معاملة SALE ناجحة/.test(q12.error || '')], [false, true]);
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);

@@ -1,8 +1,15 @@
 /**
- * cod-payment-center-worker  (v3.19.0)
+ * cod-payment-center-worker  (v3.20.0)
  * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 15-11-2026
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * v3.20.0 — «فرق تغطية شوبيفاي» على شحنة S2 الموجبة في «فحص شحنات بوسطة» (15-11-2026 · قرار أحمد · #47530):
+ *   الشحنة Exchange `7217235847` إجماليها 100 وشوبيفاي مغطّية 75 بس (SALE 5275 + 75 يدوي · المسجّل قبل كده S1 5275) — فرق الاستبدال على شوبيفاي 75 والشحنة اترفعت بـ100. كانت ممنوعة («مفيش SALE تغطي»).
+ *   🆕 `bostaS1Check`: S2 موجبة (مش RTO) وفيه دليل SALE جزئي (`saleSum > المسجّل قبل كده`) ← قابلة بدل المنع ومعاها `captureGap {gap, proven, gross}` و`needsCaptureAck`. بلا دليل زيادة = منع زي ما هو. **بلا سقف** على الفرق (قرار أحمد).
+ *   🆕 `bostaPayS1`: بياخد `captureGap: { ack, reason }` — من غير `ack:true` ⇒ `needsCaptureAck` وبلا سبب (≥ 3 حروف) ⇒ `needsReason` (بلا أي كتابة) · `expected.captureGap` بيتقارن بالحالي (`stale`) · الرد `warning`.
+ *      الصف (D1 بس · صفر كتابة على شوبيفاي): `extra.shopifyCaptureShort=true` · `shopifyCaptureGap` · `shopifyCaptureProven` · `captureGapReason`. `courierCollect` = Net زي ما هو — الخزنة ما اتأثرتش (إضافة بحتة).
+ *   🔴 `codPayment.min = 3.20.0` — انشر الـ Worker قبل الصفحة (على Worker أقدم الشحنة بتفضل ممنوعة بـ«مفيش معاملة SALE»).
+ *
  * v3.19.0 — «استرداد جزئي بوسطة» (15-11-2026 · قرار أحمد): بوسطة بتدفع للعميل 2000 كاش بس (حد بوسطة `3008`) والباقي بيحوّله موظف التحصيل (انستاباي/محفظة).
  *   🆕 `bostaPartialList` (قراءة): الطابور من سجل «رفع بوسطة» (`tool='bosta_exchange_export'` · `extra.codClipped=1` · من 17-09 · CRP **و**Exchange) + الحالة الحية
  *      من شوبيفاي (S1 = Delivered · S2 ∈ Shipped/In-Return/Returned · المستحق) + حالة D1. الحالات: `ready` · `exists` (استرداد شوبيفاي موجود بالملاحظة) · `blocked` (بسببه) · `done`.
@@ -401,7 +408,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.19.0';
+const WORKER_VERSION = 'v3.20.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -2118,7 +2125,18 @@ async function bostaS1Evaluate(env, orderRef) {
     const what = c.leg === 'S1' ? 'S1' : c.typeLabel;
     if (c._p && c._p.gross > 0) {
       if (out !== null && out === c._p.gross) b.push(`الأوردر لسه مش متحصّل على شوبيفاي (المتبقي = إجمالي ${what}) — سجّله بملف الـ Cash-out العادي عشان يتحصّل`);
-      else if (saleSum < legs.pos + c._p.gross) b.push(`مفيش معاملة SALE ناجحة على شوبيفاي تغطي إجمالي ${what} (${bostaFmt(c._p.gross)})${legs.pos ? ` + شحنات بوسطة المسجّلة قبل كده (${bostaFmt(legs.pos)})` : ''} — الموجود ${bostaFmt(saleSum)}`);
+      else if (saleSum < legs.pos + c._p.gross) {
+        const gapP = legs.pos + c._p.gross - saleSum;
+        const msg = `مفيش معاملة SALE ناجحة على شوبيفاي تغطي إجمالي ${what} (${bostaFmt(c._p.gross)})${legs.pos ? ` + شحنات بوسطة المسجّلة قبل كده (${bostaFmt(legs.pos)})` : ''} — الموجود ${bostaFmt(saleSum)}`;
+        // 🆕 v3.20.0 (قرار أحمد 15-11-2026، #47530) — شحنة S2 موجبة ليها دليل SALE **جزئي** (saleSum > المسجّل قبل كده) = فرق بين اللي بوسطة حصّلته واللي على شوبيفاي
+        // (شحنة اترفعت بمبلغ أكبر من فرق الاستبدال: 100 مقابل 75). بدل المنع: تسجيل D1 بس بإقرار صريح وسبب، والفرق بيتخزّن في extra (بلا سقف).
+        // ⛔ مفيش أي دليل زيادة (saleSum ≤ المسجّل قبل كده) = منع زي ما هو. و S1 والـ RTO (إجمالي صفر) مش في الحالة دي.
+        if (c.leg === 'S2' && c.legKind !== 'rto_fee' && saleSum > legs.pos) {
+          c.captureGap = { gap: bostaFmt(gapP), proven: bostaFmt(saleSum - legs.pos), gross: bostaFmt(c._p.gross) };
+          c.needsCaptureAck = true; c._cg = gapP;
+          c.notes.push(`شوبيفاي مغطّية ${c.captureGap.proven} من ${c.captureGap.gross} بس — الفرق ${c.captureGap.gap} (محتاج إقرار وسبب)`);
+        } else b.push(msg);
+      }
     }
     if (c.leg === 'S2' && c._p && c._p.gross < 0) {
       const need = -c._p.gross;
@@ -2344,7 +2362,7 @@ async function partialEvaluate(env, orderRef, trackingWanted = null) {
   return { found: true, shape: partialShape(nd, g, led), token };
 }
 
-const bostaS1Public = e => { const { _sales, _pend, candidates, ...pub } = e; return { ...pub, candidates: (candidates || []).map(({ _p, _r, ...c }) => c) }; };
+const bostaS1Public = e => { const { _sales, _pend, candidates, ...pub } = e; return { ...pub, candidates: (candidates || []).map(({ _p, _r, _cg, ...c }) => c) }; };
 
 // ══════════════════════════════════════════════════════
 // §HANDLER
@@ -3040,6 +3058,22 @@ export default {
           return json({ success: false, status: 'error', needsAck: true, actions: [],
             error: 'شوبيفاي مفيهاش مستحق استرداد ولا استرداد مسجّل (ممكن اتحسب جوّه استبدال) — التسجيل في السجل بس ومحتاج تأكيد صريح' }, 200, request);
         }
+        // 🆕 v3.20.0 — فرق تغطية شوبيفاي (#47530): إقرار صريح + سبب إجباري، والأرقام بتتقارن بالحالي (stale) — كله قبل أي كتابة
+        const cg = c.captureGap || null, cgIn = (bodyData.captureGap && typeof bodyData.captureGap === 'object') ? bodyData.captureGap : null;
+        let cgReason = null;
+        if (cg) {
+          if (expected.captureGap !== undefined && String(expected.captureGap) !== cg.gap) {
+            return json({ success: false, status: 'error', stale: true, actions: [],
+              error: `فرق تغطية شوبيفاي اتغيّر من وقت الفحص (دلوقتي ${cg.gap}) — أعد الفحص وراجع` }, 200, request);
+          }
+          if (!cgIn || cgIn.ack !== true) {
+            return json({ success: false, status: 'error', needsCaptureAck: true, captureGap: cg, actions: [],
+              error: `شوبيفاي مغطّية ${cg.proven} بس من ${cg.gross} (الفرق ${cg.gap}) — التسجيل في السجل فقط ومحتاج إقرار صريح` }, 200, request);
+          }
+          cgReason = String(cgIn.reason ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+          if (cgReason.length < 3) return json({ success: false, status: 'error', needsReason: true, captureGap: cg, actions: [],
+            error: `لازم تكتب سبب فرق التغطية (${cg.gap}) — 3 حروف على الأقل` }, 200, request);
+        }
         const p = c._p, actions = [];
         // مطابقة التسجيل المسبق: مبلغ + معاملة SALE ناجحة بنفس الـ id — وقتها المفتاح بيتمسح بعد نجاح السجل (S1 بس)
         let preRegTx = null;
@@ -3069,7 +3103,9 @@ export default {
                 ...(c.legKind === 'rto_fee' ? { legKind: 'rto_fee', originalType: c.oldType } : {}) }),
           bostaTypeCode: c.typeCode, bostaStateCode: c.stateCode, onlineStatus: c.onlineStatus, onlineProvider: c.onlineProvider,
           preRegCaptured: preRegTx ? bostaFmt(p.gross) : null, preRegTransactionId: preRegTx,
+          ...(cg ? { shopifyCaptureShort: true, shopifyCaptureGap: cg.gap, shopifyCaptureProven: cg.proven, captureGapReason: cgReason } : {}),
         };
+        if (cg) actions.push(`⚠ شوبيفاي مغطّية ${cg.proven} ج من ${cg.gross} ج بس — الفرق ${cg.gap} ج اتسجّل بإقرار (${cgReason})`);
         // 🆕 v3.18.0 — الاسترداد على شوبيفاي **الأول** (فشله = صفر كتابة)، وبعده سجل D1. ملاحظة الاسترداد = مفتاح عدم التكرار لو D1 فشلت بعدها.
         let rfInfo = null;
         if (rp?.state === 'create') {
@@ -3100,6 +3136,7 @@ export default {
         if (rfInfo && rAmountP !== p.gross * -1) addW(`مبلغ الاسترداد على شوبيفاي (${rfInfo.amount}) غير اللي بوسطة دفعته (${bostaFmt(-p.gross)})`);
         if (rfInfo && Number(rfInfo.owedAfter) > 0) addW(`لسه مستحق ${rfInfo.owedAfter} ج للعميل على شوبيفاي — خدمة العملاء تراجعه`);
         if (rp?.state === 'nothing_owed') addW('شوبيفاي مفيهاش مستحق استرداد — السجل اتكتب بس (راجع الأوردر لو لسه العميل ليه فلوس)');
+        if (cg) addW(`شوبيفاي مغطّية ${cg.proven} من ${cg.gross} بس — الفرق ${cg.gap} ج (خدمة العملاء تراجعه)`);
         return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, preRegCleared, orderId: e.orderId, kind: r.kind, leg: c.leg, amount: bostaFmt(Math.abs(p.gross)), net: c.net,
           refund: rfInfo ? { created: true, id: rfInfo.id, amount: rfInfo.amount, owedAfter: rfInfo.owedAfter } : (rp ? { created: false, state: rp.state } : null) }, 200, request);
       }
