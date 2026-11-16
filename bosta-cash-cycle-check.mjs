@@ -140,6 +140,18 @@ const BOSTA = {
   },
 };
 const bostaCalls = []; let bostaMode = 'ok'; let failRefund = false;
+// 🆕 v3.22.0 — شوبيفاي وهمية بتتصرف زي الحقيقية: المستحق = إجمالي + فرق الاسترداد − netPayment، والاسترداد بيسجّل (المقترح − الفعلي) كفرق.
+//   (مقيس حيًا 16-11-2026: #49667 · #65885 · #65634) — o.out = اللي شوبيفاي بترجّعه في totalOutstanding، o.disc = refundDiscrepancy (افتراضي 0)
+const shopMoneyOf = v => ({ shopMoney: { amount: String(v) } });
+const balanceFields = o => {
+  const disc = parseFloat(o.disc || '0'), bal = parseFloat(o.out) - disc, base = 3000;
+  return { currentTotalPriceSet: shopMoneyOf((base + Math.max(bal, 0)).toFixed(1)), netPaymentSet: shopMoneyOf((base + Math.max(-bal, 0)).toFixed(1)), refundDiscrepancySet: shopMoneyOf(disc.toFixed(1)) };
+};
+const applyRefundToShop = (o, amt) => {
+  const out0 = parseFloat(o.out), disc0 = parseFloat(o.disc || '0'), suggested = Math.max(0, -out0);
+  const bal1 = (out0 - disc0) + amt, disc1 = disc0 + (suggested - amt);
+  o.out = (bal1 + disc1).toFixed(1); o.disc = disc1.toFixed(1); o.refunded = (parseFloat(o.refunded) + amt).toFixed(1);
+};
 const byGid = {}; for (const o of Object.values(SHOP)) byGid[`gid://shopify/Order/${o.id}`] = o;
 const rest = [], refunds = [], gqlOps = [];
 globalThis.fetch = async (url, init = {}) => {
@@ -157,7 +169,7 @@ globalThis.fetch = async (url, init = {}) => {
       gqlOps.push('nodes');
       const nodes = variables.ids.map(g => { const o = byGid[g]; if (!o) return null; return {
         id: g, name: o.name, createdAt: o.createdAt, cancelledAt: o.cancelledAt, displayFinancialStatus: 'PENDING',
-        totalOutstandingSet: { shopMoney: { amount: o.out } }, totalRefundedSet: { shopMoney: { amount: o.refunded } }, refunds: o.refundObjs || [], courier: o.courier ? { value: o.courier } : null,
+        totalOutstandingSet: { shopMoney: { amount: o.out } }, totalRefundedSet: { shopMoney: { amount: o.refunded } }, ...balanceFields(o), refunds: o.refundObjs || [], courier: o.courier ? { value: o.courier } : null,
         t1: o.t1 ? { value: o.t1 } : null, t2: o.t2 ? { value: o.t2 } : null, t0: null,
         transactions: o.tx.map(t => ({ id: t.id, kind: t.kind, status: t.status, amountSet: { shopMoney: { amount: t.amt } } })),
       }; });
@@ -169,7 +181,7 @@ globalThis.fetch = async (url, init = {}) => {
       const o = byGid[variables.input.orderId];
       const amt = variables.input.transactions.reduce((a, t) => a + parseFloat(t.amount), 0);
       const rid = `gid://shopify/Refund/${9000 + refunds.length}`;
-      if (o) { o.out = (parseFloat(o.out) + amt).toFixed(1); o.refunded = (parseFloat(o.refunded) + amt).toFixed(1); (o.refundObjs = o.refundObjs || []).push({ id: rid, note: variables.input.note, totalRefundedSet: { shopMoney: { amount: amt.toFixed(1) } } }); }
+      if (o) { applyRefundToShop(o, amt); (o.refundObjs = o.refundObjs || []).push({ id: rid, note: variables.input.note, totalRefundedSet: { shopMoney: { amount: amt.toFixed(1) } } }); }
       return new Response(JSON.stringify({ data: { refundCreate: { refund: { id: rid, totalRefundedSet: { shopMoney: { amount: amt.toFixed(1) } } }, userErrors: [] } } }), { status: 200 });
     }
   }
@@ -183,7 +195,7 @@ globalThis.fetch = async (url, init = {}) => {
   const m = u.match(/orders\/(\d+)\/transactions\.json/);
   if (m) {
     const body = JSON.parse(init.body); rest.push({ id: m[1], ...body.transaction });
-    const o = Object.values(SHOP).find(x => String(x.id) === m[1]); if (o) o.out = '0.0';
+    const o = Object.values(SHOP).find(x => String(x.id) === m[1]); if (o) { o.out = '0.0'; o.disc = '0'; }
     return new Response(JSON.stringify({ transaction: { id: 777 } }), { status: 200 });
   }
   return new Response('{}', { status: 404 });
@@ -392,7 +404,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.21.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.21.0');
+eq('get_config بيرجّع 3.22.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.22.0');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -831,6 +843,25 @@ const d35 = await chk('#47535'), x35 = cand(d35, '9300000012');
 eq('#47535 (SALE 5275 بس = S1): Exchange ممنوعة · بلا captureGap', [x35.eligible, x35.captureGap, /مفيش معاملة SALE ناجحة/.test(x35.blockers.join())], [false, undefined, true]);
 q12 = await payS1('#47535', '9300000012', EXP12(), { captureGap: { ack: true, reason: 'محاولة' } });
 eq('الإقرار مابيفتحش الممنوعة', [q12.success, /مفيش معاملة SALE ناجحة/.test(q12.error || '')], [false, true]);
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('══ ⑬ v3.22.0 — #49667: ملف الـ Cash-out بعد استرداد جزئي (المستحق الخام 0 · الرصيد الحقيقي −2000) ══');
+// استرداد جزئي 2800 من مستحق 4800 ← شوبيفاي سجّل REFUND_DISCREPANCY +2000 وصفّر totalOutstanding. الصف −2000 (CRP بوسطة) لازم يطابق الرصيد الحقيقي.
+const sh67 = mk('#49667', 4966, '0.0', { disc: '2000.0', refunded: '2800.0', t1: '2648919992', t2: '4445297000',
+  tx: [{ id: 'gid://shopify/OrderTransaction/8551302922562', kind: 'SALE', status: 'SUCCESS', amt: '6900.0' }],
+  refundObjs: [{ id: 'gid://shopify/Refund/1125118640450', note: 'Bosta partial refund 4445297000', totalRefundedSet: { shopMoney: { amount: '2800.0' } } }] });
+SHOP['49667'] = sh67; byGid['gid://shopify/Order/4966'] = sh67; PRIOR_S1.add('4966');
+const R67 = R('#49667', '4445297000', 'EXCHANGE', -2000, 0, -2158.46, 158.46);
+const ctx13 = { ...ctx, rowsTotal: 1, netTotal: '-2158.46', payOrders: 0, refundOrders: 1, s1Orders: ['#49667'] };
+const v13 = (await val([R67], ctx13)).results[0];
+eq('الصف −2000 مقابل رصيد −2000 → ready (كان «≠ مستحق شوبيفاي (0.00)»)', [v13.status, v13.shopify, v13.kind, v13.shopifyDiscrepancy], ['ready', '-2000.00', 'refund', '2000.00']);
+const R67b = R('#49667', '4445297000', 'EXCHANGE', -1500, 0, -1658.46, 158.46, { rowNo: 99 });
+const v13b = (await val([R67b], ctx13)).results[0];
+eq('صف −1500 ≠ الرصيد −2000 → خطأ والسبب فيه الرصيد والفرق والمستحق الخام', [v13b.status, /−?-?1500\.00|1500\.00/.test(v13b.reasons.join()), /-2000\.00/.test(v13b.reasons.join()), /فرق استرداد 2000\.00/.test(v13b.reasons.join()), /المستحق الظاهر 0\.00/.test(v13b.reasons.join())], ['error', true, true, true, true]);
+const rf0 = refunds.length;
+const p13 = (await call({ action: 'bostaPay', row: R67, ctx: ctx13, employee: 'Ahmed_Ibraheem' })).body;
+eq('bostaPay: نجح + استرداد 2000 على شوبيفاي', [p13.success, refunds.length - rf0, refunds.length > rf0 ? refunds[refunds.length - 1].transactions.reduce((a2, t) => a2 + parseFloat(t.amount), 0) : null], [true, 1, 2000]);
+eq('شوبيفاي بعد الاسترداد التاني: الفرق اتعادل (مستحق 0 · فرق 0)', [sh67.out, sh67.disc], ['0.0', '0.0']);
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
