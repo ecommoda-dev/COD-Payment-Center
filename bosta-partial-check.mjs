@@ -30,13 +30,15 @@ add(mk(18936740217154, '#60015', '-2700.0', { tx: [TX(15, '2900.0')],           
 add(mk(18928313598274, '#59006', '-2300.0', { tx: [TX(16, '2500.0')] }));                        // لإختبار فشل شوبيفاي
 add(mk(18941560881474, '#60354', '-3400.0', { tx: [TX(17, '3600.0')] }));                        // لإختبار D1 وقعت بعد الاسترداد
 add(mk(18943206621506, '#60518', '-2450.0', { tx: [TX(18, '2650.0')] }));                        // S1 check: حارس بوسطة
-add(mk(70001, '#70001', '-2500.0', { tx: [TX(30, '2700.0')] }));                        // مفيش رفعة مقصوصة
+add(mk(70001, '#70001', '-2500.0', { tx: [TX(30, '2700.0')], t2: '9090909090' }));            // مفيش رفعة مقصوصة (بس عليه تتبع S2) → v3.21.0 manual
+add(mk(70002, '#70002', '-2500.0', { tx: [TX(31, '2700.0')] }));                              // manual بلا تتبع S2
+add(mk(70003, '#70003', '-2500.0', { tx: [TX(32, '2700.0')], t2: '9090909091', s1: 'Shipped' })); // manual · S1 مش Delivered
 const byGid = {}; for (const o of Object.values(SHOP)) byGid[`gid://shopify/Order/${o.id}`] = o;
 const refundsMade = [], gqlOps = []; let failRefund = false;
 const nodeOf = (g, withTx) => { const o = byGid[g]; if (!o) return null; return {
   id: g, name: o.name, createdAt: '2026-10-20T10:00:00Z', cancelledAt: o.cancelledAt, displayFinancialStatus: 'PAID',
   totalOutstandingSet: { shopMoney: { amount: o.out } }, totalRefundedSet: { shopMoney: { amount: o.refunded } }, refunds: o.refundObjs,
-  courier: o.courier ? { value: o.courier } : null, s1: o.s1 ? { value: o.s1 } : null, s2: o.s2 ? { value: o.s2 } : null, t1: null, t2: null, t0: null,
+  courier: o.courier ? { value: o.courier } : null, s1: o.s1 ? { value: o.s1 } : null, s2: o.s2 ? { value: o.s2 } : null, t1: null, t2: o.t2 ? { value: o.t2 } : null, t0: null,
   ...(withTx ? { transactions: o.tx.map(t => ({ id: t.id, kind: t.kind, status: t.status, amountSet: { shopMoney: { amount: t.amt } } })) } : {}),
 }; };
 // بوسطة (للاختبار ⑥ حارس bostaS1Check)
@@ -260,6 +262,30 @@ const payS1 = await call({ action: 'bostaPayS1', orderRef: '#60518', trackingNum
   expected: { gross: crp.gross, net: crp.net, cashOutId: crp.cashOutId, owed: crp.refund.owed, refundState: 'create' }, refund: { amount: '2450.00', reason: 'اختبار', ack: true } });
 // ملحوظة: ممكن يتمنع قبل كده بسبب بوابة S1 — المهم إن مفيش استرداد على شوبيفاي اتكتب بالمبلغ الكبير
 eq('اختيار 2450 مرفوض — مفيش استرداد 2450 اتكتب', [payS1.body.success, refundsMade.every(x => x.transactions.reduce((a2, t) => a2 + parseFloat(t.amount), 0) !== 2450)], [false, true]);
+
+console.log('══ ⑦ أوردر مضاف يدويًا من خارج الطابور (manual · v3.21.0) ══');
+const mnl1 = (await call({ action: 'bostaPartialCheck', orderRef: '#70001', manual: true })).body;
+eq('manual: ready بتتبع S2 من شوبيفاي', [mnl1.success, mnl1.manual, mnl1.state, mnl1.tracking, mnl1.kind], [true, true, 'ready', '9090909090', 'manual']);
+eq('manual: المستحق 2500 · الباقي 500 · مفيش سبب إجباري', [mnl1.owed, mnl1.remainder, mnl1.codRemainder, mnl1.needsReason], ['2500.00', '500.00', null, false]);
+yes('manual: تحذير «مضاف يدويًا»', mnl1.warnings.some(x => /مضاف يدويًا/.test(x)));
+eq('بلا manual: نفس الأوردر لسه «مفيهوش رفعة» (السلوك القديم)', (await check('#70001')).success, false);
+const mnl2 = (await call({ action: 'bostaPartialCheck', orderRef: '#70002', manual: true })).body;
+eq('manual بلا تتبع S2 → خطأ بسببه', [mnl2.success, /bosta_tracking_number_s2/.test(mnl2.error || '')], [false, true]);
+const mnl3 = (await call({ action: 'bostaPartialCheck', orderRef: '#70003', manual: true })).body;
+eq('manual: نفس الموانع (S1 مش Delivered → blocked)', [mnl3.state, /S1 = «Shipped»/.test(mnl3.blockers.join())], ['blocked', true]);
+eq('manual مع رقم تتبع غلط → خطأ', (await call({ action: 'bostaPartialCheck', orderRef: '#70001', manual: true, trackingNumber: '1111111111' })).body.success, false);
+const mnlQ = (await call({ action: 'bostaPartialCheck', orderRef: '#64612', manual: true })).body;
+eq('manual على أوردر في الطابور → بيتجاهَل (نفس رفعة الطابور)', [mnlQ.manual, mnlQ.kind, mnlQ.state], [false, 'return', 'ready']);
+const expMnl = { remainder: '500.00', owed: '2500.00', s2: 'In-Return' };
+const logN0 = logs.length, refN0 = refundsMade.length;
+r = await pay('#70001', '9090909090', expMnl, { paymentMethods: PM('500.00', '0.00') });
+eq('تسجيل بلا manual → مرفوض بلا كتابة', [r.success, refundsMade.length - refN0, logs.length - logN0], [false, 0, 0]);
+r = await pay('#70001', '9090909090', expMnl, { manual: true, paymentMethods: PM('500.00', '0.00') });
+eq('تسجيل manual ناجح', [r.success, r.amount, r.refund.created], [true, '500.00', true]);
+eq('الاسترداد بالباقي بملاحظة التتبع', [refundsMade.length - refN0, refundsMade[refundsMade.length - 1].note], [1, 'Bosta partial refund 9090909090']);
+const exRowMnl = JSON.parse(logs[logs.length - 1].extra);
+eq('الصف: علامة الخزنة + manualAdded', [logs.length - logN0, exRowMnl.source, exRowMnl.batchId, exRowMnl.partialRefund.manualAdded, exRowMnl.partialRefund.jobKind, exRowMnl.courierCollect], [1, 'bosta_partial_refund', 'bosta-partial-9090909090', true, 'manual', -500]);
+eq('بعد التسجيل: manual check بيرجّع done', (await call({ action: 'bostaPartialCheck', orderRef: '#70001', manual: true })).body.state, 'done');
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);

@@ -1,8 +1,14 @@
 /**
- * cod-payment-center-worker  (v3.20.0)
+ * cod-payment-center-worker  (v3.21.0)
  * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 15-11-2026
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * v3.21.0 — «استرداد جزئي بوسطة»: إضافة أوردر **يدويًا** من خارج الطابور (16-11-2026 · قرار أحمد):
+ *   🆕 `bostaPartialCheck`/`bostaPartialPay` بياخدوا `manual: true` — لو الأوردر مفيهوش رفعة `codClipped` في سجل الرفع بنبني رفعة افتراضية من شوبيفاي: رقم التتبع = `bosta_tracking_number_s2`
+ *      (من غيره خطأ بسببه — مفيش رقم من المتصفح) · `kind='manual'` · `codRemainder=null` (مفيش `needsReason`). **باقي الحكم هو هو**: S1 Delivered · S2 ∈ Shipped/In-Return/Returned · مستحق > 0 · الباقي ≤ المتاح للاسترداد · إقرار · طرق دفع.
+ *   لو الأوردر فيه رفعة مقصوصة فعلًا `manual` بيتجاهَل. الرد فيه `manual:true` وتحذير «مضاف يدويًا»، والصف `extra.partialRefund.manualAdded=true` (باقي عقد الخزنة زي ما هو: `bosta_partial_refund` · `bosta-partial-<تتبع>`).
+ *   🔴 `codPayment.min = 3.21.0` — انشر الـ Worker قبل الصفحة. فحص: `node bosta-partial-check.mjs` 86 بند (+13 §⑦).
+ *
  * v3.20.0 — «فرق تغطية شوبيفاي» على شحنة S2 الموجبة في «فحص شحنات بوسطة» (15-11-2026 · قرار أحمد · #47530):
  *   الشحنة Exchange `7217235847` إجماليها 100 وشوبيفاي مغطّية 75 بس (SALE 5275 + 75 يدوي · المسجّل قبل كده S1 5275) — فرق الاستبدال على شوبيفاي 75 والشحنة اترفعت بـ100. كانت ممنوعة («مفيش SALE تغطي»).
  *   🆕 `bostaS1Check`: S2 موجبة (مش RTO) وفيه دليل SALE جزئي (`saleSum > المسجّل قبل كده`) ← قابلة بدل المنع ومعاها `captureGap {gap, proven, gross}` و`needsCaptureAck`. بلا دليل زيادة = منع زي ما هو. **بلا سقف** على الفرق (قرار أحمد).
@@ -408,7 +414,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.20.0';
+const WORKER_VERSION = 'v3.21.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -2298,6 +2304,7 @@ function partialShape(node, g, led) {
   }
   const mismatch = up.codRemainderP !== null && remainderP > 0 && up.codRemainderP !== remainderP;
   if (mismatch && state === 'ready') warnings.push(`الباقي الحالي (${bostaFmt(remainderP)}) غير المسجّل وقت الرفع (${bostaFmt(up.codRemainderP)}) — لازم تكتب السبب`);
+  if (g.manual && (state === 'ready' || state === 'exists')) warnings.push('أوردر مضاف يدويًا — مش من سجل «رفع بوسطة» (مفيش رفعة مقصوصة مسجّلة)، فالباقي بيتحسب من المستحق الحالي على شوبيفاي بس. راجع الأرقام قبل التسجيل.');
   if (g.uploads.length > 1) warnings.push(`الأوردر ليه ${g.uploads.length} رفعات استرجاع/استبدال — الباقي بيتحسب من المستحق الحالي على شوبيفاي`);
   const fm = p => p === null ? null : bostaFmt(p);
   return {
@@ -2306,7 +2313,7 @@ function partialShape(node, g, led) {
     codRemainder: fm(up.codRemainderP), s1, s2, courier, owed: bostaFmt(owedP), bostaCap: bostaFmt(BOSTA_CASH_REFUND_CAP),
     bostaRegistered: bostaPartP === 0, remainder: bostaFmt(Math.max(0, remainderP)),
     max: saleSum === null ? null : bostaFmt(Math.max(0, Math.min(remainderP, saleSum - refundedP))),
-    state, blockers, warnings, needsReason: !!mismatch,
+    state, blockers, warnings, needsReason: !!mismatch, manual: !!g.manual,
     existing: hit ? { refundId: String(hit.id || ''), amount: bostaFmt(bostaPiastres(hit.totalRefundedSet?.shopMoney?.amount) || 0) } : null,
     registered: done ? { at: String(done.at).slice(0, 16).replace('T', ' ') } : null,
     _p: { owedP, remainderP, refundedP, saleSum, bostaPartP, existingP: hit ? (bostaPiastres(hit.totalRefundedSet?.shopMoney?.amount) || 0) : null, sales },
@@ -2342,15 +2349,18 @@ async function partialList(env) {
 }
 
 // فحص أوردر واحد (بالمعاملات الكاملة) — بيستخدمه الفحص وكتابة التسجيل
-async function partialEvaluate(env, orderRef, trackingWanted = null) {
+// 🆕 v3.21.0 (قرار أحمد 16-11-2026) — `manual: true` = أوردر مضاف يدويًا من خارج الطابور (مفيهوش رفعة `codClipped` في سجل الرفع).
+//    رقم التتبع بيتاخد من ميتافيلد S2 على شوبيفاي (`bosta_tracking_number_s2`) — مفيش تخمين ولا رقم من المتصفح. باقي الحكم (S1/S2/المستحق/الباقي/المتاح للاسترداد)
+//    **هو هو**، و`codRemainder` = null فمفيش `needsReason`. لو الأوردر فيه رفعة مقصوصة فعلًا بنستخدمها زي الطابور (manual بيتجاهَل).
+async function partialEvaluate(env, orderRef, trackingWanted = null, manual = false) {
   const token = await getAccessToken(env);
   if (!token) throw new Error('Failed to get Shopify access token');
   const orderId = await bostaFindOrderId(env, token, orderRef);
   if (!orderId) return { found: false, error: `الأوردر ${String(orderRef).startsWith('#') ? orderRef : '#' + orderRef} مش موجود على شوبيفاي` };
   const groups = await partialUploads(env.DB, orderId);
-  const g = groups.get(String(orderId));
-  if (!g) return { found: false, error: 'الأوردر ده مفيهوش رفعة استرجاع/استبدال اتقصّ فيها المبلغ (حد بوسطة) في سجل الرفع' };
-  if (trackingWanted) {
+  let g = groups.get(String(orderId));
+  if (!g && !manual) return { found: false, error: 'الأوردر ده مفيهوش رفعة استرجاع/استبدال اتقصّ فيها المبلغ (حد بوسطة) في سجل الرفع' };
+  if (g && trackingWanted) {
     const i = g.uploads.findIndex(u => u.tracking === trackingWanted);
     if (i < 0) return { found: false, error: 'رقم التتبع مش من رفعات الأوردر ده' };
     g.uploads.unshift(...g.uploads.splice(i, 1));
@@ -2358,6 +2368,12 @@ async function partialEvaluate(env, orderRef, trackingWanted = null) {
   const data = await shopifyGQL(env, token, Q_BOSTA_ORDERS, { ids: [`gid://shopify/Order/${orderId}`] }, 'bostaOrders');
   const nd = (data.data?.nodes || [])[0];
   if (!nd?.id) return { found: false, error: 'شوبيفاي ما رجّعتش بيانات الأوردر' };
+  if (!g) {
+    const tn = String(nd.t2?.value || '').trim();
+    if (!/^\d{5,15}$/.test(tn)) return { found: false, error: 'الأوردر مفيهوش رقم تتبع S2 على شوبيفاي (bosta_tracking_number_s2) — مش هينفع يتسجّل استرداد جزئي بوسطة من غير رقم الشحنة' };
+    if (trackingWanted && trackingWanted !== tn) return { found: false, error: 'رقم التتبع مش هو رقم S2 على الأوردر ده' };
+    g = { orderId: String(orderId), orderName: nd.name || null, manual: true, uploads: [{ tracking: tn, kind: 'manual', codRemainderP: null, at: null, employee: null }] };
+  }
   const led = await partialLedgerState(env.DB, [orderId]);
   return { found: true, shape: partialShape(nd, g, led), token };
 }
@@ -3153,7 +3169,7 @@ export default {
         if (!/^#?\d{1,10}$/.test(ref)) return json({ error: 'orderRef غير صالح' }, 400, request);
         const tnW = bodyData.trackingNumber ? String(bodyData.trackingNumber).trim() : null;
         if (tnW && !/^\d{5,15}$/.test(tnW)) return json({ error: 'trackingNumber غير صالح' }, 400, request);
-        const ev = await partialEvaluate(env, ref, tnW);
+        const ev = await partialEvaluate(env, ref, tnW, bodyData.manual === true);
         if (!ev.found) return json({ success: false, error: ev.error }, 200, request);
         return json({ success: true, ...partialPublic(ev.shape) }, 200, request);
       }
@@ -3169,7 +3185,7 @@ export default {
         if (!expected || typeof expected !== 'object') return json({ error: 'expected is required' }, 400, request);
         const fail = (extra) => json({ success: false, status: 'error', actions: [], ...extra }, 200, request);
 
-        const ev = await partialEvaluate(env, ref, tn);
+        const ev = await partialEvaluate(env, ref, tn, bodyData.manual === true);
         if (!ev.found) return fail({ error: ev.error });
         const sh = ev.shape, P = sh._p;
         if (sh.state === 'done') return fail({ error: `اتسجّل قبل كده (${sh.registered?.at || ''}) — مفيش حاجة تتكرر` });
@@ -3225,7 +3241,7 @@ export default {
           source: BOSTA_PARTIAL_SOURCE, trackingNumber: tn, slot: 'S2', legOrigin: 'bosta_partial',
           partialRefund: {
             bostaCap: sh.bostaCap, bostaPartRegistered: sh.bostaRegistered, remainder: net, owedBefore: sh.owed, codRemainderRecorded: sh.codRemainder,
-            jobKind: sh.kind, s1: sh.s1, s2: sh.s2, reason: rReason, collector: collectorName,
+            jobKind: sh.kind, manualAdded: !!sh.manual, s1: sh.s1, s2: sh.s2, reason: rReason, collector: collectorName,
             shopifyRefundCreated: sh.state === 'ready', shopifyRefundId: rf.id,
           },
         };
