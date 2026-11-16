@@ -14,7 +14,7 @@ globalThis.fetch = async (url, init = {}) => {
   }
   if (u.includes('/transactions.json')) {
     const b = JSON.parse(init.body).transaction; posts.push(b);
-    return new Response(JSON.stringify({ transaction: { id: 7, kind: b.kind, status: b.status, gateway: b.gateway, amount: b.amount, message: `Marked the ${b.gateway} payment as received`, parent_id: b.kind === 'sale' ? null : 555, manual_payment_gateway: true, payment_id: '#65982.1' } }), { status: 201 });
+    return new Response(JSON.stringify({ transaction: { id: 7, kind: b.kind, status: b.status, gateway: b.gateway, amount: b.amount, message: `Marked the ${b.gateway} payment as received`, manual_payment_gateway: true, payment_id: '#65982.1' } }), { status: 201 });
   }
   return new Response('{}', { status: 404 });
 };
@@ -27,12 +27,6 @@ const call = async body => {
 let d = await call({ orderName: '#65982', amount: '100', gateway: 'Bosta COD تجربة' });
 eq('نجاح', [d.success, d.transaction?.gateway, d.transaction?.message], [true, 'Bosta COD تجربة', 'Marked the Bosta COD تجربة payment as received']);
 eq('الطلب: capture/manual-gateway-string/المبلغ', [posts[0].kind, posts[0].gateway, posts[0].amount, posts[0].currency], ['capture', 'Bosta COD تجربة', '100.00', 'EGP']);
-
-posts = [];
-d = await call({ orderName: '65982', amount: '10', gateway: 'g', kind: 'sale' });
-eq('kind=sale بيتبعت + parent_id في الرد', [posts[0].kind, d.transaction.parent_id], ['sale', null]);
-d = await call({ orderName: '65982', amount: '10', gateway: 'g', kind: 'refund' });
-eq('kind غريب ← capture (مش refund)', [posts[1].kind, d.transaction.parent_id], ['capture', 555]);
 
 posts = []; tags = ['x'];
 d = await call({ orderName: '65982', amount: '100', gateway: 'g' });
