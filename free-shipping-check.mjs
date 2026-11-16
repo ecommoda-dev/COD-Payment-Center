@@ -31,10 +31,16 @@ const ORDERS = {
   '17': { name: '#70024', amount: '-200.0', ship: null,  courier: null,            returns: [RET0()], refund: true },
   '18': { name: '#70025', amount: '-200.0', ship: null,  courier: 'Bosta',         returns: [RET0()], refund: true },
   '19': { name: '#70026', amount: '0.0',    ship: null,  courier: 'Saif',          returns: [RET0()] },                   // متبقي صفر ← مفيش حاجة تتسجّل
+  // ── v3.23.0: الرصيد الحقيقي (إجمالي − netPayment) — #65634: استرداد 18 من 165 سجّل REFUND_DISCREPANCY فـ totalOutstanding اتصفّر والعميل لسه له 147 ──
+  '20': { name: '#65634', amount: '-147.0', ship: null,  courier: 'Saif',          returns: [RET0()], refund: true },
+  '21': { name: '#70031', amount: '0.0',    ship: null,  courier: 'Saif',          returns: [], noBal: true },             // شوبيفاي ما رجّعتش الإجمالي/المدفوع
 };
+// 🆕 v3.23.0 — مسارات المناديب بتقرا الرصيد الحقيقي (إجمالي − netPayment) مش totalOutstanding: الـ mock بيرجّع الحقلين (a موجب = عليه · سالب = له)
+const moneyOf = v => ({ shopMoney: { amount: String(v) } });
+const balNode = a => { const n = parseFloat(a); return { currentTotalPriceSet: moneyOf((1000 + Math.max(n, 0)).toFixed(1)), netPaymentSet: moneyOf((1000 + Math.max(-n, 0)).toFixed(1)) }; };
 const gqlOrder = o => ({ data: { order: {
   id: 'gid://shopify/Order/1', name: o.name, cancelledAt: null, canMarkAsPaid: !o.refund, displayFinancialStatus: 'PENDING',
-  totalOutstandingSet: { shopMoney: { amount: o.amount } }, subtotalPriceSet: { shopMoney: { amount: o.amount } },
+  ...(o.noBal ? {} : balNode(o.amount)), subtotalPriceSet: { shopMoney: { amount: o.amount } },
   shippingLine: o.ship == null ? null : { originalPriceSet: { shopMoney: { amount: o.ship } } },
   courierMeta: o.courier == null ? null : { value: o.courier }, preRegMeta: null, s1Meta: { value: 'Delivered' }, s2Meta: null,
   discountApplications: { edges: [] }, lineItems: { nodes: [] }, returns: { nodes: o.returns }, refunds: [], transactions: [],
@@ -178,7 +184,7 @@ eq('استبدال بتأكيد بلا leg ← blocked', d.blocked, true);
 
 console.log('══ ④ الأوردر المسجّل مسبقًا ══');
 KV_PENDING = { amount: '1750.00', subtotal: '1750.00', shippingAmount: '0.00', courier: 'Kareem', orderName: '#63607', lineItems: [], preRegisteredAt: '2026-11-03T10:00:00Z' };
-PRE_STATE = { totalOutstandingSet: { shopMoney: { amount: '0.0' } }, s2Meta: null, courierMeta: { value: 'Kareem' }, returns: { nodes: [] } };
+PRE_STATE = { ...balNode('0.0'), s2Meta: null, courierMeta: { value: 'Kareem' }, returns: { nodes: [] } };
 const pv = await call({ action: 'preview', orderId: '2' });
 eq('preview مسجّل مسبقًا بشحن 0 ← شحن مجاني 75', { pre: pv.preRegistered, ...fee(pv) }, { pre: true, freeShipping: true, courierFee: 75, courierKind: 'courier', courierMissing: false });
 c0 = captures; r0 = rows.length;
@@ -187,6 +193,15 @@ eq('مسجّل مسبقًا بلا تأكيد ← blocked قبل أي كتابة
 d = await call({ action: 'pay', orderId: '2', amount: '1750.00', employee: 'Fady', batchId: 'b8', sessionMeta: { courier: 'Kareem' }, orderMeta: { courierCollect: 1750, preRegistered: true, freeShipping: ack('courier', 75) } });
 eq('مسجّل مسبقًا بتأكيد ← courierCollect = 1750 − 75', { success: d.success, cc: extraOf(rows.length - 1).courierCollect, f: extraOf(rows.length - 1).freeShipping?.courierFee }, { success: true, cc: 1675, f: 75 });
 KV_PENDING = null;
+
+console.log('══ ⑧ v3.23.0 — مسارات المناديب بتقرا الرصيد الحقيقي (#65634) ══');
+const pv20 = await call({ action: 'preview', orderId: '20' });
+eq('#65634: الرصيد −147 (الحقيقي) ← «مستحق استرداد» — مش «مدفوع بالكامل»', pv20.skipReason, 'مستحق استرداد');
+const pv21 = await call({ action: 'preview', orderId: '21' });
+eq('حقول الإجمالي/المدفوع ناقصة ← خطأ بسببه (مش «مدفوع بالكامل» ولا صفر ضمني)', { ok: pv21.success === true, skipPaid: pv21.skipReason === 'مدفوع بالكامل', msg: /إجمالي الأوردر أو المدفوع/.test(JSON.stringify(pv21)) }, { ok: false, skipPaid: false, msg: true });
+const ref0 = refunds;
+const rf20 = await call({ action: 'refund', orderId: '20', amount: '147.00', employee: 'Fady', batchId: 'r20', sessionMeta: { courier: 'Saif' }, orderMeta: { hasReturn: true, courierCollect: -147 }, saleTransactions: [{ id: 'gid://shopify/OrderTransaction/50', amount: 165 }] });
+eq('استرداد 147 على #65634: الأوردر بيتعامل كـ «له فلوس» (مفيش «مدفوع بالكامل»)', { saidPaid: /مدفوع بالكامل/.test(JSON.stringify(rf20)) }, { saidPaid: false });
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} بند عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);

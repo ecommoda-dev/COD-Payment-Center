@@ -205,7 +205,7 @@ eq('تفصيل الحسابات ≠ المبلغ → رفض', [r.success, r.need
 r = await pay('#63994', '4962164025', exp1, { paymentMethods: PM('300.00', '200.00'), paymentAccounts: { instapay: { 'فادي': '100.00', 'مُرسل': '200.00' }, wallet: { 'إسلام': '200.00' } } });
 eq('نجاح #63994', [r.success, r.status, r.amount, r.courier, r.refund.created], [true, 'success', '500.00', 'Ahmed Ibraheem', true]);
 eq('شوبيفاي: استرداد واحد بالباقي فقط (مش 2500)', [refundsMade.length, refundsMade[0].transactions.reduce((a2, t) => a2 + parseFloat(t.amount), 0)], [1, 500]);
-eq('ملاحظة الاسترداد = مفتاح عدم التكرار', refundsMade[0].note, 'Bosta partial refund 4962164025');
+eq('ملاحظة الاسترداد: البادئة + التتبع (مفتاح عدم التكرار) في أولها', refundsMade[0].note.startsWith('Bosta partial refund 4962164025'), true);
 eq('الاسترداد على معاملة SALE الناجحة بس (مش PENDING)', refundsMade[0].transactions.map(t => t.parentId), ['gid://shopify/OrderTransaction/2']);
 const row = logs[logs.length - 1], ex1 = JSON.parse(row.extra);
 eq('صف D1 واحد بس اتكتب', logs.length - n0, 1);
@@ -295,7 +295,7 @@ r = await pay('#70001', '9090909090', expMnl, { paymentMethods: PM('500.00', '0.
 eq('تسجيل بلا manual → مرفوض بلا كتابة', [r.success, refundsMade.length - refN0, logs.length - logN0], [false, 0, 0]);
 r = await pay('#70001', '9090909090', expMnl, { manual: true, paymentMethods: PM('500.00', '0.00') });
 eq('تسجيل manual ناجح', [r.success, r.amount, r.refund.created], [true, '500.00', true]);
-eq('الاسترداد بالباقي بملاحظة التتبع', [refundsMade.length - refN0, refundsMade[refundsMade.length - 1].note], [1, 'Bosta partial refund 9090909090']);
+eq('الاسترداد بالباقي بملاحظة التتبع (البادئة + التتبع في أولها)', [refundsMade.length - refN0, refundsMade[refundsMade.length - 1].note.startsWith('Bosta partial refund 9090909090')], [1, true]);
 const exRowMnl = JSON.parse(logs[logs.length - 1].extra);
 eq('الصف: علامة الخزنة + manualAdded', [logs.length - logN0, exRowMnl.source, exRowMnl.batchId, exRowMnl.partialRefund.manualAdded, exRowMnl.partialRefund.jobKind, exRowMnl.courierCollect], [1, 'bosta_partial_refund', 'bosta-partial-9090909090', true, 'manual', -500]);
 eq('بعد التسجيل: manual check بيرجّع done', (await call({ action: 'bostaPartialCheck', orderRef: '#70001', manual: true })).body.state, 'done');
@@ -330,6 +330,8 @@ eq('#49669: ready والمستحق 2800 والباقي 2800 (الرصيد الح
 const p69 = await pay('#49669', '7777777777', { remainder: '2800.00', owed: '2800.00', s2: 'In-Return' }, { paymentMethods: PM('2800.00', '0.00') });
 eq('التسجيل نجح بالباقي 2800', [p69.success, refundsMade[refundsMade.length - 1].transactions.reduce((a2, t) => a2 + parseFloat(t.amount), 0)], [true, 2800]);
 eq('الاسترداد التاني بيعادل الفرق: شوبيفاي رجعت نضيفة (مستحق 0 · فرق 0)', [sh69.out, sh69.disc], ['0.0', '0.0']);
+const note69 = refundsMade[refundsMade.length - 1].note;
+eq('سبب استرداد الباقي: البادئة + التتبع (مفتاح عدم التكرار) + توضيح الحد والموظف', [note69.startsWith('Bosta partial refund 7777777777'), /Bosta cash cap \(2000\.00 EGP\)/.test(note69), /transferred by Ahmed Ibraheem/.test(note69)], [true, true, true]);
 eq('وبعدها #49669 done', (await check('#49669')).state, 'done');
 
 // أوردر بفرق استرداد قديم (مثال #55640: استرداد 2400 من 2800 → فرق +400 والمستحق الخام 0) — لسه له 400

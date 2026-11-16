@@ -1,6 +1,15 @@
 /**
- * cod-payment-center-worker  (v3.22.0)
+ * cod-payment-center-worker  (v3.23.0)
  * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 16-11-2026
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * v3.23.0 — مسارات المناديب بتقرا الرصيد الحقيقي كمان + «سبب» الاسترداد (16-11-2026 · #49667 · #65634):
+ *   ✅ `courierBalance(node)` (= `currentTotal − netPayment`، بيرمي لو حقل ناقص) بدل `totalOutstandingSet` في `getOrderById` (preview/pay/refund) و`getPreRegPayState` و`getCourierOrders` و`getCourierOrdersToday`.
+ *      #65634: استرداد 18 من 165 صفّر المستحق الخام والعميل لسه له 147 ← كان «مدفوع بالكامل»، دلوقتي «مستحق استرداد» بمبلغ −147. الحقول `outstanding` في الرد بقت الرصيد الحقيقي (نفس الاسم).
+ *      ⚠️ أوردر فيه فرق استرداد **مقصود** (رسوم اتحجزت) هيبان له مستحق استرداد بقد الفرق — الموظف هو اللي بيقرر.
+ *   ✅ سبب الاسترداد على شوبيفاي (Refund reason): ملف الـ Cash-out بقى بيكتب `Bosta <النوع> <التتبع>` (كان فاضي «No reason provided») زي نافذة الفحص — فبتتعرف `exists` لو اتفحصت بعدين.
+ *      واسترداد الباقي: `Bosta partial refund <التتبع> — remainder above the Bosta cash cap (2000.00 EGP) · transferred by <الموظف>` (البادئة + التتبع هم مفتاح عدم التكرار — ما اتغيّروش).
+ *   🔴 `codPayment.min = 3.23.0` — انشر الـ Worker قبل الصفحة. فحص: `free-shipping-check` 55 (+§⑧) · `bosta-partial-check` 97 · `bosta-cash-cycle-check` 264 · `order-kind-check` 25.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * v3.22.0 — «الرصيد الحقيقي للعميل» بدل `totalOutstandingSet` في مسارات بوسطة الثلاثة (16-11-2026 · #49667):
@@ -424,7 +433,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.22.0';
+const WORKER_VERSION = 'v3.23.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1297,7 +1306,7 @@ async function getOrderDataById(env, numericId) {
         cancelledAt
         canMarkAsPaid
         displayFinancialStatus
-        totalOutstandingSet { shopMoney { amount } }
+        ${COURIER_BALANCE_FIELDS}
         subtotalPriceSet    { shopMoney { amount } }
         shippingLine { originalPriceSet { shopMoney { amount } } }
         courierMeta: metafield(namespace: "custom", key: "courier")              { value }
@@ -1402,7 +1411,7 @@ async function getOrderDataById(env, numericId) {
     };
   }
 
-  const outstanding     = parseFloat(order.totalOutstandingSet?.shopMoney?.amount || '0');
+  const outstanding     = courierBalance(order, 'getOrderById');   // 🆕 v3.23.0 — الرصيد الحقيقي (إجمالي − netPayment) مش totalOutstanding
   const subtotal        = parseFloat(order.subtotalPriceSet?.shopMoney?.amount    || '0');
   const shippingAmount  = parseFloat(order.shippingLine?.originalPriceSet?.shopMoney?.amount || '0');
   const canMarkAsPaid   = order.canMarkAsPaid;
@@ -1504,7 +1513,7 @@ async function getPreRegPayState(token, env, numericId) {
   const query = `
     query getPreRegPayState($id: ID!) {
       order(id: $id) {
-        totalOutstandingSet { shopMoney { amount } }
+        ${COURIER_BALANCE_FIELDS}
         s2Meta: metafield(namespace: "custom", key: "status_2_r_e") { value }
         courierMeta: metafield(namespace: "custom", key: "courier") { value }
         returns(first: 1) { nodes { id } }
@@ -1514,10 +1523,8 @@ async function getPreRegPayState(token, env, numericId) {
   const data  = await shopifyGQL(env, token, query, { id: `gid://shopify/Order/${numericId}` }, 'getPreRegPayState');
   const order = data?.data?.order;
   if (!order) throw new Error(`الأوردر ${numericId} مش موجود على شوبيفاي — التحصيل اتوقف`);
-  const amt = order.totalOutstandingSet?.shopMoney?.amount;
-  if (amt == null) throw new Error(`شوبيفاي ما رجّعتش المستحق للأوردر ${numericId} — التحصيل اتوقف`);
   return {
-    outstanding: parseFloat(amt),
+    outstanding: courierBalance(order, `getPreRegPayState #${numericId}`),   // 🆕 v3.23.0 — الرصيد الحقيقي
     s2:          order.s2Meta?.value || null,
     courier:     order.courierMeta?.value || null,
     hasReturn:   (order.returns?.nodes || []).length > 0,
@@ -1720,6 +1727,20 @@ function bostaBalance(nd) {
 // ملاحظة استرداد «استرداد جزئي بوسطة» — ما تتعدّش استرداد الـ CRP (نفس رقم التتبع في الملاحظة) ولا تدخل في «اتعمل استرداد مقابل»
 const BOSTA_PARTIAL_NOTE_PREFIX = 'Bosta partial refund ';
 const isPartialRefundNote = note => String(note || '').startsWith(BOSTA_PARTIAL_NOTE_PREFIX);
+
+// ── 🆕 v3.23.0 — مسارات المناديب بتقرا الرصيد الحقيقي كمان (نفس §BOSTA-BALANCE) ──────────────────────────────
+// `totalOutstandingSet` بيتصفّر بعد أي استرداد جزئي (REFUND_DISCREPANCY) فأوردر زي #65634 (له 147) كان بيطلع «مدفوع بالكامل». الرصيد الحقيقي = إجمالي − netPayment.
+// بيرمي لو أي حقل ناقص — مفيش صفر ضمني على مسار مالي (نفس قاعدة getOrderOutstanding من v3.5.0). النتيجة بالجنيه (رقم) وبتتقرّب لقرشين.
+const COURIER_BALANCE_FIELDS = `currentTotalPriceSet { shopMoney { amount } } netPaymentSet { shopMoney { amount } }`;
+function courierBalance(node, label) {
+  const b = bostaBalance(node).balanceP;
+  if (b === null) throw new Error(`${label}: شوبيفاي ما رجّعتش إجمالي الأوردر أو المدفوع (مش قادرين نحسب المستحق) — الأمر اتوقف`);
+  return b / 100;
+}
+// ── 🆕 v3.23.0 — «سبب» الاسترداد على شوبيفاي (Refund reason) — مفتاح عدم التكرار لاسترداد الـ CRP: `Bosta <النوع> <التتبع>` (نفس نافذة الفحص وملف الـ Cash-out) ──
+const BOSTA_ORDER_TYPE_LABEL = { CUSTOMER_RETURN_PICKUP: 'Customer Return Pickup', EXCHANGE: 'Exchange', SEND: 'Send', RETURN_TO_ORIGIN: 'Return to Origin', RTO: 'Return to Origin' };
+const bostaRefundNote = (typeLabel, tn) => `Bosta ${typeLabel} ${tn}`;
+const bostaOrderTypeLabel = t => BOSTA_ORDER_TYPE_LABEL[String(t || '').toUpperCase().replace(/[\s-]+/g, '_')] || String(t || 'Order');
 
 function bostaCheckCtx(ctx) {
   const c = ctx || {};
@@ -2774,7 +2795,7 @@ export default {
                 edges {
                   node {
                     id name canMarkAsPaid displayFinancialStatus createdAt
-                    totalOutstandingSet { shopMoney { amount } }
+                    ${COURIER_BALANCE_FIELDS}
                     subtotalPriceSet    { shopMoney { amount } }
                     shippingLine { originalPriceSet { shopMoney { amount } } }
                     shippingAddress { firstName lastName }
@@ -2800,7 +2821,7 @@ export default {
           for (const edge of ordersData.edges) {
             const node        = edge.node;
             const nId          = node.id.replace('gid://shopify/Order/', '');
-            const outstanding = parseFloat(node.totalOutstandingSet?.shopMoney?.amount || '0');
+            const outstanding = courierBalance(node, 'getCourierOrders');   // 🆕 v3.23.0
             const subtotal    = parseFloat(node.subtotalPriceSet?.shopMoney?.amount    || '0');
             const shipping    = parseFloat(node.shippingLine?.originalPriceSet?.shopMoney?.amount || '0');
             const addr        = node.shippingAddress;
@@ -2897,7 +2918,7 @@ export default {
             nodes(ids: $ids) {
               ... on Order {
                 id name canMarkAsPaid displayFinancialStatus createdAt
-                totalOutstandingSet { shopMoney { amount } }
+                ${COURIER_BALANCE_FIELDS}
                 subtotalPriceSet    { shopMoney { amount } }
                 shippingLine { originalPriceSet { shopMoney { amount } } }
                 shippingAddress { firstName lastName }
@@ -2928,7 +2949,7 @@ export default {
           for (const node of nodes) {
             if (!node?.id) continue; // null = أوردر محذوف/غير متاح
             const nId = node.id.replace('gid://shopify/Order/', '');
-            const outstanding = parseFloat(node.totalOutstandingSet?.shopMoney?.amount || '0');
+            const outstanding = courierBalance(node, 'getCourierOrdersToday');   // 🆕 v3.23.0
             const subtotal     = parseFloat(node.subtotalPriceSet?.shopMoney?.amount    || '0');
             const shipping     = parseFloat(node.shippingLine?.originalPriceSet?.shopMoney?.amount || '0');
             const addr         = node.shippingAddress;
@@ -3030,7 +3051,7 @@ export default {
           if (!tx.success) return json({ success: false, status: 'error', error: tx.error, actions }, 200, request);
           actions.push(`تحصيل ${bostaFmt(gross)} ج على شوبيفاي (بوسطة ${ctx.cashOutId})`);
         } else if (r.kind === 'refund') {
-          const rf = await createRefund(token, env, r.orderId, r._sale, bostaFmt(-gross), 'EGP');
+          const rf = await createRefund(token, env, r.orderId, r._sale, bostaFmt(-gross), 'EGP', bostaRefundNote(bostaOrderTypeLabel(n.orderType), n.tracking));   // 🆕 v3.23.0 — سبب الاسترداد (كان فاضي «No reason provided»)
           if (!rf.success) return json({ success: false, status: 'error', error: rf.error, actions }, 200, request);
           actions.push(`استرداد ${bostaFmt(-gross)} ج على شوبيفاي (بوسطة ${ctx.cashOutId})`);
         } else {
@@ -3167,7 +3188,7 @@ export default {
           const tokenR = await getAccessToken(env);
           if (!tokenR) return json({ success: false, status: 'error', error: 'Failed to get Shopify access token', actions: [] }, 200, request);
           const saleTx = (e._sales || []).map(t => ({ id: `gid://shopify/OrderTransaction/${t.id}`, amount: t.p / 100 }));
-          const rf = await createRefund(tokenR, env, e.orderId, saleTx, bostaFmt(rAmountP), 'EGP', `Bosta ${c.typeLabel} ${tn}`);
+          const rf = await createRefund(tokenR, env, e.orderId, saleTx, bostaFmt(rAmountP), 'EGP', bostaRefundNote(c.typeLabel, tn));
           if (!rf.success) return json({ success: false, status: 'error', error: `شوبيفاي رفضت الاسترداد: ${rf.error} — مفيش حاجة اتكتبت (لا شوبيفاي ولا السجل)`, actions: [] }, 200, request);
           rfInfo = { id: rf.refundId, amount: bostaFmt(rAmountP), owedAfter: bostaFmt(Math.max(0, c._r.owed - rAmountP)) };
           actions.push(`شوبيفاي: اتعمل استرداد ${rfInfo.amount} ج (${rf.refundId}) — المستحق قبل ${rp.owed} · بعد ${rfInfo.owedAfter}`);
@@ -3258,7 +3279,7 @@ export default {
         let rf = null;
         if (sh.state === 'ready') {
           const saleTx = P.sales.map(t => ({ id: `gid://shopify/OrderTransaction/${t.id}`, amount: t.p / 100 }));
-          const r = await createRefund(ev.token, env, sh.orderId, saleTx, bostaFmt(amountP), 'EGP', partialNote(tn));
+          const r = await createRefund(ev.token, env, sh.orderId, saleTx, bostaFmt(amountP), 'EGP', `${partialNote(tn)} — remainder above the Bosta cash cap (${bostaFmt(BOSTA_CASH_REFUND_CAP)} EGP) · transferred by ${collectorName}`);   // 🆕 v3.23.0 — سبب أوضح؛ البادئة + التتبع (مفتاح عدم التكرار) زي ما هم
           if (!r.success) return fail({ error: `شوبيفاي رفضت الاسترداد: ${r.error} — مفيش حاجة اتكتبت (لا شوبيفاي ولا السجل)` });
           rf = { id: r.refundId, amount: bostaFmt(amountP) };
           actions.push(`شوبيفاي: اتعمل استرداد ${rf.amount} ج (${r.refundId}) — الباقي بعد حد بوسطة (${sh.bostaCap}) · المستحق قبل ${sh.owed}`);
