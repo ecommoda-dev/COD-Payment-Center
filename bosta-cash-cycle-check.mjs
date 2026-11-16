@@ -75,6 +75,8 @@ Object.assign(SHOP, {
 Object.assign(SHOP, {
   '47534': mk('#47534', 801, '0.0', { createdAt: '2026-07-14T14:54:17Z', t1: '9300000001', tx: [TX('31', '5275.0', 'SALE', 'PENDING'), TX('32', '5275.0'), TX('33', '75.0')] }),
   '47535': mk('#47535', 802, '0.0', { createdAt: '2026-07-14T14:54:17Z', t1: '9300000011', tx: [TX('34', '5275.0')] }),   // مفيش أي دليل زيادة على S1 → منع
+  '51802': mk('#51802', 803, '0.0', { createdAt: '2026-08-17T05:23:14Z', t1: '9300000021', courier: 'Mahmoud Samy', tx: [TX('41', '1325.0')] }),   // #51802 الحقيقي: S1 اتحصّل قبل كده والمندوب على شوبيفاي مش Bosta
+  '51153': mk('#51153', 804, '1050.0', { createdAt: '2026-08-17T05:23:14Z', courier: 'Bosta', tx: [TX('51', '1850.0', 'SALE', 'PENDING'), TX('52', '1850.0')] }),   // #51153 الحقيقي: S1 1850 + Exchange 950 + Exchange 100 — شوبيفاي مفيهاش تحصيل للاستبدالين (المتبقي 1050)
 });
 const bd = (tn, code, state, o = {}) => ({ trackingNumber: tn, type: { code, value: { 10: 'Send', 20: 'Return to Origin', 30: 'Exchange' }[code] }, state: { code: state }, createdAt: o.createdAt || '2026-08-01T12:00:00Z', ...(o.oldType ? { oldType: o.oldType } : {}) });
 const PRIOR_S1_ADD = ['702', '703', '704', '706', '707'];
@@ -87,6 +89,8 @@ const BOSTA = {
     '47530': [bd('3505408529', 20, 46, { oldType: 'EXCHANGE', createdAt: '2026-08-02T09:00:00Z' }), bd('7217235847', 30, 46, { createdAt: '2026-08-06T09:00:00Z' }), bd('3356047136', 10, 45, { createdAt: '2026-07-15T09:00:00Z' })],
     '47534': [bd('9300000001', 10, 45, { createdAt: '2026-07-15T09:00:00Z' }), bd('9300000002', 30, 46, { createdAt: '2026-08-06T09:00:00Z' })],
     '47535': [bd('9300000011', 10, 45, { createdAt: '2026-07-15T09:00:00Z' }), bd('9300000012', 30, 46, { createdAt: '2026-08-06T09:00:00Z' })],
+    '51802': [bd('9300000021', 10, 45, { createdAt: '2026-08-17T09:00:00Z' })],
+    '51153': [bd('570507773', 10, 45, { createdAt: '2026-08-17T09:00:00Z' }), bd('5575612262', 30, 46, { createdAt: '2026-08-20T09:00:00Z' }), bd('4775948853', 30, 46, { createdAt: '2026-08-29T09:00:00Z' })],
     '47531': [bd('9100000010', 20, 46, { oldType: 'EXCHANGE' })],
     '47532': [bd('9100000001', 20, 46, { oldType: 'EXCHANGE' }), bd('9100000011', 10, 45)],
     '47533': [bd('9100000002', 20, 46), bd('9100000012', 10, 45)],
@@ -105,6 +109,10 @@ const BOSTA = {
     '9300000002': { ...bd('9300000002', 30, 46), ...wal(100, 149.34, 'MONCOD10AUG26', '2026-08-10T00:00:00.000Z') },
     '9300000011': { ...bd('9300000011', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
     '9300000012': { ...bd('9300000012', 30, 46), ...wal(100, 149.34, 'MONCOD10AUG26', '2026-08-10T00:00:00.000Z') },
+    '9300000021': { ...bd('9300000021', 10, 45), ...wal(1325, 113.43, 'MONCOD24AUG26', '2026-08-24T00:00:00.000Z') },
+    '570507773': { ...bd('570507773', 10, 45), ...wal(1850, 122.55, 'MONCOD24AUG26', '2026-08-24T00:00:00.000Z') },
+    '5575612262': { ...bd('5575612262', 30, 46), ...wal(950, 137.94, 'MONCOD31AUG26', '2026-08-31T00:00:00.000Z') },
+    '4775948853': { ...bd('4775948853', 30, 46), ...wal(100, 156.18, 'MONCOD07SEP26', '2026-09-07T00:00:00.000Z') },
     '9100000010': { ...bd('9100000010', 20, 46, { oldType: 'EXCHANGE' }), ...wal(100, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
     '9100000001': { ...bd('9100000001', 20, 46, { oldType: 'EXCHANGE' }), ...wal(150, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
     '9100000011': { ...bd('9100000011', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
@@ -195,7 +203,7 @@ globalThis.fetch = async (url, init = {}) => {
   const m = u.match(/orders\/(\d+)\/transactions\.json/);
   if (m) {
     const body = JSON.parse(init.body); rest.push({ id: m[1], ...body.transaction });
-    const o = Object.values(SHOP).find(x => String(x.id) === m[1]); if (o) { o.out = '0.0'; o.disc = '0'; }
+    const o = Object.values(SHOP).find(x => String(x.id) === m[1]); if (o) { o.out = (parseFloat(o.out) - parseFloat(body.transaction.amount)).toFixed(1); o.disc = '0'; o.tx.push(TX(String(9000 + rest.length), body.transaction.amount)); }
     return new Response(JSON.stringify({ transaction: { id: 777 } }), { status: 200 });
   }
   return new Response('{}', { status: 404 });
@@ -404,7 +412,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.23.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.23.0');
+eq('get_config بيرجّع 3.25.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.25.0');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -863,6 +871,53 @@ const p13 = (await call({ action: 'bostaPay', row: R67, ctx: ctx13, employee: 'A
 eq('bostaPay: نجح + استرداد 2000 على شوبيفاي', [p13.success, refunds.length - rf0, refunds.length > rf0 ? refunds[refunds.length - 1].transactions.reduce((a2, t) => a2 + parseFloat(t.amount), 0) : null], [true, 1, 2000]);
 eq('شوبيفاي بعد الاسترداد التاني: الفرق اتعادل (مستحق 0 · فرق 0)', [sh67.out, sh67.disc], ['0.0', '0.0']);
 eq('سبب الاسترداد (Refund reason) بدل «No reason provided»: Bosta <النوع> <التتبع>', refunds[refunds.length - 1].note, 'Bosta Exchange 4445297000');
+
+console.log('══ ⑭ v3.24.0 — #51802: المندوب على شوبيفاي مش Bosta = تنبيه + تأكيد يدوي (بدل المنع) ══');
+const d51 = await chk('#51802'), x51 = cand(d51, '9300000021');
+eq('S1 قابلة بتنبيه (مش ممنوعة) · courierMismatch بالاسم', [x51.eligible, x51.needsCourierAck, x51.courierMismatch, x51.blockers], [true, true, { shopify: 'Mahmoud Samy', expected: 'Bosta' }, []]);
+eq('الملاحظة بتسمّي المندوب', /Mahmoud Samy/.test(x51.notes.join()), true);
+const EXP14 = (o = {}) => ({ gross: '1325.00', net: '1211.57', cashOutId: 'MONCOD24AUG26', courierMismatch: 'Mahmoud Samy', ...o });
+const w14c = wr();
+let q14c = await payS1('#51802', '9300000021', EXP14());
+eq('بلا تأكيد → needsCourierAck بلا أي كتابة', [q14c.success, q14c.needsCourierAck, q14c.courierMismatch.shopify, wr()], [false, true, 'Mahmoud Samy', w14c]);
+q14c = await payS1('#51802', '9300000021', EXP14({ courierMismatch: 'Ali' }), { courierMismatch: { ack: true } });
+eq('expected.courierMismatch غلط → stale بلا كتابة', [q14c.success, q14c.stale, wr()], [false, true, w14c]);
+q14c = await payS1('#51802', '9300000021', EXP14(), { courierMismatch: { ack: true } });
+const L14 = logs[logs.length - 1], X14 = E8(L14);
+eq('بالتأكيد: نجاح · warning · payment · courier بيفضل Bosta', [q14c.success, q14c.status, L14.type, X14.courier, X14.courierCollect], [true, 'warning', 'payment', 'Bosta', 1211.57]);
+eq('extra بيحفظ المندوب الأصلي · التحذير بيسمّيه', [X14.courierMismatch, X14.shopifyCourier, /Mahmoud Samy/.test(q14c.warning || '')], [true, 'Mahmoud Samy', true]);
+eq('صفر كتابة على شوبيفاي · صف D1 واحد', [rest.length, refunds.length, logs.length - w14c[0]], [w14c[1], w14c[2], 1]);
+// مسار ملف الـ Cash-out لسه بيمنع (مفيش إقرار في الدفعة)
+
+console.log('══ ⑮ v3.25.0 — #51153: استبدالين (950 + 100) بوسطة حصّلتهم وشوبيفاي مفيهاش تحصيل — تحصيل على شوبيفاي بتنبيه وتأكيد ══');
+const s53c = await payS1('#51153', '570507773', { gross: '1850.00', net: '1727.45', cashOutId: 'MONCOD24AUG26' });
+eq('S1 اتسجّلت', [s53c.success, s53c.status], [true, 'success']);
+let d53c = await chk('#51153'), x53c = cand(d53c, '5575612262'), y53c = cand(d53c, '4775948853');
+eq('المتبقي 1050 · SALE 1850', [d53c.shopifyOutstanding, d53c.shopifySaleCaptured], ['1050.00', '1850.00']);
+eq('Exchange 950: قابلة بتأكيد + shopifyCapture', [x53c.eligible, x53c.needsCaptureConfirm, x53c.shopifyCapture, x53c.blockers], [true, true, { amount: '950.00', outstanding: '1050.00', after: '100.00' }, []]);
+eq('Exchange 100 (قبل 950): قابلة كمان — المتبقي 1050 أكبر منها', [y53c.eligible, y53c.shopifyCapture && y53c.shopifyCapture.after], [true, '950.00']);
+const EXP15c = (o = {}) => ({ gross: '950.00', net: '812.06', cashOutId: 'MONCOD31AUG26', shopifyCapture: '1050.00', ...o });
+const w15c = wr();
+let q15c = await payS1('#51153', '5575612262', EXP15c());
+eq('بلا تأكيد → needsCaptureConfirm بلا أي كتابة', [q15c.success, q15c.needsCaptureConfirm, q15c.shopifyCapture.amount, wr()], [false, true, '950.00', w15c]);
+q15c = await payS1('#51153', '5575612262', EXP15c({ shopifyCapture: '999.00' }), { shopifyCapture: { ack: true } });
+eq('expected.shopifyCapture غلط → stale بلا كتابة', [q15c.success, q15c.stale, wr()], [false, true, w15c]);
+q15c = await payS1('#51153', '5575612262', EXP15c(), { shopifyCapture: { ack: true } });
+const L15c = logs[logs.length - 1], X15c = E8(L15c);
+eq('بالتأكيد: نجاح · warning · payment 950', [q15c.success, q15c.status, q15c.kind, q15c.leg, L15c.type, L15c.value_after], [true, 'warning', 'leg_api', 'S2', 'payment', 950]);
+eq('شوبيفاي: تحصيل واحد بـ950 (capture · manual) والمتبقي 100', [rest.length - w15c[1], rest[rest.length - 1].amount, rest[rest.length - 1].kind, SHOP['51153'].out], [1, '950.00', 'capture', '100.0']);
+eq('الخزنة: courierCollect = Net 812.06 · جلسة مستقلة · courier Bosta', [X15c.courierCollect, X15c.batchId, X15c.courier, X15c.source], [812.06, 'bosta-leg-5575612262', 'Bosta', 'bosta_cash_cycle']);
+eq('extra: shopifyCaptured 950 · معاملة · المتبقي قبل/بعد', [X15c.shopifyCaptured, X15c.shopifyCaptureCreated, X15c.shopifyOutstandingBefore, X15c.shopifyOutstandingAfter], ['950.00', true, '1050.00', '100.00']);
+eq('الرد بيقول التحصيل · والتحذير', [q15c.shopifyCapture && q15c.shopifyCapture.amount, /950\.00/.test(q15c.warning || '')], ['950.00', true]);
+d53c = await chk('#51153'); y53c = cand(d53c, '4775948853');
+eq('بعدها Exchange 100 = المتبقي بالظبط ← «سجّله بملف الـ Cash-out العادي»', [y53c.eligible, /ملف الـ Cash-out العادي/.test(y53c.blockers.join())], [false, true]);
+const ctx15c = { ...ctx, rowsTotal: 1, netTotal: '-56.18', payOrders: 1, refundOrders: 0, s1Orders: ['#51153'] };
+const R100c = R('#51153', '4775948853', 'EXCHANGE', 100, 0, -56.18, 156.18);
+const v15c = (await val([R100c], ctx15c)).results[0];
+eq('صف الملف 100 بقى مطابق للمتبقي → ready', [v15c.status], ['ready']);
+const rs0c = rest.length;
+const p15c = (await call({ action: 'bostaPay', row: R100c, ctx: ctx15c, employee: 'Ahmed_Ibraheem' })).body;
+eq('bostaPay: تحصيل 100 على شوبيفاي والأوردر يتقفل (المتبقي 0)', [p15c.success, rest.length - rs0c, SHOP['51153'].out], [true, 1, '0.0']);
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);

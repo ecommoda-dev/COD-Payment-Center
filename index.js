@@ -22,6 +22,18 @@
  *   ➕ الرد: `shopifyOutstanding` بقى الرصيد الحقيقي، + `shopifyOutstandingRaw` (اللي شوبيفاي بيرجّعه) + `shopifyRefundDiscrepancy`. فحص: `node bosta-partial-check.mjs` · `node bosta-cash-cycle-check.mjs`. ⚠️ ما اتجرّبش على Worker منشور/شوبيفاي حقيقية.
  *
 
+ * v3.25.0 — «فحص شحنات بوسطة»: تحصيل على شوبيفاي لشحنة Exchange موجبة مفيهاش SALE والمتبقي أكبر منها (16-11-2026 · قرار أحمد · #51153):
+ *   🆕 `bostaS1Check`: S2 موجبة (مش RTO) · بلا دليل SALE · `0 < إجماليها < المتبقي` ← قابلة بدل المنع + `shopifyCapture {amount, outstanding, after}` و`needsCaptureConfirm`. (== المتبقي بالظبط لسه ملف الـ Cash-out العادي.)
+ *   🆕 `bostaPayS1`: `shopifyCapture: { ack }` — بلا `ack:true` ⇒ `needsCaptureConfirm` · `expected.shopifyCapture` (المتبقي) ≠ الحالي ⇒ `stale` — قبل أي كتابة. التحصيل على شوبيفاي **الأول** (`createTransaction` بمبلغ الشحنة · فشله = صفر كتابة) ثم صف D1.
+ *   الصف: `leg_api` · `courierCollect` = Net زي ما هو · `extra.shopifyCaptured` = المبلغ · `shopifyCaptureCreated` · `shopifyCaptureTransactionId` · `shopifyOutstandingBefore/After`. ⚠️ مفيش رجوع من الأداة. الإعادة بعد فشل D1 آمنة (شوبيفاي بقت مغطّية).
+ *   🔴 `codPayment.min = 3.25.0` — انشر الـ Worker قبل الصفحة. فحص: `bosta-cash-cycle-check` (+§⑮ #51153).
+ *
+ * v3.24.0 — «فحص شحنات بوسطة»: المندوب على شوبيفاي مش Bosta = تنبيه + تأكيد يدوي بدل المنع (16-11-2026 · قرار أحمد · #51802):
+ *   🆕 `bostaS1Check`: المندوب ≠ Bosta ما بقاش `blocker` — بيرجّع `courierMismatch {shopify, expected}` و`needsCourierAck:true` وملاحظة. الشحنة جاية من بوسطة نفسها (بحث بالمرجع + رقم التتبع).
+ *   🆕 `bostaPayS1`: بياخد `courierMismatch: { ack }` — من غير `ack:true` ⇒ `needsCourierAck` (قبل أي كتابة، حتى الاسترداد على شوبيفاي) · `expected.courierMismatch` ≠ الحالي ⇒ `stale` · الرد `warning`.
+ *   الصف (D1 بس): `courier` بيفضل `Bosta` (عقد الخزنة) + `extra.courierMismatch=true` · `shopifyCourier`. ⛔ مسار ملف الـ Cash-out (`bostaValidate`/`bostaPay`) لسه بيمنع — مفيش إقرار في الدفعة؛ الصف بيروح لنافذة «فحص شحنات بوسطة».
+ *   🔴 `codPayment.min = 3.24.0` — انشر الـ Worker قبل الصفحة. فحص: `bosta-cash-cycle-check` 271 (+§⑭).
+ *
  * v3.21.0 — «استرداد جزئي بوسطة»: إضافة أوردر **يدويًا** من خارج الطابور (16-11-2026 · قرار أحمد):
  *   🆕 `bostaPartialCheck`/`bostaPartialPay` بياخدوا `manual: true` — لو الأوردر مفيهوش رفعة `codClipped` في سجل الرفع بنبني رفعة افتراضية من شوبيفاي: رقم التتبع = `bosta_tracking_number_s2`
  *      (من غيره خطأ بسببه — مفيش رقم من المتصفح) · `kind='manual'` · `codRemainder=null` (مفيش `needsReason`). **باقي الحكم هو هو**: S1 Delivered · S2 ∈ Shipped/In-Return/Returned · مستحق > 0 · الباقي ≤ المتاح للاسترداد · إقرار · طرق دفع.
@@ -433,7 +445,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.23.0';
+const WORKER_VERSION = 'v3.25.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -2185,7 +2197,13 @@ async function bostaS1Evaluate(env, orderRef) {
     } else if (t2 && String(t2).trim() !== c.trackingNumber) {
       c.notes.push(`رقم S2 على شوبيفاي (${String(t2).trim()}) غير رقم الشحنة دي — الأوردر عليه أكتر من شحنة S2 والميتافيلد بيشيل رقم واحد بس`);
     } else if (!t2 && !legacy) c.notes.push('رقم تتبع S2 مش مسجّل على الأوردر في شوبيفاي');
-    if (courier !== BOSTA_COURIER) b.push(`المندوب على شوبيفاي «${courier || 'فاضي'}» مش ${BOSTA_COURIER}`);
+    // 🆕 v3.24.0 (قرار أحمد 16-11-2026، #51802) — المندوب على شوبيفاي مش Bosta بس الشحنة جاية من بوسطة نفسها (بحث بالمرجع + رقم التتبع): تنبيه + تأكيد يدوي بدل المنع.
+    // التسجيل D1 بس (courier='Bosta' في الصف زي ما هو) — ومسار ملف الـ Cash-out لسه بيمنع (مفيش إقرار في الدفعة).
+    if (courier !== BOSTA_COURIER) {
+      c.courierMismatch = { shopify: courier || 'فاضي', expected: BOSTA_COURIER };
+      c.needsCourierAck = true;
+      c.notes.push(`⚠ المندوب على شوبيفاي «${courier || 'فاضي'}» مش ${BOSTA_COURIER} — الشحنة جاية من بوسطة نفسها (محتاج تأكيد صريح)`);
+    }
     const what = c.leg === 'S1' ? 'S1' : c.typeLabel;
     if (c._p && c._p.gross > 0) {
       if (out !== null && out === c._p.gross) b.push(`الأوردر لسه مش متحصّل على شوبيفاي (المتبقي = إجمالي ${what}) — سجّله بملف الـ Cash-out العادي عشان يتحصّل`);
@@ -2199,6 +2217,13 @@ async function bostaS1Evaluate(env, orderRef) {
           c.captureGap = { gap: bostaFmt(gapP), proven: bostaFmt(saleSum - legs.pos), gross: bostaFmt(c._p.gross) };
           c.needsCaptureAck = true; c._cg = gapP;
           c.notes.push(`شوبيفاي مغطّية ${c.captureGap.proven} من ${c.captureGap.gross} بس — الفرق ${c.captureGap.gap} (محتاج إقرار وسبب)`);
+        } else if (c.leg === 'S2' && c.legKind !== 'rto_fee' && out !== null && out > c._p.gross) {
+          // 🆕 v3.25.0 (قرار أحمد 16-11-2026، #51153) — Exchange موجبة بوسطة حصّلتها ومفيش ولا SALE عليها على شوبيفاي، والمتبقي على الأوردر أكبر من إجماليها
+          // (استبدالين بعض: 950 + 100 والمتبقي 1050 — ملف الـ Cash-out ممنوع لأن 950 ≠ 1050). بدل المنع: تحصيل بمبلغ الشحنة على شوبيفاي بتنبيه وتأكيد صريح.
+          // ⛔ الحد: المبلغ ≤ المتبقي (out > gross) — ولو == المتبقي بيروح لملف الـ Cash-out العادي (الفرع اللي فوق).
+          c.shopifyCapture = { amount: bostaFmt(c._p.gross), outstanding: bostaFmt(out), after: bostaFmt(out - c._p.gross) };
+          c.needsCaptureConfirm = true;
+          c.notes.push(`شوبيفاي مفيهاش تحصيل للشحنة دي — هيتسجّل تحصيل ${c.shopifyCapture.amount} على شوبيفاي والمتبقي بعده ${c.shopifyCapture.after} (محتاج تأكيد صريح)`);
         } else b.push(msg);
       }
     }
@@ -3134,6 +3159,30 @@ export default {
           return json({ success: false, status: 'error', needsAck: true, actions: [],
             error: 'شوبيفاي مفيهاش مستحق استرداد ولا استرداد مسجّل (ممكن اتحسب جوّه استبدال) — التسجيل في السجل بس ومحتاج تأكيد صريح' }, 200, request);
         }
+        // 🆕 v3.24.0 — المندوب على شوبيفاي مش Bosta (#51802): تأكيد صريح (من غير سبب) — قبل أي كتابة (شوبيفاي أو D1)
+        const cm = c.courierMismatch || null, cmIn = (bodyData.courierMismatch && typeof bodyData.courierMismatch === 'object') ? bodyData.courierMismatch : null;
+        if (cm) {
+          if (expected.courierMismatch !== undefined && String(expected.courierMismatch) !== cm.shopify) {
+            return json({ success: false, status: 'error', stale: true, actions: [],
+              error: `المندوب على شوبيفاي اتغيّر من وقت الفحص (دلوقتي «${cm.shopify}») — أعد الفحص وراجع` }, 200, request);
+          }
+          if (!cmIn || cmIn.ack !== true) {
+            return json({ success: false, status: 'error', needsCourierAck: true, courierMismatch: cm, actions: [],
+              error: `المندوب على شوبيفاي «${cm.shopify}» مش ${cm.expected} — التسجيل في السجل فقط ومحتاج تأكيد صريح` }, 200, request);
+          }
+        }
+        // 🆕 v3.25.0 — تحصيل على شوبيفاي بمبلغ الشحنة (#51153): تأكيد صريح + الأرقام بتتقارن بالحالي (stale) — قبل أي كتابة
+        const sc = c.shopifyCapture || null, scIn = (bodyData.shopifyCapture && typeof bodyData.shopifyCapture === 'object') ? bodyData.shopifyCapture : null;
+        if (sc) {
+          if (expected.shopifyCapture !== undefined && String(expected.shopifyCapture) !== sc.outstanding) {
+            return json({ success: false, status: 'error', stale: true, actions: [],
+              error: `المتبقي على شوبيفاي اتغيّر من وقت الفحص (دلوقتي ${sc.outstanding}) — أعد الفحص وراجع` }, 200, request);
+          }
+          if (!scIn || scIn.ack !== true) {
+            return json({ success: false, status: 'error', needsCaptureConfirm: true, shopifyCapture: sc, actions: [],
+              error: `هيتكتب تحصيل ${sc.amount} على شوبيفاي (المتبقي ${sc.outstanding} ← ${sc.after}) ومفيش منه رجوع من الأداة — محتاج تأكيد صريح` }, 200, request);
+          }
+        }
         // 🆕 v3.20.0 — فرق تغطية شوبيفاي (#47530): إقرار صريح + سبب إجباري، والأرقام بتتقارن بالحالي (stale) — كله قبل أي كتابة
         const cg = c.captureGap || null, cgIn = (bodyData.captureGap && typeof bodyData.captureGap === 'object') ? bodyData.captureGap : null;
         let cgReason = null;
@@ -3179,10 +3228,23 @@ export default {
                 ...(c.legKind === 'rto_fee' ? { legKind: 'rto_fee', originalType: c.oldType } : {}) }),
           bostaTypeCode: c.typeCode, bostaStateCode: c.stateCode, onlineStatus: c.onlineStatus, onlineProvider: c.onlineProvider,
           preRegCaptured: preRegTx ? bostaFmt(p.gross) : null, preRegTransactionId: preRegTx,
+          ...(cm ? { courierMismatch: true, shopifyCourier: cm.shopify } : {}),
           ...(cg ? { shopifyCaptureShort: true, shopifyCaptureGap: cg.gap, shopifyCaptureProven: cg.proven, captureGapReason: cgReason } : {}),
         };
+        if (cm) actions.push(`⚠ المندوب على شوبيفاي «${cm.shopify}» مش ${cm.expected} — اتسجّلت بتأكيد الموظف`);
         if (cg) actions.push(`⚠ شوبيفاي مغطّية ${cg.proven} ج من ${cg.gross} ج بس — الفرق ${cg.gap} ج اتسجّل بإقرار (${cgReason})`);
         // 🆕 v3.18.0 — الاسترداد على شوبيفاي **الأول** (فشله = صفر كتابة)، وبعده سجل D1. ملاحظة الاسترداد = مفتاح عدم التكرار لو D1 فشلت بعدها.
+        // 🆕 v3.25.0 — التحصيل على شوبيفاي **الأول** (فشله = صفر كتابة). لو السجل فشل بعده: الإعادة آمنة (شوبيفاي بقت مغطّية فالفحص بيعدّي بلا تحصيل تاني)
+        let scInfo = null;
+        if (sc) {
+          const tokenC = await getAccessToken(env);
+          if (!tokenC) return json({ success: false, status: 'error', error: 'Failed to get Shopify access token', actions: [] }, 200, request);
+          const tx = await createTransaction(tokenC, env, e.orderId, bostaFmt(p.gross));
+          if (!tx.success) return json({ success: false, status: 'error', error: `شوبيفاي رفضت التحصيل: ${tx.error} — مفيش حاجة اتكتبت (لا شوبيفاي ولا السجل)`, actions: [] }, 200, request);
+          scInfo = { id: tx.transactionId, amount: sc.amount, outstandingAfter: sc.after };
+          actions.push(`شوبيفاي: اتعمل تحصيل ${sc.amount} ج (${tx.transactionId}) — المتبقي قبل ${sc.outstanding} · بعد ${sc.after}`);
+          Object.assign(extend, { shopifyCaptured: sc.amount, shopifyCaptureCreated: true, shopifyCaptureTransactionId: String(tx.transactionId), shopifyOutstandingBefore: sc.outstanding, shopifyOutstandingAfter: sc.after });
+        }
         let rfInfo = null;
         if (rp?.state === 'create') {
           const tokenR = await getAccessToken(env);
@@ -3212,8 +3274,11 @@ export default {
         if (rfInfo && rAmountP !== p.gross * -1) addW(`مبلغ الاسترداد على شوبيفاي (${rfInfo.amount}) غير اللي بوسطة دفعته (${bostaFmt(-p.gross)})`);
         if (rfInfo && Number(rfInfo.owedAfter) > 0) addW(`لسه مستحق ${rfInfo.owedAfter} ج للعميل على شوبيفاي — خدمة العملاء تراجعه`);
         if (rp?.state === 'nothing_owed') addW('شوبيفاي مفيهاش مستحق استرداد — السجل اتكتب بس (راجع الأوردر لو لسه العميل ليه فلوس)');
+        if (scInfo) addW(`اتعمل تحصيل ${scInfo.amount} ج على شوبيفاي — المتبقي بعده ${scInfo.outstandingAfter} ج`);
+        if (cm) addW(`المندوب على شوبيفاي «${cm.shopify}» مش ${cm.expected} (اتسجّلت بتأكيد الموظف) — راجع حقل المندوب على الأوردر`);
         if (cg) addW(`شوبيفاي مغطّية ${cg.proven} من ${cg.gross} بس — الفرق ${cg.gap} ج (خدمة العملاء تراجعه)`);
         return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, preRegCleared, orderId: e.orderId, kind: r.kind, leg: c.leg, amount: bostaFmt(Math.abs(p.gross)), net: c.net,
+          shopifyCapture: scInfo ? { created: true, id: String(scInfo.id), amount: scInfo.amount, outstandingAfter: scInfo.outstandingAfter } : null,
           refund: rfInfo ? { created: true, id: rfInfo.id, amount: rfInfo.amount, owedAfter: rfInfo.owedAfter } : (rp ? { created: false, state: rp.state } : null) }, 200, request);
       }
 
