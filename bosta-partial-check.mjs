@@ -10,6 +10,19 @@ const yes = (name, c) => eq(name, !!c, true);
 // ── شوبيفاي وهمية ────────────────────────────────────────────────
 const TX = (id, amt, kind = 'SALE', status = 'SUCCESS') => ({ id: `gid://shopify/OrderTransaction/${id}`, kind, status, amt });
 const mk = (id, name, out, o = {}) => ({ id, name, out, refunded: '0.0', courier: 'Bosta', s1: 'Delivered', s2: 'In-Return', cancelledAt: null, refundObjs: [], tx: [], ...o });
+
+// 🆕 v3.22.0 — شوبيفاي وهمية بتتصرف زي الحقيقية: المستحق = إجمالي + فرق الاسترداد − netPayment، والاسترداد بيسجّل (المقترح − الفعلي) كفرق.
+//   (مقيس حيًا 16-11-2026: #49667 · #65885 · #65634) — o.out = اللي شوبيفاي بترجّعه في totalOutstanding، o.disc = refundDiscrepancy (افتراضي 0)
+const shopMoneyOf = v => ({ shopMoney: { amount: String(v) } });
+const balanceFields = o => {
+  const disc = parseFloat(o.disc || '0'), bal = parseFloat(o.out) - disc, base = 3000;
+  return { currentTotalPriceSet: shopMoneyOf((base + Math.max(bal, 0)).toFixed(1)), netPaymentSet: shopMoneyOf((base + Math.max(-bal, 0)).toFixed(1)), refundDiscrepancySet: shopMoneyOf(disc.toFixed(1)) };
+};
+const applyRefundToShop = (o, amt) => {
+  const out0 = parseFloat(o.out), disc0 = parseFloat(o.disc || '0'), suggested = Math.max(0, -out0);
+  const bal1 = (out0 - disc0) + amt, disc1 = disc0 + (suggested - amt);
+  o.out = (bal1 + disc1).toFixed(1); o.disc = disc1.toFixed(1); o.refunded = (parseFloat(o.refunded) + amt).toFixed(1);
+};
 const SHOP = {};
 const add = (o) => { SHOP[String(o.id)] = o; };
 add(mk(19103443747138, '#63994', '-2500.0', { tx: [TX(1, '2675.0', 'SALE', 'PENDING'), TX(2, '2675.0')] }));
@@ -37,7 +50,7 @@ const byGid = {}; for (const o of Object.values(SHOP)) byGid[`gid://shopify/Orde
 const refundsMade = [], gqlOps = []; let failRefund = false;
 const nodeOf = (g, withTx) => { const o = byGid[g]; if (!o) return null; return {
   id: g, name: o.name, createdAt: '2026-10-20T10:00:00Z', cancelledAt: o.cancelledAt, displayFinancialStatus: 'PAID',
-  totalOutstandingSet: { shopMoney: { amount: o.out } }, totalRefundedSet: { shopMoney: { amount: o.refunded } }, refunds: o.refundObjs,
+  totalOutstandingSet: { shopMoney: { amount: o.out } }, totalRefundedSet: { shopMoney: { amount: o.refunded } }, ...balanceFields(o), refunds: o.refundObjs,
   courier: o.courier ? { value: o.courier } : null, s1: o.s1 ? { value: o.s1 } : null, s2: o.s2 ? { value: o.s2 } : null, t1: null, t2: o.t2 ? { value: o.t2 } : null, t0: null,
   ...(withTx ? { transactions: o.tx.map(t => ({ id: t.id, kind: t.kind, status: t.status, amountSet: { shopMoney: { amount: t.amt } } })) } : {}),
 }; };
@@ -62,7 +75,7 @@ globalThis.fetch = async (url, init = {}) => {
       const o = byGid[variables.input.orderId];
       const amt = variables.input.transactions.reduce((a, t) => a + parseFloat(t.amount), 0);
       const rid = `gid://shopify/Refund/${9000 + refundsMade.length}`;
-      o.out = (parseFloat(o.out) + amt).toFixed(1); o.refunded = (parseFloat(o.refunded) + amt).toFixed(1);
+      applyRefundToShop(o, amt);
       o.refundObjs.push({ id: rid, note: variables.input.note, totalRefundedSet: { shopMoney: { amount: amt.toFixed(1) } } });
       return new Response(JSON.stringify({ data: { refundCreate: { refund: { id: rid, totalRefundedSet: { shopMoney: { amount: amt.toFixed(1) } } }, userErrors: [] } } }), { status: 200 });
     }
@@ -286,6 +299,47 @@ eq('الاسترداد بالباقي بملاحظة التتبع', [refundsMade
 const exRowMnl = JSON.parse(logs[logs.length - 1].extra);
 eq('الصف: علامة الخزنة + manualAdded', [logs.length - logN0, exRowMnl.source, exRowMnl.batchId, exRowMnl.partialRefund.manualAdded, exRowMnl.partialRefund.jobKind, exRowMnl.courierCollect], [1, 'bosta_partial_refund', 'bosta-partial-9090909090', true, 'manual', -500]);
 eq('بعد التسجيل: manual check بيرجّع done', (await call({ action: 'bostaPartialCheck', orderRef: '#70001', manual: true })).body.state, 'done');
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════
+console.log('══ ⑧ v3.22.0 — الرصيد الحقيقي بدل totalOutstanding (#49667 · REFUND_DISCREPANCY) ══');
+// 🔴 #49667 الحقيقي (16-11-2026): استرداد جزئي 2800 من مستحق 4800 ← شوبيفاي سجّل فرق +2000 وصفّر المستحق (totalOutstanding = 0) والعميل لسه له 2000 (بوسطة دفعتها).
+const addShop = o => { SHOP[String(o.id)] = o; byGid[`gid://shopify/Order/${o.id}`] = o; };
+addShop(mk(49667001, '#49667', '0.0', { disc: '2000.0', refunded: '2800.0', tx: [TX(40, '6900.0')],
+  refundObjs: [{ id: 'gid://shopify/Refund/1125118640450', note: 'Bosta partial refund 8888888801', totalRefundedSet: { shopMoney: { amount: '2800.0' } } }] }));
+const s49 = (await call({ action: 'bostaS1Check', orderRef: '#49667' })).body;
+const crp49 = (s49.candidates || []).find(x => x.trackingNumber === '8888888801');
+yes('#49667: الفحص رجّع شحنة الـ CRP', !!crp49);
+eq('الرصيد الحقيقي −2000 (مش 0) + المستحق الخام والفرق ظاهرين', [s49.shopifyOutstanding, s49.shopifyOutstandingRaw, s49.shopifyRefundDiscrepancy, s49.shopifyOwed], ['-2000.00', '0.00', '2000.00', '2000.00']);
+eq('الرصيد الحقيقي = إجمالي الـ CRP بالظبط ← «سجّله بملف الـ Cash-out العادي» (مش exists ولا nothing_owed)', [crp49.refund, crp49.eligible, /المتبقي على شوبيفاي = قيمة الاسترداد/.test((crp49.blockers || []).join())], [null, false, true]);
+// نفس الملاحظة مع مستحق أكبر من اللي بوسطة دفعته: رصيد −2500 بعد استرداد جزئي 2000 → create بحد 2000 (cappedByBosta) — مش exists بسبب ملاحظة «Bosta partial refund <تتبع>»
+addShop(mk(49671001, '#49671', '0.0', { disc: '2500.0', refunded: '2000.0', tx: [TX(44, '6900.0')],
+  refundObjs: [{ id: 'gid://shopify/Refund/777001', note: 'Bosta partial refund 8888888801', totalRefundedSet: { shopMoney: { amount: '2000.0' } } }] }));
+const s71 = (await call({ action: 'bostaS1Check', orderRef: '#49671' })).body;
+const crp71 = (s71.candidates || []).find(x => x.trackingNumber === '8888888801');
+eq('رصيد −2500: create (مش exists) بحد 2000 + الباقي 500', [crp71.refund.state, crp71.refund.by, crp71.refund.owed, crp71.refund.need, crp71.refund.max, crp71.refund.cappedByBosta, crp71.refund.partialRemainder], ['create', undefined, '2500.00', '2000.00', '2000.00', true, '500.00']);
+
+// الترتيب العكسي: استرداد الـ CRP (2000) على شوبيفاي الأول ثم الباقي (2800) من التاب — المستحق الخام بيتصفّر بعد الأول لكن الرصيد الحقيقي −2800
+addShop(mk(49669001, '#49669', '-4800.0', { tx: [TX(41, '6900.0')] }));
+U(49669001, '#49669', '7777777777', 2800);
+logs.push({ id: logs.length + 1, timestamp: '2026-11-16T09:00:00.000Z', tool: 'cod_payment', type: 'refund', order_id: '49669001', order_name: '#49669', extra: JSON.stringify({ source: 'bosta_cash_cycle', slot: 'S2', grossCollected: '-2000.00', trackingNumber: '8888888802' }) });
+const sh69 = SHOP['49669001']; applyRefundToShop(sh69, 2000);          // استرداد الـ CRP اتعمل على شوبيفاي
+sh69.refundObjs.push({ id: 'gid://shopify/Refund/8001', note: 'Bosta Customer Return Pickup 8888888802', totalRefundedSet: { shopMoney: { amount: '2000.0' } } });
+eq('شوبيفاي بعد استرداد الـ CRP: المستحق الخام 0 · الفرق +2800', [sh69.out, sh69.disc], ['0.0', '2800.0']);
+const c69 = await check('#49669');
+eq('#49669: ready والمستحق 2800 والباقي 2800 (الرصيد الحقيقي)', [c69.state, c69.owed, c69.remainder, c69.max], ['ready', '2800.00', '2800.00', '2800.00']);
+const p69 = await pay('#49669', '7777777777', { remainder: '2800.00', owed: '2800.00', s2: 'In-Return' }, { paymentMethods: PM('2800.00', '0.00') });
+eq('التسجيل نجح بالباقي 2800', [p69.success, refundsMade[refundsMade.length - 1].transactions.reduce((a2, t) => a2 + parseFloat(t.amount), 0)], [true, 2800]);
+eq('الاسترداد التاني بيعادل الفرق: شوبيفاي رجعت نضيفة (مستحق 0 · فرق 0)', [sh69.out, sh69.disc], ['0.0', '0.0']);
+eq('وبعدها #49669 done', (await check('#49669')).state, 'done');
+
+// أوردر بفرق استرداد قديم (مثال #55640: استرداد 2400 من 2800 → فرق +400 والمستحق الخام 0) — لسه له 400
+addShop(mk(55640001, '#55640', '0.0', { disc: '400.0', refunded: '2400.0', tx: [TX(42, '5675.0')] }));
+const s55 = (await call({ action: 'bostaS1Check', orderRef: '#55640' })).body;
+eq('#55640: الرصيد −400 رغم إن المستحق الخام 0', [s55.shopifyOutstanding, s55.shopifyOutstandingRaw, s55.shopifyOwed], ['-400.00', '0.00', '400.00']);
+
+// حقول ناقصة = مش بنفترض صفر
+addShop(mk(49670001, '#49670', '0.0', { tx: [TX(43, '2700.0')] }));
+U(49670001, '#49670', '7777777778', 500);
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);

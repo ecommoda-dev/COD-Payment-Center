@@ -1,8 +1,18 @@
 /**
- * cod-payment-center-worker  (v3.21.0)
- * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 15-11-2026
+ * cod-payment-center-worker  (v3.22.0)
+ * skills: worker-builder v3.7.0 · constants v3.1.0 · order-lifecycle v1.9.0 · bosta-api-helper v6.6.0(+ملاحظات 10-11) — 16-11-2026
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * v3.22.0 — «الرصيد الحقيقي للعميل» بدل `totalOutstandingSet` في مسارات بوسطة الثلاثة (16-11-2026 · #49667):
+ *   🔴 العطل: `totalOutstandingSet` **بيتصفّر بعد أي استرداد جزئي**. شوبيفاي بيسجّل (المقترح − الفعلي) كـ `REFUND_DISCREPANCY` (`order.refundDiscrepancySet`) ويعتبره «اتحجز عمدًا»:
+ *      المستحق = الإجمالي الحالي + فرق الاسترداد − netPayment. #49667: استرداد 2800 من مستحق 4800 → فرق +2000 → المستحق 0 والعميل لسه له 2000 (دفعتها بوسطة).
+ *      تجربة حيّة على #65885 (4000 ← تعديل −3000 ← استرداد 1000 ← استرداد 1500): الفرق +2000 ثم +500؛ وبعد الاسترداد التاني بيتعادل (المقترح 0 والفعلي موجب → −1500).
+ *   ✅ `bostaBalance(nd)` = `currentTotalPriceSet − netPaymentSet` (موجب = العميل عليه · سالب = له فلوس) — مقيس صح على 200 أوردر (صفر اختلاف مع `outstanding − refundDiscrepancy`). بتحل محل `totalOutstandingSet`
+ *      في `bostaEvaluate` (ملف الـ Cash-out) و`bostaS1Evaluate` (فحص شحنات بوسطة) و`partialShape` (استرداد جزئي بوسطة). ⛔ مسارات `pay`/`refund`/`preview` بتاعت المناديب **ما اتلمستش** (قرار منفصل).
+ *   🐞 تعارض الملاحظة: ملاحظة «Bosta partial refund <تتبع>» كانت بتتعدّ استرداد الـ CRP (نفس رقم التتبع) في `bostaS1Evaluate` → `exists`. دلوقتي ملاحظات الاسترداد الجزئي مستثناة، وكمان من حالة `exists` بالمجموع (`refundedP`).
+ *   ➕ الرد: `shopifyOutstanding` بقى الرصيد الحقيقي، + `shopifyOutstandingRaw` (اللي شوبيفاي بيرجّعه) + `shopifyRefundDiscrepancy`. فحص: `node bosta-partial-check.mjs` · `node bosta-cash-cycle-check.mjs`. ⚠️ ما اتجرّبش على Worker منشور/شوبيفاي حقيقية.
+ *
+
  * v3.21.0 — «استرداد جزئي بوسطة»: إضافة أوردر **يدويًا** من خارج الطابور (16-11-2026 · قرار أحمد):
  *   🆕 `bostaPartialCheck`/`bostaPartialPay` بياخدوا `manual: true` — لو الأوردر مفيهوش رفعة `codClipped` في سجل الرفع بنبني رفعة افتراضية من شوبيفاي: رقم التتبع = `bosta_tracking_number_s2`
  *      (من غيره خطأ بسببه — مفيش رقم من المتصفح) · `kind='manual'` · `codRemainder=null` (مفيش `needsReason`). **باقي الحكم هو هو**: S1 Delivered · S2 ∈ Shipped/In-Return/Returned · مستحق > 0 · الباقي ≤ المتاح للاسترداد · إقرار · طرق دفع.
@@ -414,7 +424,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.21.0';
+const WORKER_VERSION = 'v3.22.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1692,6 +1702,25 @@ function bostaPiastres(v) {
 const bostaFmt = p => (p / 100).toFixed(2);
 const bostaBatchId = cashOutId => `bosta-${cashOutId}`;
 
+// ── §BOSTA-BALANCE (v3.22.0 · 16-11-2026 · #49667) ──────────────────────────────────────────────────────────
+// الرصيد الحقيقي للعميل على شوبيفاي = الإجمالي الحالي − netPayment (قروش · موجب = العميل عليه · سالب = له فلوس).
+// ⛔ مش `totalOutstandingSet`: ده بيساوي `currentTotal + refundDiscrepancy − netPayment`، وأي استرداد أقل من المقترح بيسجّل الفرق كـ REFUND_DISCREPANCY
+//    (شوبيفاي بيعتبره «اتحجز») فالمستحق بيتصفّر والعميل لسه له فلوس. موثّق: community.shopify.dev (Ben-Shopify) + `Order.refundDiscrepancySet`. التفاصيل في CLAUDE.md.
+// بيرجّع null لو أي حقل ناقص (مفيش صفر ضمني) — المستدعي بيعامل null كـ «شوبيفاي ما رجّعتش المستحق».
+const BOSTA_BALANCE_FIELDS = `currentTotalPriceSet { shopMoney { amount } } netPaymentSet { shopMoney { amount } } refundDiscrepancySet { shopMoney { amount } }`;
+function bostaBalance(nd) {
+  const ct = bostaPiastres(nd?.currentTotalPriceSet?.shopMoney?.amount);
+  const net = bostaPiastres(nd?.netPaymentSet?.shopMoney?.amount);
+  return {
+    balanceP: ct === null || net === null ? null : ct - net,
+    outstandingRawP: bostaPiastres(nd?.totalOutstandingSet?.shopMoney?.amount),
+    discrepancyP: bostaPiastres(nd?.refundDiscrepancySet?.shopMoney?.amount) || 0,
+  };
+}
+// ملاحظة استرداد «استرداد جزئي بوسطة» — ما تتعدّش استرداد الـ CRP (نفس رقم التتبع في الملاحظة) ولا تدخل في «اتعمل استرداد مقابل»
+const BOSTA_PARTIAL_NOTE_PREFIX = 'Bosta partial refund ';
+const isPartialRefundNote = note => String(note || '').startsWith(BOSTA_PARTIAL_NOTE_PREFIX);
+
 function bostaCheckCtx(ctx) {
   const c = ctx || {};
   if (!/^[A-Za-z0-9_-]{3,60}$/.test(String(c.cashOutId || ''))) return 'Cash-out ID غير صالح';
@@ -1751,6 +1780,7 @@ const Q_BOSTA_ORDERS = `query bostaOrders($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Order {
     id name createdAt cancelledAt displayFinancialStatus
     totalOutstandingSet { shopMoney { amount } } totalRefundedSet { shopMoney { amount } }
+    ${BOSTA_BALANCE_FIELDS}
     refunds { id note totalRefundedSet { shopMoney { amount } } }
     courier: metafield(namespace: "custom", key: "courier") { value }
     t1: metafield(namespace: "custom", key: "bosta_tracking_number_s1") { value }
@@ -1853,8 +1883,11 @@ async function bostaEvaluate(env, rawRows, ctx, strictS1 = false) {
     if (!nd) { r.reasons.push('شوبيفاي ما رجّعتش بيانات الأوردر'); return; }
     r.orderName = nd.name; r.financialStatus = nd.displayFinancialStatus;
     const gross = n.cod + n.online;
-    const out = bostaPiastres(nd.totalOutstandingSet?.shopMoney?.amount);
+    // 🆕 v3.22.0 — الرصيد الحقيقي (إجمالي − netPayment) مش `totalOutstanding` اللي بيتصفّر بعد أي استرداد جزئي (§BOSTA-BALANCE)
+    const bal = bostaBalance(nd);
+    const out = bal.balanceP;
     r.shopify = out === null ? null : bostaFmt(out);
+    if (bal.discrepancyP) r.shopifyDiscrepancy = bostaFmt(bal.discrepancyP);
     // 🔴 v3.12.0 — S1 اتحصّل بالتسجيل المسبق: مبلغ الملف == مبلغ التسجيل المسبق، ومعاملته الناجحة على شوبيفاي نفس
     // transactionId المحفوظ في KV. وقتها المستحق الحالي (صفر أو فرق S2) مالوش علاقة بالصف → بيتسجّل في D1 بس.
     let preS1Hint = '';
@@ -1873,6 +1906,7 @@ async function bostaEvaluate(env, rawRows, ctx, strictS1 = false) {
     if (out === null) r.reasons.push('شوبيفاي ما رجّعتش المستحق');
     else if (out !== gross && !r.preS1) {
       r.reasons.push(`الإجمالي في الملف (${bostaFmt(gross)}) ≠ مستحق شوبيفاي (${bostaFmt(out)})${preS1Hint}`
+        + (bal.discrepancyP ? ` — (فيه فرق استرداد ${bostaFmt(bal.discrepancyP)} على شوبيفاي · المستحق الظاهر ${bal.outstandingRawP === null ? '—' : bostaFmt(bal.outstandingRawP)})` : '')
         + (nd.cancelledAt && gross !== 0 ? ' — الأوردر ملغي' : '')
         + (out === 0 && gross > 0 ? ' — شوبيفاي مفيهاش مستحق (اتحصّل قبل كده؟ راجع السجل)' : ''));
     }
@@ -2079,7 +2113,8 @@ async function bostaS1Evaluate(env, orderRef) {
   const nd = (data.data?.nodes || [])[0];
   if (!nd?.id) return { found: false, error: 'شوبيفاي ما رجّعتش بيانات الأوردر' };
 
-  const out = bostaPiastres(nd.totalOutstandingSet?.shopMoney?.amount);
+  const bal = bostaBalance(nd);                                    // 🆕 v3.22.0 — الرصيد الحقيقي مش `totalOutstanding` (§BOSTA-BALANCE)
+  const out = bal.balanceP;
   const sales = (nd.transactions || []).filter(t => t.kind === 'SALE' && t.status === 'SUCCESS')
     .map(t => ({ id: String(t.id).split('/').pop(), p: bostaPiastres(t.amountSet?.shopMoney?.amount) || 0 }));
   const saleSum = sales.reduce((s, t) => s + t.p, 0);
@@ -2092,6 +2127,8 @@ async function bostaS1Evaluate(env, orderRef) {
   const owedP = out !== null && out < 0 ? -out : 0;                 // 🆕 v3.18.0 — «مستحق استرداد» عند شوبيفاي (Refund owed)
   const maxRefundP = Math.max(0, saleSum - refundedP);              // المتاح للاسترداد (maximumRefundable)
   const refundsList = Array.isArray(nd.refunds) ? nd.refunds : [];
+  // 🆕 v3.22.0 — استردادات «استرداد جزئي بوسطة» (ملاحظتها فيها نفس رقم التتبع) مش استرداد الـ CRP نفسه
+  const partialRefundedP = refundsList.filter(rf => isPartialRefundNote(rf?.note)).reduce((s, rf) => s + (bostaPiastres(rf?.totalRefundedSet?.shopMoney?.amount) || 0), 0);
   const legs = await bostaOrderLegs(env.DB, orderId);
   let pend = null; try { pend = await checkPendingPreReg(env, orderId); } catch { pend = null; }
 
@@ -2150,9 +2187,9 @@ async function bostaS1Evaluate(env, orderRef) {
       else {
         if (saleSum < need) b.push(`معاملات SALE الناجحة على شوبيفاي (${bostaFmt(saleSum)}) أقل من الاسترداد (${bostaFmt(need)})`);
         // 🆕 v3.18.0 (قرار أحمد 15-11-2026 — بيلغي «أ» بتاعة 14-11): خطة الاسترداد على شوبيفاي — الأداة هي اللي بتعمل createRefund بمبلغ يختاره الموظف
-        const hit = refundsList.find(rf => String(rf?.note || '').includes(c.trackingNumber));
+        const hit = refundsList.find(rf => !isPartialRefundNote(rf?.note) && String(rf?.note || '').includes(c.trackingNumber));
         if (hit) c.refund = { state: 'exists', refundId: String(hit.id || ''), amount: bostaFmt(bostaPiastres(hit.totalRefundedSet?.shopMoney?.amount) || 0), by: 'note' };
-        else if (refundedP >= legs.neg + need) c.refund = { state: 'exists', refundId: null, amount: bostaFmt(refundedP), by: 'total' };
+        else if (refundedP - partialRefundedP >= legs.neg + need) c.refund = { state: 'exists', refundId: null, amount: bostaFmt(refundedP - partialRefundedP), by: 'total' };
         else if (owedP === 0) c.refund = { state: 'nothing_owed' };
         else {
           // 🆕 v3.19.0 (قرار أحمد 15-11-2026) — حد بوسطة: لو اللي بوسطة دفعته = السقف (2000) والمستحق أكبر، الزيادة مش من اختصاص الـ CRP هنا —
@@ -2187,7 +2224,7 @@ async function bostaS1Evaluate(env, orderRef) {
   const preReg = pend ? { amount: pend.amount ?? null, transactionId: pend.transactionId != null ? String(pend.transactionId) : null } : null;
   return {
     found: true, orderId: String(orderId), orderName: nd.name, courier, financialStatus: nd.displayFinancialStatus,
-    shopifyOutstanding: out === null ? null : bostaFmt(out), shopifyOwed: bostaFmt(owedP), shopifySaleCaptured: bostaFmt(saleSum), shopifyRefunded: bostaFmt(refundedP), legsRegistered: { positive: bostaFmt(legs.pos), negative: bostaFmt(legs.neg) }, t1, t2, hasS1, preRegistered: !!pend, preReg, trackingUnverifiedOrder: !!legacy,
+    shopifyOutstanding: out === null ? null : bostaFmt(out), shopifyOutstandingRaw: bal.outstandingRawP === null ? null : bostaFmt(bal.outstandingRawP), shopifyRefundDiscrepancy: bostaFmt(bal.discrepancyP), shopifyOwed: bostaFmt(owedP), shopifySaleCaptured: bostaFmt(saleSum), shopifyRefunded: bostaFmt(refundedP), legsRegistered: { positive: bostaFmt(legs.pos), negative: bostaFmt(legs.neg) }, t1, t2, hasS1, preRegistered: !!pend, preReg, trackingUnverifiedOrder: !!legacy,
     candidates: cands, _sales: sales, _pend: pend,
   };
 }
@@ -2208,12 +2245,13 @@ const PARTIAL_S1_OK         = 'Delivered';
 const PARTIAL_S2_OK         = new Set(['Shipped', 'In-Return', 'Returned']);   // Returned: العميل غالبًا أخد فلوسه — بتحذير (قرار أحمد 15-11-2026)
 const PARTIAL_LIST_CHUNK    = 25;                           // أوردر/نداء (من غير transactions — سقف تكلفة شوبيفاي)
 const PARTIAL_LIST_MAX      = 100;
-const partialNote = tn => `Bosta partial refund ${tn}`;     // مفتاح عدم التكرار على شوبيفاي
+const partialNote = tn => `${BOSTA_PARTIAL_NOTE_PREFIX}${tn}`;     // مفتاح عدم التكرار على شوبيفاي
 
 const Q_PARTIAL_LIST = `query partialList($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Order {
     id name cancelledAt
     totalOutstandingSet { shopMoney { amount } } totalRefundedSet { shopMoney { amount } }
+    ${BOSTA_BALANCE_FIELDS}
     refunds { id note totalRefundedSet { shopMoney { amount } } }
     courier: metafield(namespace: "custom", key: "courier") { value }
     s1: metafield(namespace: "custom", key: "manual_status") { value }
@@ -2272,7 +2310,7 @@ async function partialLedgerState(db, orderIds) {
 // الحساب الواحد (للقايمة وللفحص وللكتابة) — node من شوبيفاي (transactions اختيارية) + سجل D1
 function partialShape(node, g, led) {
   const oid = String(node.id).replace('gid://shopify/Order/', '');
-  const owedRaw = bostaPiastres(node.totalOutstandingSet?.shopMoney?.amount);
+  const owedRaw = bostaBalance(node).balanceP;            // 🆕 v3.22.0 — الرصيد الحقيقي مش `totalOutstanding` (§BOSTA-BALANCE)
   const owedP = owedRaw !== null && owedRaw < 0 ? -owedRaw : 0;
   const refundedP = bostaPiastres(node.totalRefundedSet?.shopMoney?.amount) || 0;
   const sales = (node.transactions || []).filter(t => t.kind === 'SALE' && t.status === 'SUCCESS').map(t => ({ id: String(t.id).split('/').pop(), p: bostaPiastres(t.amountSet?.shopMoney?.amount) || 0 }));
@@ -2296,7 +2334,8 @@ function partialShape(node, g, led) {
     if (courier !== BOSTA_COURIER) blockers.push(`المندوب على شوبيفاي «${courier || 'فاضي'}» مش ${BOSTA_COURIER}`);
     if (s1 !== PARTIAL_S1_OK) blockers.push(`S1 = «${s1 || 'فاضي'}» — لازم ${PARTIAL_S1_OK}`);
     if (!PARTIAL_S2_OK.has(s2)) blockers.push(`S2 = «${s2 || 'فاضي'}» — لازم Shipped أو In-Return أو Returned`);
-    if (owedP === 0) blockers.push('مفيش مستحق استرداد على شوبيفاي');
+    if (owedRaw === null) blockers.push('شوبيفاي ما رجّعتش إجمالي الأوردر أو المدفوع — مش قادرين نحسب المستحق');
+    else if (owedP === 0) blockers.push('مفيش مستحق استرداد على شوبيفاي');
     else if (remainderP <= 0) blockers.push(bostaPartP === 0 ? 'مفيش باقي بعد جزء بوسطة المسجّل' : `المستحق (${bostaFmt(owedP)}) مش أكبر من حد بوسطة (${bostaFmt(BOSTA_CASH_REFUND_CAP)}) — مفيش باقي`);
     if (saleSum !== null && remainderP > 0 && remainderP > saleSum - refundedP) blockers.push(`الباقي (${bostaFmt(remainderP)}) أكبر من المتاح للاسترداد على شوبيفاي (${bostaFmt(Math.max(0, saleSum - refundedP))})`);
     state = blockers.length ? 'blocked' : 'ready';
