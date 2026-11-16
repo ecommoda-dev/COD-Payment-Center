@@ -404,7 +404,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.22.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.22.0');
+eq('get_config بيرجّع 3.23.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.23.0');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -862,6 +862,7 @@ const rf0 = refunds.length;
 const p13 = (await call({ action: 'bostaPay', row: R67, ctx: ctx13, employee: 'Ahmed_Ibraheem' })).body;
 eq('bostaPay: نجح + استرداد 2000 على شوبيفاي', [p13.success, refunds.length - rf0, refunds.length > rf0 ? refunds[refunds.length - 1].transactions.reduce((a2, t) => a2 + parseFloat(t.amount), 0) : null], [true, 1, 2000]);
 eq('شوبيفاي بعد الاسترداد التاني: الفرق اتعادل (مستحق 0 · فرق 0)', [sh67.out, sh67.disc], ['0.0', '0.0']);
+eq('سبب الاسترداد (Refund reason) بدل «No reason provided»: Bosta <النوع> <التتبع>', refunds[refunds.length - 1].note, 'Bosta Exchange 4445297000');
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);

@@ -30,9 +30,12 @@ const ORDERS = {
 };
 
 // ── شوبيفاي وهمية ───────────────────────────────────────────────────
+// 🆕 v3.23.0 — مسارات المناديب بتقرا الرصيد الحقيقي (إجمالي − netPayment) مش totalOutstanding: الـ mock بيرجّع الحقلين (a موجب = عليه · سالب = له)
+const moneyOf = v => ({ shopMoney: { amount: String(v) } });
+const balNode = a => { const n = parseFloat(a); return { currentTotalPriceSet: moneyOf((1000 + Math.max(n, 0)).toFixed(1)), netPaymentSet: moneyOf((1000 + Math.max(-n, 0)).toFixed(1)) }; };
 const gqlOrder = o => ({ data: { order: {
   id: 'gid://shopify/Order/1', name: o.name, cancelledAt: null, canMarkAsPaid: false, displayFinancialStatus: 'PARTIALLY_REFUNDED',
-  totalOutstandingSet: { shopMoney: { amount: '-1000' } }, subtotalPriceSet: { shopMoney: { amount: '1000' } },
+  ...balNode('-1000'), subtotalPriceSet: { shopMoney: { amount: '1000' } },
   shippingLine: null, courierMeta: { value: 'Showroom' }, preRegMeta: null, s1Meta: { value: 'Delivered' }, s2Meta: null,
   discountApplications: { edges: [] }, lineItems: { nodes: o.lines.map(L) }, returns: { nodes: o.returns }, refunds: [], transactions: [],
 } } });
@@ -94,7 +97,7 @@ eq('واجهة قديمة (بلا تفصيل) ← null', [extraOf(base + 1).paym
 await call({ action: 'pay', orderId: '2', amount: '100.00', batchId: 'b7', sessionMeta: { courier: 'C', paymentAccounts: 'x' },
   orderMeta: { orderKind: 'normal', paymentSplit: { cash: '0', instapay: '100', wallet: '0' }, paymentAccounts: { cash: { 'x': '5' }, instapay: { '': '5', ['y'.repeat(41)]: '5', 'فادي': 'abc', 'إسلام': '100' }, wallet: [1, 2] } } });
 eq('مدخلات باظة بتتجاهَل (طريقة غريبة · اسم فاضي/طويل · قيمة مش رقم · مش object)', [extraOf(base + 2).paymentAccounts, extraOf(base + 2).sessionPaymentAccounts], [{ instapay: { 'إسلام': '100.00' } }, null]);
-eq('نسخة الـ Worker', (await call({ action: 'get_config' })).workerVersion ?? 'v3.22.0', 'v3.22.0');
+eq('نسخة الـ Worker', (await call({ action: 'get_config' })).workerVersion ?? 'v3.23.0', 'v3.23.0');
 
 console.log(`\n${bad ? '❌' : '✅'} النتيجة: ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
