@@ -445,7 +445,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.25.0';
+const WORKER_VERSION = 'v3.25.1';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1601,21 +1601,23 @@ async function getOrderIdByName(env, orderNumber) {
   return orders[0].id.replace('gid://shopify/Order/', '');
 }
 
-async function createTransaction(token, env, numericOrderId, amount) {
+// 🧪 `gateway` اختياري (الافتراضي 'manual' = السلوك القديم بالظبط) — بيتبعت بس من `gwTestPay` المؤقتة.
+//    و`raw` = معاملة شوبيفاي كما رجعت (فيها `message`) — إضافة بحتة، باقي المستدعين بيتجاهلوها.
+async function createTransaction(token, env, numericOrderId, amount, gateway = 'manual') {
   const res = await fetch(
     `https://${env.SHOP_DOMAIN}/admin/api/2026-01/orders/${numericOrderId}/transactions.json`,
     {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
       body:    JSON.stringify({
-        transaction: { kind: 'capture', status: 'success', amount, currency: 'EGP', gateway: 'manual' },
+        transaction: { kind: 'capture', status: 'success', amount, currency: 'EGP', gateway },
       }),
     }
   );
   const raw = await res.text();
   let data = null;
   try { data = JSON.parse(raw); } catch { /* رد مش JSON — بيتعامل معاه كفشل برسالة واضحة تحت */ }
-  if (res.ok && data?.transaction?.id) return { success: true, transactionId: data.transaction.id };
+  if (res.ok && data?.transaction?.id) return { success: true, transactionId: data.transaction.id, raw: data.transaction };
   if (data?.errors) return { success: false, error: JSON.stringify(data.errors) };
   return { success: false, error: `شوبيفاي ردّت HTTP ${res.status} — ${raw.slice(0, 200)}` };
 }
@@ -3383,6 +3385,52 @@ export default {
         const warning = sh.warnings.length ? sh.warnings.join(' · ') : null;
         return json({ success: true, status: warning ? 'warning' : 'success', actions, warning, logged: true, orderId: sh.orderId, amount: net, courier: collectorName,
           refund: { created: sh.state === 'ready', id: rf.id, amount: rf.amount, owedAfter } }, 200, request);
+      }
+
+      // ── ACTION: gwTestPay ─────────────────────────────────────────
+      // 🧪 تجربة مؤقتة (16-11-2026 · طلب أحمد) — **هتتحذف** مع تاب «🧪 تجربة gateway» في الواجهة.
+      //    الهدف: نشوف إيه اللي بيطلع في الـ Message/العنوان على شوبيفاي لما `gateway` في
+      //    معاملة التحصيل (REST) يبقى اسم تاني غير 'manual'.
+      //    ⛔ كتابة حقيقية على شوبيفاي بلا صف D1 ولا PRE_REG_KV ولا خزنة — فمحمية بتاج:
+      //       الأوردر لازم يكون عليه GW_TEST_TAG وإلا بيرفض قبل أي كتابة (أوردر حقيقي بالغلط).
+      if (action === 'gwTestPay') {
+        const GW_TEST_TAG = 'TEST-DELETE-ME';
+        const orderName = String(bodyData.orderName ?? '').replace(/^#/, '').trim();
+        const amount    = parseFloat(bodyData.amount);
+        const gateway   = String(bodyData.gateway ?? '').trim();
+        if (!/^\d{1,7}$/.test(orderName)) return json({ success: false, error: 'رقم الأوردر لازم أرقام بس' }, 200, request);
+        if (!(amount > 0)) return json({ success: false, error: 'المبلغ لازم أكبر من صفر' }, 200, request);
+        if (!gateway || gateway.length > 100) return json({ success: false, error: 'اسم الـ gateway مطلوب (حتى 100 حرف)' }, 200, request);
+
+        const token = await getAccessToken(env);
+        if (!token) return json({ success: false, error: 'Failed to get Shopify access token' }, 200, request);
+        const numeric = await getOrderIdByName(env, orderName);
+        if (!numeric) return json({ success: false, error: `الأوردر #${orderName} مش موجود` }, 200, request);
+
+        const gq = await shopifyGQL(env, token, `
+          query gwTestOrder($id: ID!) {
+            order(id: $id) { name tags cancelledAt displayFinancialStatus totalOutstandingSet { shopMoney { amount } } }
+          }`, { id: `gid://shopify/Order/${numeric}` }, 'gwTestOrder');
+        const o = gq?.data?.order;
+        if (!o) return json({ success: false, error: 'الأوردر ماتقرأش من شوبيفاي' }, 200, request);
+        if (!(o.tags || []).includes(GW_TEST_TAG)) {
+          return json({ success: false, error: `⛔ #${orderName} مش أوردر تجريبي — ضيف عليه التاج ${GW_TEST_TAG} الأول` }, 200, request);
+        }
+        if (o.cancelledAt) return json({ success: false, error: `#${orderName} ملغي` }, 200, request);
+        const outstanding = parseFloat(o.totalOutstandingSet?.shopMoney?.amount);
+        if (!(outstanding > 0.005)) return json({ success: false, error: `#${orderName} مفيهوش متبقي (${o.displayFinancialStatus})` }, 200, request);
+        if (amount - outstanding > 0.005) return json({ success: false, error: `المبلغ (${amount.toFixed(2)}) أكبر من المتبقي (${outstanding.toFixed(2)})` }, 200, request);
+
+        const tx = await createTransaction(token, env, numeric, amount.toFixed(2), gateway);
+        if (!tx.success) return json({ success: false, error: tx.error }, 200, request);
+        const t = tx.raw || {};
+        return json({
+          success: true, orderName: o.name, outstandingBefore: outstanding.toFixed(2),
+          transaction: {
+            id: t.id, kind: t.kind, status: t.status, gateway: t.gateway, message: t.message ?? null,
+            manual_payment_gateway: t.manual_payment_gateway ?? null, amount: t.amount, payment_id: t.payment_id ?? null,
+          },
+        }, 200, request);
       }
 
       // ── ACTION: get_config ────────────────────────────────────────
