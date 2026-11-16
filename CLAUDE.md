@@ -59,12 +59,14 @@
 > ⚠️ **وعدّاد `login` بتاع `tool='cod_payment'` واقف عند رقمه** (مفيش واجهة بتكتبه) — مش عطل، بس أي استعلام
 > بيعدّ دخول الأداة دي لازم يعرف. صفوف `payment`/`refund` **ما اتغيّرتش**.
 
-## 🧪 Worker v3.25.1 — أكشن مؤقت `gwTestPay` (تجربة اسم الـ gateway · 16-11-2026 · **هيتحذف**)
+## 🧪 خلاصة تجربة اسم الـ gateway في تحصيل REST (16-11-2026 · اتلغت — كانت `gwTestPay`)
 
-- **السبب:** رسالة التحصيل «Marked the manual payment as received» قالب بيتبني من `gateway` (`manual` ← "manual"، `Cash on Delivery (COD)` ← "Cash on Delivery (COD)" — متأكَّد من الأدمن). الأكشن بيجرّب REST بـ gateway من اختيارنا ويرجّع `transaction.message` كما رجعت من شوبيفاي.
-- `createTransaction` بقت بتاخد `gateway` اختياري (الافتراضي `'manual'` = السلوك القديم بالظبط) وبترجّع `raw`. **التحصيل العادي/بوسطة ما اتغيّرش.**
-- ⛔ `gwTestPay` بيكتب على شوبيفاي بلا D1/KV/خزنة، ومحمي بتاج `TEST-DELETE-ME` على الأوردر + المبلغ ≤ المتبقي + مش ملغي. الفحص: `node gw-test-check.mjs` (10 بنود).
-- ⚠️ لو اتغيّر `gateway` في الإنتاج لاحقًا: `Treasury-Ledger` (`CASH_GATEWAY_RE`) لازم الاسم يحتوي `cash on delivery`/`cod`/`manual` وإلا الحركة بتتحسب `nonCash`، والاسترداد (`createRefund`) لسه `manual`.
+رسالة التحصيل «Marked the manual payment as received» قالب = `Marked the {gateway} payment as received` (متأكَّد من الأدمن: Other ← manual · COD ← "Cash on Delivery (COD)"). اللي اتجرّب على REST `transactions.json`:
+- `capture` على أوردر عنده معاملة **PENDING يدوية لسه فيها رصيد** ← شوبيفاي بتربطها بيه (`parentTransaction`) وبتورّث gateway منه وبتتجاهل `gateway` المبعوت (#65984: COD).
+- لما الـ pending يخلص (أو مفيش — زي #51153 بعد تعديل الاستبدال) ← `parentTransaction: null` والـ gateway `manual`. **اسم حر (`XYZ`) اتحوّل لـ `manual`** — مش بيتحفظ.
+- `kind: 'sale'` ← مرفوض (`sale is not a valid transaction`).
+- ⚠️ **ما اتجرّبش:** `gateway` = اسم طريقة دفع يدوية **معرّفة** (`Cash on Delivery (COD)` أو طريقة مخصصة من Settings ← Payments ← Manual payment methods) بعد ما الـ pending يخلص. لو اتقبل فهو الطريقة الوحيدة لتغيير الجملة. لو اتعمد في الإنتاج: `Treasury-Ledger` (`CASH_GATEWAY_RE`) لازم الاسم يحتوي `cash on delivery`/`cod`/`manual`، و`createRefund` لسه `manual`.
+- مفيش حقل رسمي لتخصيص الـ Message، ومفيش mutation لتعليقات الـ timeline (الـ MCP: `OrderTransactionInput` بلا `message` · `orderCreateManualPayment` بيحتاج Plus للمبلغ).
 
 ## 💰 Worker v3.25.0 — «فحص شحنات بوسطة»: تحصيل على شوبيفاي لاستبدال بوسطة حصّلته ومفيش عليه تحصيل (16-11-2026 · قرار أحمد · #51153)
 
