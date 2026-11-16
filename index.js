@@ -1603,14 +1603,14 @@ async function getOrderIdByName(env, orderNumber) {
 
 // 🧪 `gateway` اختياري (الافتراضي 'manual' = السلوك القديم بالظبط) — بيتبعت بس من `gwTestPay` المؤقتة.
 //    و`raw` = معاملة شوبيفاي كما رجعت (فيها `message`) — إضافة بحتة، باقي المستدعين بيتجاهلوها.
-async function createTransaction(token, env, numericOrderId, amount, gateway = 'manual') {
+async function createTransaction(token, env, numericOrderId, amount, gateway = 'manual', kind = 'capture') {
   const res = await fetch(
     `https://${env.SHOP_DOMAIN}/admin/api/2026-01/orders/${numericOrderId}/transactions.json`,
     {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
       body:    JSON.stringify({
-        transaction: { kind: 'capture', status: 'success', amount, currency: 'EGP', gateway },
+        transaction: { kind, status: 'success', amount, currency: 'EGP', gateway },
       }),
     }
   );
@@ -3398,6 +3398,7 @@ export default {
         const orderName = String(bodyData.orderName ?? '').replace(/^#/, '').trim();
         const amount    = parseFloat(bodyData.amount);
         const gateway   = String(bodyData.gateway ?? '').trim();
+        const kind      = bodyData.kind === 'sale' ? 'sale' : 'capture';   // الافتراضي = اللي الإنتاج بيستخدمه
         if (!/^\d{1,7}$/.test(orderName)) return json({ success: false, error: 'رقم الأوردر لازم أرقام بس' }, 200, request);
         if (!(amount > 0)) return json({ success: false, error: 'المبلغ لازم أكبر من صفر' }, 200, request);
         if (!gateway || gateway.length > 100) return json({ success: false, error: 'اسم الـ gateway مطلوب (حتى 100 حرف)' }, 200, request);
@@ -3421,7 +3422,7 @@ export default {
         if (!(outstanding > 0.005)) return json({ success: false, error: `#${orderName} مفيهوش متبقي (${o.displayFinancialStatus})` }, 200, request);
         if (amount - outstanding > 0.005) return json({ success: false, error: `المبلغ (${amount.toFixed(2)}) أكبر من المتبقي (${outstanding.toFixed(2)})` }, 200, request);
 
-        const tx = await createTransaction(token, env, numeric, amount.toFixed(2), gateway);
+        const tx = await createTransaction(token, env, numeric, amount.toFixed(2), gateway, kind);
         if (!tx.success) return json({ success: false, error: tx.error }, 200, request);
         const t = tx.raw || {};
         return json({
@@ -3429,6 +3430,7 @@ export default {
           transaction: {
             id: t.id, kind: t.kind, status: t.status, gateway: t.gateway, message: t.message ?? null,
             manual_payment_gateway: t.manual_payment_gateway ?? null, amount: t.amount, payment_id: t.payment_id ?? null,
+            parent_id: t.parent_id ?? null,   // لو != null شوبيفاي ربطتها بمعاملة pending وورّثت gateway منها
           },
         }, 200, request);
       }
