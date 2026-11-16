@@ -59,6 +59,15 @@
 > ⚠️ **وعدّاد `login` بتاع `tool='cod_payment'` واقف عند رقمه** (مفيش واجهة بتكتبه) — مش عطل، بس أي استعلام
 > بيعدّ دخول الأداة دي لازم يعرف. صفوف `payment`/`refund` **ما اتغيّرتش**.
 
+## 🧪 خلاصة تجربة اسم الـ gateway في تحصيل REST (16-11-2026 · اتلغت — كانت `gwTestPay`)
+
+رسالة التحصيل «Marked the manual payment as received» قالب = `Marked the {gateway} payment as received` (متأكَّد من الأدمن: Other ← manual · COD ← "Cash on Delivery (COD)"). اللي اتجرّب على REST `transactions.json`:
+- `capture` على أوردر عنده معاملة **PENDING يدوية لسه فيها رصيد** ← شوبيفاي بتربطها بيه (`parentTransaction`) وبتورّث gateway منه وبتتجاهل `gateway` المبعوت (#65984: COD).
+- لما الـ pending يخلص (أو مفيش — زي #51153 بعد تعديل الاستبدال) ← `parentTransaction: null` والـ gateway `manual`. **اسم حر (`XYZ`) اتحوّل لـ `manual`** — مش بيتحفظ.
+- `kind: 'sale'` ← مرفوض (`sale is not a valid transaction`).
+- ⚠️ **ما اتجرّبش:** `gateway` = اسم طريقة دفع يدوية **معرّفة** (`Cash on Delivery (COD)` أو طريقة مخصصة من Settings ← Payments ← Manual payment methods) بعد ما الـ pending يخلص. لو اتقبل فهو الطريقة الوحيدة لتغيير الجملة. لو اتعمد في الإنتاج: `Treasury-Ledger` (`CASH_GATEWAY_RE`) لازم الاسم يحتوي `cash on delivery`/`cod`/`manual`، و`createRefund` لسه `manual`.
+- مفيش حقل رسمي لتخصيص الـ Message، ومفيش mutation لتعليقات الـ timeline (الـ MCP: `OrderTransactionInput` بلا `message` · `orderCreateManualPayment` بيحتاج Plus للمبلغ).
+
 ## 💰 Worker v3.25.0 — «فحص شحنات بوسطة»: تحصيل على شوبيفاي لاستبدال بوسطة حصّلته ومفيش عليه تحصيل (16-11-2026 · قرار أحمد · #51153)
 
 - **الحالة:** S1 1850 (SALE ناجحة 1850) + Exchange `5575612262` (950) + Exchange `4775948853` (100) — بوسطة حصّلت الاستبدالين ولا SALE على شوبيفاي، والمتبقي 1050 = مجموعهم. الملف بيمنع (950 ≠ 1050 والـ100 ≠ 1050)، والفحص كان بيمنع (قاعدة v3.20.0 محتاجة دليل SALE جزئي) ← تعليقة.
