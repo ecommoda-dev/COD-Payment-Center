@@ -414,7 +414,7 @@ eq('بلا سر → 401', (await call({ action: 'bostaValidate', rows: [], ctx }
 eq('ctx ناقص → 400', (await call({ action: 'bostaValidate', rows: [ROWS.ok], ctx: { cashOutId: 'x' } })).status, 400);
 eq('أكتر من 15 صف → 400', (await call({ action: 'bostaValidate', rows: Array.from({ length: 16 }, () => ROWS.ok), ctx })).status, 400);
 eq('بلا موظف في bostaPay → 400', (await call({ action: 'bostaPay', row: ROWS.ok, ctx })).status, 400);
-eq('get_config بيرجّع 3.25.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.25.0');
+eq('get_config بيرجّع 3.27.0', (await (await w.fetch(new Request('https://x/?action=get_config', { headers: { Authorization: 'Bearer s' } }), env)).json()).workerVersion, 'v3.27.0');
 
 console.log('══ ⑥ v3.12.0 — بوابة S2 + S1 المسجّل مسبقًا (#49395) ══');
 const kvDel0 = kvDeletes.length, restN = () => rest.length;
@@ -931,6 +931,17 @@ eq('صف الملف 100 بقى مطابق للمتبقي → ready', [v15c.statu
 const rs0c = rest.length;
 const p15c = (await call({ action: 'bostaPay', row: R100c, ctx: ctx15c, employee: 'Ahmed_Ibraheem' })).body;
 eq('bostaPay: تحصيل 100 على شوبيفاي والأوردر يتقفل (المتبقي 0)', [p15c.success, rest.length - rs0c, SHOP['51153'].out], [true, 1, '0.0']);
+
+console.log('══ ⑰ v3.27.0 — حد التفاصيل 8 + تجاهل الشحنات قبل 01-01-2026 ══');
+const base17 = BOSTA.search['46009'].slice();
+for (let i = 1; i <= 7; i++) BOSTA.search['46009'].push(bd('94000000' + String(i).padStart(2, '0'), 30, 46, { createdAt: '2026-09-0' + i + 'T09:00:00Z' }));
+BOSTA.search['46009'].push(bd('9400000099', 10, 45, { createdAt: '2022-04-18T09:00:00Z' }));
+const d17 = await chk('#46009');
+eq('الشحنة اللي تاريخها 2022 اتجاهلت وعدّادها 1', [d17.candidates.some(c => c.trackingNumber === '9400000099'), d17.skippedOld], [false, 1]);
+eq('9 شحنات بعد التجاهل: 8 بتفاصيل والتاسعة بس «أكتر من 8»', [d17.candidates.length, d17.candidates.filter(c => /أكتر من 8 شحنات/.test((c.blockers || []).join())).length], [9, 1]);
+const d17b = await chk('#46010');
+eq('أوردر عادي: skippedOld = 0', [d17b.skippedOld], [0]);
+BOSTA.search['46009'] = base17;
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
