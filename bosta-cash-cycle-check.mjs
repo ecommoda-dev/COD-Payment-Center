@@ -82,6 +82,7 @@ const bd = (tn, code, state, o = {}) => ({ trackingNumber: tn, type: { code, val
 const PRIOR_S1_ADD = ['702', '703', '704', '706', '707'];
 const wal = (total, fees, tx, date, flex = '0.00') => ({ wallet: { cashCycle: { total_amount: total, bosta_fees: String(fees), flex_ship_amount: flex, deposited_amt: total - fees }, cashout: tx ? { transaction_id: tx, transaction_date: date } : { next_cashout_date: '2026-11-12' } } });
 const BOSTA = {
+  searchPlain: { '51153': [bd('9648268911', 30, 46, { createdAt: '2026-08-25T09:00:00Z' })] },   // اترفعت يدويًا بمرجع «51153» من غير #
   search: {
     '46008': [bd('5671180009', 25, 46), bd('4132677759', 30, 46), bd('9619903860', 10, 45)],
     '46009': [bd('9000000001', 10, 45), bd('9000000002', 30, 46)], '46010': [bd('9000000003', 30, 46)],
@@ -113,6 +114,7 @@ const BOSTA = {
     '570507773': { ...bd('570507773', 10, 45), ...wal(1850, 122.55, 'MONCOD24AUG26', '2026-08-24T00:00:00.000Z') },
     '5575612262': { ...bd('5575612262', 30, 46), ...wal(950, 137.94, 'MONCOD31AUG26', '2026-08-31T00:00:00.000Z') },
     '4775948853': { ...bd('4775948853', 30, 46), ...wal(100, 156.18, 'MONCOD07SEP26', '2026-09-07T00:00:00.000Z') },
+    '9648268911': { ...bd('9648268911', 30, 46), ...wal(0, 143.64, 'MONCOD07SEP26', '2026-09-07T00:00:00.000Z') },
     '9100000010': { ...bd('9100000010', 20, 46, { oldType: 'EXCHANGE' }), ...wal(100, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
     '9100000001': { ...bd('9100000001', 20, 46, { oldType: 'EXCHANGE' }), ...wal(150, 181.26, 'WEDCOD05AUG26', '2026-08-05T00:00:00.000Z', '100.00') },
     '9100000011': { ...bd('9100000011', 10, 45), ...wal(5275, 166.16, 'MONCOD20JUL26', '2026-07-20T00:00:00.000Z') },
@@ -196,7 +198,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.startsWith('https://app.bosta.co/api/v2/')) {
     bostaCalls.push({ method: init.method || 'GET', path: u.replace('https://app.bosta.co/api/v2', ''), auth: init.headers && init.headers.Authorization });
     if (bostaMode === '401') return new Response('{"message":"Invalid"}', { status: 401 });
-    if (u.endsWith('/deliveries/search')) { const ref = JSON.parse(init.body).businessReference.replace('#', ''); return new Response(JSON.stringify({ data: { deliveries: BOSTA.search[ref] || [] } }), { status: 200 }); }
+    if (u.endsWith('/deliveries/search')) { const br = JSON.parse(init.body).businessReference, ref = br.replace('#', ''); return new Response(JSON.stringify({ data: { deliveries: (br.startsWith('#') ? BOSTA.search[ref] : BOSTA.searchPlain[ref]) || [] } }), { status: 200 }); }
     const g = u.match(/deliveries\/business\/(\d+)$/);
     if (g) return BOSTA.full[g[1]] ? new Response(JSON.stringify({ data: BOSTA.full[g[1]] }), { status: 200 }) : new Response('{}', { status: 400 });
   }
@@ -910,6 +912,17 @@ eq('الخزنة: courierCollect = Net 812.06 · جلسة مستقلة · courie
 eq('extra: shopifyCaptured 950 · معاملة · المتبقي قبل/بعد', [X15c.shopifyCaptured, X15c.shopifyCaptureCreated, X15c.shopifyOutstandingBefore, X15c.shopifyOutstandingAfter], ['950.00', true, '1050.00', '100.00']);
 eq('الرد بيقول التحصيل · والتحذير', [q15c.shopifyCapture && q15c.shopifyCapture.amount, /950\.00/.test(q15c.warning || '')], ['950.00', true]);
 d53c = await chk('#51153'); y53c = cand(d53c, '4775948853');
+
+console.log('══ ⑯ #51153 — Exchange 9648268911 بإجمالي 0 (رسوم بوسطة بس) والمتبقي على شوبيفاي 100 ══');
+const z53 = cand(d53c, '9648268911');
+eq('Exchange 0: قابلة بلا تنبيه ولا تأكيد · Net −143.64', [z53 && z53.eligible, z53 && z53.gross, z53 && z53.net, z53 && z53.blockers, z53 && !!z53.needsCaptureConfirm, z53 && !!z53.needsCaptureAck], [true, '0.00', '-143.64', [], false, false]);
+eq('مرجعها من غير # → ظهرت · refNoHash · ملاحظة · مفيش تكرار', [z53 && z53.refNoHash, z53 && /من غير #/.test(z53.notes.join()), d53c.candidates.filter(c => c.trackingNumber === '9648268911').length], [true, true, 1]);
+const w16 = wr();
+const q16 = await payS1('#51153', '9648268911', { gross: '0.00', net: '-143.64', cashOutId: 'MONCOD07SEP26' });
+const L16 = logs[logs.length - 1], X16 = E8(L16);
+eq('تسجيل: نجاح · payment · value_after 0 · noCollection · slot S2', [q16.success, q16.kind, L16.type, L16.value_after, X16.noCollection, X16.slot], [true, 'none', 'payment', 0, true, 'S2']);
+eq('🔴 الخزنة: courierCollect = Net −143.64 · جلسة مستقلة · courier Bosta', [X16.courierCollect, X16.batchId, X16.courier, X16.source], [-143.64, 'bosta-leg-9648268911', 'Bosta', 'bosta_cash_cycle']);
+eq('صفر كتابة على شوبيفاي · المتبقي لسه 100 · صف D1 واحد', [rest.length, refunds.length, SHOP['51153'].out, logs.length - w16[0]], [w16[1], w16[2], '100.0', 1]);
 eq('بعدها Exchange 100 = المتبقي بالظبط ← «سجّله بملف الـ Cash-out العادي»', [y53c.eligible, /ملف الـ Cash-out العادي/.test(y53c.blockers.join())], [false, true]);
 const ctx15c = { ...ctx, rowsTotal: 1, netTotal: '-56.18', payOrders: 1, refundOrders: 0, s1Orders: ['#51153'] };
 const R100c = R('#51153', '4775948853', 'EXCHANGE', 100, 0, -56.18, 156.18);

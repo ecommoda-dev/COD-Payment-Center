@@ -445,7 +445,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.25.0';
+const WORKER_VERSION = 'v3.26.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -2166,7 +2166,13 @@ async function bostaS1Evaluate(env, orderRef) {
   let pend = null; try { pend = await checkPendingPreReg(env, orderId); } catch { pend = null; }
 
   const ref = String(orderRef).replace(/^#/, '');
-  const raw = bostaExtractDeliveries(await bostaApi(env, 'POST', '/deliveries/search', { businessReference: `#${ref}`, limit: 50, page: 1 }));
+  // 🆕 v3.26.0 (#51153) — شحنة اترفعت يدويًا من داشبورد بوسطة بمرجع «51153» بدل «#51153» ما كانتش بتظهر: بنبحث بالاتنين ونجمّع بلا تكرار (رقم التتبع).
+  // البحث بالمرجع الخالي من # مقيّد بنفس رقم الأوردر بالظبط، وفشله مابيوقّفش الفحص (البحث الأساسي هو اللي بيحسم).
+  const rawMain = bostaExtractDeliveries(await bostaApi(env, 'POST', '/deliveries/search', { businessReference: `#${ref}`, limit: 50, page: 1 }));
+  let rawPlain = [];
+  try { rawPlain = bostaExtractDeliveries(await bostaApi(env, 'POST', '/deliveries/search', { businessReference: ref, limit: 50, page: 1 })); } catch { rawPlain = []; }
+  const seenTn = new Set(rawMain.map(d => String(d.trackingNumber ?? '')));
+  const raw = [...rawMain, ...rawPlain.filter(d => d.trackingNumber && !seenTn.has(String(d.trackingNumber))).map(d => ({ ...d, _refNoHash: true }))];
   const sorted = [...raw].sort((a, b) => (b.type?.code === 10 || (b.type?.code === 20 && String(b.oldType || '').toUpperCase() === 'SEND') ? 1 : 0)
     - (a.type?.code === 10 || (a.type?.code === 20 && String(a.oldType || '').toUpperCase() === 'SEND') ? 1 : 0));
   const cands = await Promise.all(sorted.map(async (d, i) => {
@@ -2177,6 +2183,7 @@ async function bostaS1Evaluate(env, orderRef) {
     const c = bostaShapeCandidate(d, full, err);
     const b = c.blockers;
     // 🆕 v3.16.0 — الشحنة S1 (Send / RTO كانت Send) أو S2 (Exchange · Customer Return Pickup)
+    if (d._refNoHash) c.refNoHash = true;
     c.leg = c.isS1Type ? 'S1' : 'S2'; c.notes = []; c.afterS1 = false; c.refundMissing = false; c.refund = null;
     if (c.isRtoFee) {
       // 🆕 v3.17.0 — RTO فاشلة (كانت Exchange/CRP): S2 «رسوم فقط». أي مبلغ عليها (إجمالي أو أونلاين) = مش الحالة دي → بنمنع ونسمّي السبب
@@ -2204,6 +2211,7 @@ async function bostaS1Evaluate(env, orderRef) {
       c.needsCourierAck = true;
       c.notes.push(`⚠ المندوب على شوبيفاي «${courier || 'فاضي'}» مش ${BOSTA_COURIER} — الشحنة جاية من بوسطة نفسها (محتاج تأكيد صريح)`);
     }
+    if (c.refNoHash) c.notes.push(`الشحنة دي مرجعها على بوسطة «${ref}» (من غير #) — اترفعت يدويًا من بوسطة`);
     const what = c.leg === 'S1' ? 'S1' : c.typeLabel;
     if (c._p && c._p.gross > 0) {
       if (out !== null && out === c._p.gross) b.push(`الأوردر لسه مش متحصّل على شوبيفاي (المتبقي = إجمالي ${what}) — سجّله بملف الـ Cash-out العادي عشان يتحصّل`);
