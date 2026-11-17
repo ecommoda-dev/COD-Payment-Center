@@ -1,6 +1,6 @@
 # مركز تحصيل الأوردرات COD (`COD-Payment-Center`)
 
-![version](https://img.shields.io/badge/worker-v3.26.0-blue)
+![version](https://img.shields.io/badge/worker-v3.27.0-blue)
 
 **بتعمل إيه:** الموظف بيسجّل تحصيل/استرداد فلوس أوردرات الدفع عند الاستلام لكل مندوب، ويشوف سجل الحركة كامل.
 **مين بيستخدمها:** حسابات · مخزن
@@ -67,6 +67,12 @@
 - `kind: 'sale'` ← مرفوض (`sale is not a valid transaction`).
 - ⚠️ **ما اتجرّبش:** `gateway` = اسم طريقة دفع يدوية **معرّفة** (`Cash on Delivery (COD)` أو طريقة مخصصة من Settings ← Payments ← Manual payment methods) بعد ما الـ pending يخلص. لو اتقبل فهو الطريقة الوحيدة لتغيير الجملة. لو اتعمد في الإنتاج: `Treasury-Ledger` (`CASH_GATEWAY_RE`) لازم الاسم يحتوي `cash on delivery`/`cod`/`manual`، و`createRefund` لسه `manual`.
 - مفيش حقل رسمي لتخصيص الـ Message، ومفيش mutation لتعليقات الـ timeline (الـ MCP: `OrderTransactionInput` بلا `message` · `orderCreateManualPayment` بيحتاج Plus للمبلغ).
+
+## 🔢 Worker v3.27.0 — «فحص شحنات بوسطة»: حد التفاصيل 8 + أرضية تاريخ الإنشاء 01-01-2026 (17-11-2026 · قرار أحمد · #57833)
+
+- 🔴 **رسالة «تفاصيل الشحنة متجلبتش (أكتر من N شحنات)» قيد من كودنا (`BOSTA_MAX_FULL`) مش من بوسطة** — كان 5 فبقى **8** (نداء `GET /deliveries/business/{tn}` لكل شحنة، بالتوازي، مهلة 8 ث). ⚠️ حد الـ subrequests والتكلفة ما اتقاسوش على الإنتاج.
+- ✅ **`BOSTA_S1_MIN_CREATED = 2025-12-31T22:00Z`** (= 01-01-2026 بتوقيت القاهرة): `bostaS1Check` بيتجاهل أي شحنة `createdAt` بتاعها قبل كده **قبل** الترتيب والحد (فالشحنات القديمة مابتاخدش من الـ 8). شحنة بلا `createdAt` بتفضل. الرد فيه `skippedOld` (عدد المتجاهَل) — حقل إضافي، `codPayment.min` ما اترفعش.
+- فحص: `bosta-cash-cycle-check` **293** (+§⑰) · partial 97 · free-shipping 55 · order-kind 25 (اتصلّح بند النسخة القديم). ⚠️ ما اتجرّبش على بوسطة حقيقية.
 
 ## 🔎 Worker v3.26.0 — «فحص شحنات بوسطة»: شحنات اترفعت يدويًا بمرجع من غير `#` (17-11-2026 · #51153)
 

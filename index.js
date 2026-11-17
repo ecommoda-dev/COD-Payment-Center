@@ -445,7 +445,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.26.0';
+const WORKER_VERSION = 'v3.27.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -2041,7 +2041,9 @@ async function bostaClearPreReg(env, orderId, preRegTx, actions) {
 // المرجع: bosta-api-helper Step 8.15 (+ملاحظات 10-11-2026 عن الدفع الأونلاين `paymentInfo`) — مفتاح بوسطة خام بلا Bearer.
 const BOSTA_API_BASE = 'https://app.bosta.co/api/v2';
 const BOSTA_FETCH_MS = 8000;
-const BOSTA_MAX_FULL = 5;                          // شحنات بنجيب تفاصيلها (GET) لكل أوردر
+const BOSTA_MAX_FULL = 8;                          // شحنات بنجيب تفاصيلها (GET) لكل أوردر (كانت 5 — رُفعت لـ 8 في v3.27.0 · قرار أحمد 17-11-2026)
+// 🆕 v3.27.0 — «فحص شحنات بوسطة» بيتجاهل أي شحنة تاريخ إنشائها قبل 01-01-2026 (بتوقيت القاهرة = 2025-12-31T22:00Z) — قرار أحمد. شحنة بلا تاريخ بتفضل.
+const BOSTA_S1_MIN_CREATED = '2025-12-31T22:00:00Z';
 const BOSTA_TOOL_START = '2026-11-01T00:00:00Z';   // أول تسجيل بوسطة في D1 كان 04-11-2026 — حد أدنى لاستعلام idx_logs_tool_ts
 const BOSTA_STATE = { 10: 'Pickup requested', 20: 'Route Assigned', 21: 'Picked up from business', 24: 'Received at warehouse', 30: 'In transit between Hubs',
   41: 'Picked up', 45: 'Delivered', 46: 'Returned to business', 47: 'Exception', 48: 'Terminated', 49: 'Canceled', 100: 'Lost', 101: 'Damaged' };
@@ -2172,7 +2174,11 @@ async function bostaS1Evaluate(env, orderRef) {
   let rawPlain = [];
   try { rawPlain = bostaExtractDeliveries(await bostaApi(env, 'POST', '/deliveries/search', { businessReference: ref, limit: 50, page: 1 })); } catch { rawPlain = []; }
   const seenTn = new Set(rawMain.map(d => String(d.trackingNumber ?? '')));
-  const raw = [...rawMain, ...rawPlain.filter(d => d.trackingNumber && !seenTn.has(String(d.trackingNumber))).map(d => ({ ...d, _refNoHash: true }))];
+  const rawAll = [...rawMain, ...rawPlain.filter(d => d.trackingNumber && !seenTn.has(String(d.trackingNumber))).map(d => ({ ...d, _refNoHash: true }))];
+  const minCreatedMs = Date.parse(BOSTA_S1_MIN_CREATED);
+  const tooOld = d => { const t = d.createdAt ? Date.parse(d.createdAt) : NaN; return Number.isFinite(t) && t < minCreatedMs; };
+  const raw = rawAll.filter(d => !tooOld(d));
+  const skippedOld = rawAll.length - raw.length;
   const sorted = [...raw].sort((a, b) => (b.type?.code === 10 || (b.type?.code === 20 && String(b.oldType || '').toUpperCase() === 'SEND') ? 1 : 0)
     - (a.type?.code === 10 || (a.type?.code === 20 && String(a.oldType || '').toUpperCase() === 'SEND') ? 1 : 0));
   const cands = await Promise.all(sorted.map(async (d, i) => {
@@ -2278,7 +2284,7 @@ async function bostaS1Evaluate(env, orderRef) {
   const preReg = pend ? { amount: pend.amount ?? null, transactionId: pend.transactionId != null ? String(pend.transactionId) : null } : null;
   return {
     found: true, orderId: String(orderId), orderName: nd.name, courier, financialStatus: nd.displayFinancialStatus,
-    shopifyOutstanding: out === null ? null : bostaFmt(out), shopifyOutstandingRaw: bal.outstandingRawP === null ? null : bostaFmt(bal.outstandingRawP), shopifyRefundDiscrepancy: bostaFmt(bal.discrepancyP), shopifyOwed: bostaFmt(owedP), shopifySaleCaptured: bostaFmt(saleSum), shopifyRefunded: bostaFmt(refundedP), legsRegistered: { positive: bostaFmt(legs.pos), negative: bostaFmt(legs.neg) }, t1, t2, hasS1, preRegistered: !!pend, preReg, trackingUnverifiedOrder: !!legacy,
+    shopifyOutstanding: out === null ? null : bostaFmt(out), shopifyOutstandingRaw: bal.outstandingRawP === null ? null : bostaFmt(bal.outstandingRawP), shopifyRefundDiscrepancy: bostaFmt(bal.discrepancyP), shopifyOwed: bostaFmt(owedP), shopifySaleCaptured: bostaFmt(saleSum), shopifyRefunded: bostaFmt(refundedP), legsRegistered: { positive: bostaFmt(legs.pos), negative: bostaFmt(legs.neg) }, t1, t2, hasS1, preRegistered: !!pend, preReg, trackingUnverifiedOrder: !!legacy, skippedOld,
     candidates: cands, _sales: sales, _pend: pend,
   };
 }
