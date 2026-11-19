@@ -1,4 +1,4 @@
-// free-shipping-check.mjs — Worker v3.15.0: الشحن المجاني (رسوم المندوب 75 ثابتة بعد تأكيد الموظف) — S1 + المرتجع/الاستبدال (S2).
+// free-shipping-check.mjs — Worker v3.28.0 (+§⑨ أجر مشوار S2 بلا تحصيل · الشحن الأصلي مابقاش شرط على المرتجع) · v3.15.0: الشحن المجاني (رسوم المندوب 75 ثابتة بعد تأكيد الموظف) — S1 + المرتجع/الاستبدال (S2).
 // تشغيل: node free-shipping-check.mjs   (من غير شبكة ولا D1 حقيقية — شوبيفاي ووكيل D1 وهميين)
 // الحالات الحقيقية: #64603 (شحن اتشال بتعديل) · #63607 (اتعمل بلا شحن) · #65609 · أوردر Showroom بشحن 0 وبشحن 75.
 import w from './index.js';
@@ -10,6 +10,7 @@ const eq = (name, got, want) => { if (JSON.stringify(got) === JSON.stringify(wan
 // ship = قيمة سطر الشحن الحالي (null = السطر اتشال) · courier = ميتافيلد custom.courier
 const RET = fee => ({ id: 'r', status: 'CLOSED', createdAt: '2026-11-14T14:37:31Z', returnShippingFees: fee ? [{ amountSet: { shopMoney: { amount: String(fee.toFixed ? fee.toFixed(1) : fee) } } }] : [], returnLineItems: { nodes: [] }, exchangeLineItems: { nodes: [] } });
 const RET0 = () => RET(0);
+const RETX = (id, status, fee = 0) => ({ ...RET(fee), id: 'gid://shopify/Return/' + id, status });
 const ORDERS = {
   '1':  { name: '#64603', amount: '4150.0', ship: null,  courier: 'Mohamed Torky', returns: [] },
   '2':  { name: '#63607', amount: '1750.0', ship: '0.0', courier: 'Kareem',        returns: [] },
@@ -26,13 +27,23 @@ const ORDERS = {
   '12': { name: '#65609', amount: '-200.0', ship: null,  courier: 'Abo Selim',     returns: [RET0()], refund: true },   // الحالة الحقيقية: استرجاع كلي بلا رسوم مرتجع
   '13': { name: '#70020', amount: '-125.0', ship: null,  courier: 'Abo Selim',     returns: [RET(75)], refund: true },   // رسوم مرتجع 75 على شوبيفاي ← القديم
   '14': { name: '#70021', amount: '100.0',  ship: null,  courier: 'Saif',          returns: [RET0()] },                   // استبدال بفرق 100 يتحصّل
-  '15': { name: '#70022', amount: '-200.0', ship: '75.0', courier: 'Saif',         returns: [RET0()], refund: true },   // شحن أصلي 75 ← القديم
+  '15': { name: '#70022', amount: '-200.0', ship: '75.0', courier: 'Saif',         returns: [RET0()], refund: true },   // شحن أصلي 75 + رسوم مرتجع 0 ← v3.28.0: أجر 75 (كان القديم)
   '16': { name: '#70023', amount: '-200.0', ship: null,  courier: 'Showroom',      returns: [RET0()], refund: true },
   '17': { name: '#70024', amount: '-200.0', ship: null,  courier: null,            returns: [RET0()], refund: true },
   '18': { name: '#70025', amount: '-200.0', ship: null,  courier: 'Bosta',         returns: [RET0()], refund: true },
   '19': { name: '#70026', amount: '0.0',    ship: null,  courier: 'Saif',          returns: [RET0()] },                   // متبقي صفر ← مفيش حاجة تتسجّل
   // ── v3.23.0: الرصيد الحقيقي (إجمالي − netPayment) — #65634: استرداد 18 من 165 سجّل REFUND_DISCREPANCY فـ totalOutstanding اتصفّر والعميل لسه له 147 ──
   '20': { name: '#65634', amount: '-147.0', ship: null,  courier: 'Saif',          returns: [RET0()], refund: true },
+  // ── v3.28.0: أجر مشوار S2 بلا تحصيل (#65513: استبدال بنفس السعر · شحن أصلي 75 · رسوم مرتجع 0 · رصيد 0) ──
+  '22': { name: '#65513', amount: '0.0', ship: '75.0', courier: 'Saif',      s2: 'Returned', returns: [RETX('37747065154', 'CLOSED')], refund: true },
+  '23': { name: '#70040', amount: '0.0', ship: '75.0', courier: 'Saif',      s2: 'Shipped',  returns: [RETX('37747065155', 'OPEN')],   refund: true },   // المرتجع لسه مفتوح
+  '24': { name: '#70041', amount: '0.0', ship: '75.0', courier: 'Showroom',  s2: 'Returned', returns: [RETX('1', 'CLOSED')], refund: true },
+  '25': { name: '#70042', amount: '0.0', ship: '75.0', courier: null,        s2: 'Returned', returns: [RETX('2', 'CLOSED')], refund: true },
+  '26': { name: '#70043', amount: '0.0', ship: '75.0', courier: 'Saif',      s2: 'Returned', returns: [RETX('3', 'CLOSED', 75)], refund: true },   // رسوم مرتجع 75 اتحسبت
+  '27': { name: '#70044', amount: '0.0', ship: '75.0', courier: 'Bosta',     s2: 'Returned', returns: [RETX('4', 'CLOSED')], refund: true },
+  '28': { name: '#70045', amount: '0.0', ship: null,   courier: 'Saif',      s2: 'Delivered', returns: [RETX('5', 'OPEN')], refund: true },        // S2 = Delivered والمرتجع مفتوح ← لسه
+  '29': { name: '#70046', amount: '100.0', ship: '75.0', courier: 'Saif',     s2: 'Delivered', returns: [RETX('6', 'CLOSED')] },                  // فرق استبدال 100 + شحن أصلي 75 ← الأجر بيتطرح (كان ضايع)
+  '30': { name: '#70047', amount: '0.0', ship: '75.0', courier: 'Saif',      s2: 'Returned', returns: [RETX('7', 'CANCELED'), RETX('8', 'CLOSED')], refund: true },   // دورة ملغاة + دورة سليمة
   '21': { name: '#70031', amount: '0.0',    ship: null,  courier: 'Saif',          returns: [], noBal: true },             // شوبيفاي ما رجّعتش الإجمالي/المدفوع
 };
 // 🆕 v3.23.0 — مسارات المناديب بتقرا الرصيد الحقيقي (إجمالي − netPayment) مش totalOutstanding: الـ mock بيرجّع الحقلين (a موجب = عليه · سالب = له)
@@ -42,11 +53,11 @@ const gqlOrder = o => ({ data: { order: {
   id: 'gid://shopify/Order/1', name: o.name, cancelledAt: null, canMarkAsPaid: !o.refund, displayFinancialStatus: 'PENDING',
   ...(o.noBal ? {} : balNode(o.amount)), subtotalPriceSet: { shopMoney: { amount: o.amount } },
   shippingLine: o.ship == null ? null : { originalPriceSet: { shopMoney: { amount: o.ship } } },
-  courierMeta: o.courier == null ? null : { value: o.courier }, preRegMeta: null, s1Meta: { value: 'Delivered' }, s2Meta: null,
+  courierMeta: o.courier == null ? null : { value: o.courier }, preRegMeta: null, s1Meta: { value: 'Delivered' }, s2Meta: o.s2 ? { value: o.s2 } : null,
   discountApplications: { edges: [] }, lineItems: { nodes: [] }, returns: { nodes: o.returns }, refunds: [], transactions: [],
 } } });
 
-let gqlCalls = 0, captures = 0, refunds = 0, KV_PENDING = null, PRE_STATE = null;
+let gqlCalls = 0, captures = 0, refunds = 0, KV_PENDING = null, PRE_STATE = null, FIRST_HIT = false, FIRST_THROW = false;
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
   if (u.includes('/oauth/access_token')) return new Response(JSON.stringify({ access_token: 't' }), { status: 200 });
@@ -65,7 +76,7 @@ globalThis.fetch = async (url, init = {}) => {
   return new Response('{}', { status: 404 });
 };
 const rows = [];
-const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; }, async run() { if (/INSERT INTO logs/.test(sql)) rows.push(this._b); return {}; }, async first() { return null; }, async all() { return { results: [] }; } }) };
+const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; }, async run() { if (/INSERT INTO logs/.test(sql)) rows.push(this._b); return {}; }, async first() { return FIRST_HIT ? { id: 1 } : (FIRST_THROW ? Promise.reject(new Error('d1 down')) : null); }, async all() { return { results: [] }; } }) };
 const KV = { async get(k) { return KV_PENDING && k.startsWith('preReg:') ? JSON.stringify(KV_PENDING) : null; }, async delete() {}, async list() { return { keys: [] }; } };
 const env = { DB, PRE_REG_KV: KV, WORKER_SECRET: 's', SHOP_DOMAIN: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b' };
 const call = async body => (await w.fetch(new Request('https://x/', { method: 'POST', headers: { Authorization: 'Bearer s', 'Content-Type': 'application/json', Origin: 'https://ecommoda-dev.github.io' }, body: JSON.stringify(body) }), env)).json();
@@ -131,11 +142,11 @@ const NOFS = { freeShipping: false, courierFee: null, courierKind: null, courier
 eq('#65609 استرجاع كلي بلا رسوم مرتجع + Abo Selim ← أجر 75 (leg=return)', feeL(await call({ action: 'preview', orderId: '12' })), L('courier', 75));
 eq('رسوم مرتجع 75 على شوبيفاي ← الحساب القديم', feeL(await call({ action: 'preview', orderId: '13' })), NOFS);
 eq('استبدال بفرق 100 (تحصيل) بلا رسوم مرتجع ← أجر 75', feeL(await call({ action: 'preview', orderId: '14' })), L('courier', 75));
-eq('مرتجع بلا رسوم لكن شحن الأوردر الأصلي 75 ← الحساب القديم', feeL(await call({ action: 'preview', orderId: '15' })), NOFS);
+eq('🆕 v3.28.0 — مرتجع بلا رسوم وشحن الأوردر الأصلي 75 ← أجر 75 (كان الحساب القديم = الأجر ضايع · #65513)', feeL(await call({ action: 'preview', orderId: '15' })), L('courier', 75));
 eq('مرتجع Showroom ← تنبيه بلا أجر', feeL(await call({ action: 'preview', orderId: '16' })), L('showroom', 0));
 eq('مرتجع بلا مندوب ← courierMissing', feeL(await call({ action: 'preview', orderId: '17' })), { freeShipping: true, courierFee: null, courierKind: null, courierMissing: true, leg: 'return' });
 eq('مرتجع Bosta ← بلا تغيير', feeL(await call({ action: 'preview', orderId: '18' })), NOFS);
-eq('مرتجع بمتبقي صفر ← مفيش حاجة تتسجّل', feeL(await call({ action: 'preview', orderId: '19' })), NOFS);
+eq('🆕 v3.28.0 — مرتجع بمتبقي صفر والمشوار خلص (المرتجع CLOSED) ← «أجر مشوار فقط» (كان: مفيش حاجة تتسجّل)', { ...feeL(await call({ action: 'preview', orderId: '19' })), fo: (await call({ action: 'preview', orderId: '19' })).feeOnly }, { ...L('courier', 75), fo: true });
 eq('أوردر عادي feeLeg=null', (await call({ action: 'preview', orderId: '1' })).feeLeg, null);
 
 const rsess = { courier: 'Abo Selim', paymentMethods: { cash: '275', instapay: '0', wallet: '0' } };
@@ -202,6 +213,72 @@ eq('حقول الإجمالي/المدفوع ناقصة ← خطأ بسببه (�
 const ref0 = refunds;
 const rf20 = await call({ action: 'refund', orderId: '20', amount: '147.00', employee: 'Fady', batchId: 'r20', sessionMeta: { courier: 'Saif' }, orderMeta: { hasReturn: true, courierCollect: -147 }, saleTransactions: [{ id: 'gid://shopify/OrderTransaction/50', amount: 165 }] });
 eq('استرداد 147 على #65634: الأوردر بيتعامل كـ «له فلوس» (مفيش «مدفوع بالكامل»)', { saidPaid: /مدفوع بالكامل/.test(JSON.stringify(rf20)) }, { saidPaid: false });
+
+
+console.log('══ ⑨ v3.28.0 — أجر مشوار S2 بلا تحصيل (#65513) + الشحن الأصلي مابقاش شرط على المرتجع ══');
+const pvF = async id => await call({ action: 'preview', orderId: id });
+let f22 = await pvF('22');
+eq('#65513 (استبدال بنفس السعر · رصيد صفر · شحن 75 · رسوم صفر · المرتجع CLOSED) ← feeOnly بأجر 75', { fo: f22.feeOnly, ...feeL(f22), rid: f22.feeReturnId, st: f22.feeOnlyState }, { fo: true, ...L('courier', 75), rid: '37747065154', st: 'ready' });
+f22 = await pvF('23');
+eq('المرتجع لسه مفتوح والمشوار ما خلصش ← مفيش أجر + سبب «trip_pending»', { fo: f22.feeOnly, fs: f22.freeShipping, st: f22.feeOnlyState, msg: /لسه ما خلصش/.test(f22.feeOnlyMsg || '') }, { fo: false, fs: false, st: 'trip_pending', msg: true });
+eq('Showroom برصيد صفر ← مفيش صف (مالوش أجر)', { fo: (await pvF('24')).feeOnly, fs: (await pvF('24')).freeShipping }, { fo: false, fs: false });
+eq('مفيش مندوب برصيد صفر ← مفيش صف ومفيش منع (مفيش تخمين)', { fo: (await pvF('25')).feeOnly, miss: (await pvF('25')).courierMissing }, { fo: false, miss: false });
+eq('رسوم مرتجع 75 على شوبيفاي ← الحساب القديم (مفيش أجر مرتين)', { fo: (await pvF('26')).feeOnly, fs: (await pvF('26')).freeShipping }, { fo: false, fs: false });
+eq('Bosta برصيد صفر ← مفيش صف (مسارها الخاص)', { fo: (await pvF('27')).feeOnly, fs: (await pvF('27')).freeShipping }, { fo: false, fs: false });
+eq('S2 = Delivered والمرتجع مفتوح ← لسه (بوابة حالة الواجهة: S2 فارغ أو Returned بس)', { fo: (await pvF('28')).feeOnly, st: (await pvF('28')).feeOnlyState }, { fo: false, st: 'trip_pending' });
+ORDERS['31'] = { name: '#70048', amount: '0.0', ship: '75.0', courier: 'Saif', s2: 'Returned', returns: [RETX('9', 'OPEN')], refund: true };
+eq('S2 = Returned والمرتجع لسه OPEN ← المشوار خلص', { fo: (await pvF('31')).feeOnly, st: (await pvF('31')).feeOnlyState }, { fo: true, st: 'ready' });
+eq('دورة ملغاة + دورة سليمة ← الأحدث غير الملغاة هي اللي بتتحسب', { fo: (await pvF('30')).feeOnly, rid: (await pvF('30')).feeReturnId }, { fo: true, rid: '8' });
+FIRST_HIT = true;
+f22 = await pvF('22');
+eq('فيه صف أجر قبل كده لنفس الأوردر ← «already_recorded» ومفيش أجر', { fo: f22.feeOnly, fs: f22.freeShipping, st: f22.feeOnlyState }, { fo: false, fs: false, st: 'already_recorded' });
+FIRST_HIT = false; FIRST_THROW = true;
+f22 = await pvF('22');
+eq('D1 وقعت وقت التحقق ← «check_failed» (مفيش تخمين = مفيش أجر مرتين)', { fo: f22.feeOnly, st: f22.feeOnlyState }, { fo: false, st: 'check_failed' });
+FIRST_THROW = false;
+
+// تحصيل فرق استبدال + شحن أصلي (الفجوة ب — كان الأجر بيضيع)
+eq('فرق استبدال 100 + شحن أصلي 75 + رسوم صفر ← أجر 75 (leg=return)', feeL(await pvF('29')), L('courier', 75));
+c0 = captures; r0 = rows.length;
+d = await call({ action: 'pay', orderId: '29', amount: '100.00', employee: 'Fady', batchId: 'q1', sessionMeta: { courier: 'Saif' }, orderMeta: { hasReturn: true, courierCollect: 100, freeShipping: ackR('courier', 75) } });
+xr = extraOf(rows.length - 1);
+eq('تحصيل الفرق مؤكَّد ← courierCollect = 100 − 75 = 25 · وreturnId متخزّن (منع تكرار الأجر)', { success: d.success, cc: xr.courierCollect, rid: xr.freeShipping?.returnId, fo: xr.feeOnly ?? null }, { success: true, cc: 25, rid: '6', fo: null });
+eq('pay على أوردر feeOnly (رصيده بقى صفر) ← blocked بلا كتابة', await (async () => { const r1 = rows.length, c1 = captures; const x = await call({ action: 'pay', orderId: '22', amount: '50.00', batchId: 'q2', sessionMeta: { courier: 'Saif' }, orderMeta: {} }); return { blocked: x.blocked, rows: rows.length - r1, cap: captures - c1 }; })(), { blocked: true, rows: 0, cap: 0 });
+
+// تسجيل «أجر مشوار فقط»
+const ackF = (o = {}) => ({ confirmed: true, courierKind: 'courier', courierFee: 75, leg: 'return', feeOnly: true, ...o });
+const fsess = { courier: 'Saif', paymentMethods: { cash: '75', instapay: '0', wallet: '0' } };
+const feeReq = (orderId, over = {}) => call({ action: 'refund', feeOnly: true, orderId, employee: 'Fady', orderName: '#65513', batchId: 'f1', sessionMeta: fsess, orderMeta: { hasReturn: true, courierCollect: 0, freeShipping: ackF() }, ...over });
+rf0 = refunds; c0 = captures; r0 = rows.length;
+d = await feeReq('22', { orderMeta: { hasReturn: true, courierCollect: 0 } });
+eq('بلا تأكيد ← blocked + صفر كتابة (لا شوبيفاي ولا D1)', { blocked: d.blocked, rows: rows.length - r0, rf: refunds - rf0, cap: captures - c0 }, { blocked: true, rows: 0, rf: 0, cap: 0 });
+d = await feeReq('22', { orderMeta: { hasReturn: true, freeShipping: ackF({ feeOnly: undefined }) } });
+eq('تأكيد بلا feeOnly (صفحة قديمة) ← blocked', d.blocked, true);
+d = await feeReq('22', { sessionMeta: { courier: 'Kareem' } });
+eq('الأوردر على Saif والجلسة Kareem ← blocked (الأجر للي عمل المشوار) + الرسالة بتسمّي الاتنين', { blocked: d.blocked, msg: /Saif/.test(d.error || '') && /Kareem/.test(d.error || ''), rows: rows.length - r0 }, { blocked: true, msg: true, rows: 0 });
+d = await feeReq('23');
+eq('المرتجع لسه مفتوح ← blocked', { blocked: d.blocked, rows: rows.length - r0 }, { blocked: true, rows: 0 });
+d = await feeReq('24', { orderMeta: { freeShipping: ackF({ courierKind: 'showroom', courierFee: 0 }) } });
+eq('أوردر مش feeOnly (Showroom) ← blocked', { blocked: d.blocked, rows: rows.length - r0 }, { blocked: true, rows: 0 });
+FIRST_HIT = true; d = await feeReq('22'); FIRST_HIT = false;
+eq('الأجر اتسجّل قبل كده ← blocked (مفيش أجر مرتين)', { blocked: d.blocked, msg: /اتسجّل قبل كده/.test(d.error || ''), rows: rows.length - r0 }, { blocked: true, msg: true, rows: 0 });
+ORDERS['22'].failRead = true; d = await feeReq('22'); delete ORDERS['22'].failRead;
+eq('فشل قراءة شوبيفاي ← وقف نضيف', { success: d.success, rows: rows.length - r0 }, { success: false, rows: 0 });
+
+d = await feeReq('22');
+xr = extraOf(rows.length - 1);
+eq('تسجيل صحيح ← نجح · صفر شوبيفاي', { success: d.success, feeOnly: d.feeOnly, rf: refunds - rf0, cap: captures - c0 }, { success: true, feeOnly: true, rf: 0, cap: 0 });
+eq('الصف: type=refund · valueAfter=0 · notes', { t: rows[rows.length - 1][2], v: rows[rows.length - 1][10], n: /أجر مشوار/.test(rows[rows.length - 1][11] || '') }, { t: 'refund', v: 0, n: true });
+eq('courierCollect = −75 (الخزنة بتدفع للمندوب) — الـ Worker حسبه مش المتصفح', xr.courierCollect, -75);
+eq('extra: feeOnly + isRefund + refundAmount 0 + courier', { fo: xr.feeOnly, ir: xr.isRefund, ra: xr.refundAmount, c: xr.courier }, { fo: true, ir: true, ra: 0, c: 'Saif' });
+eq('extra.freeShipping: leg=return · returnId · feeOnly · الأجر', { leg: xr.freeShipping.leg, rid: xr.freeShipping.returnId, fo: xr.freeShipping.feeOnly, f: xr.freeShipping.courierFee, by: xr.freeShipping.confirmedBy }, { leg: 'return', rid: '37747065154', fo: true, f: 75, by: 'Fady' });
+eq('actions بتقول «بدون شوبيفاي» وأجر المشوار', { a: (xr.actions || []).some(a => /بدون أي تسجيل على شوبيفاي/.test(a)), b: (xr.actions || []).some(a => /أجر مشوار/.test(a)) }, { a: true, b: true });
+eq('الـ batchExpected/sessionMeta بتتخزّن زي أي صف', { b: xr.batchId }, { b: 'f1' });
+
+// getCourierOrders وغيره ما اتلمسوش — والـ refund العادي لسه شغّال
+rf0 = refunds;
+d = await call({ action: 'refund', orderId: '12', refundAmount: '200.00', saleTransactions: [{ id: 't1', amount: 200 }], employee: 'Fady', batchId: 'r9', sessionMeta: rsess, orderMeta: { hasReturn: true, courierCollect: -200, freeShipping: ackR('courier', 75) } });
+eq('الاسترداد العادي بعد v3.28.0 ← بنفس السلوك (−275 وشوبيفاي مرة)', { success: d.success, cc: extraOf(rows.length - 1).courierCollect, rf: refunds - rf0 }, { success: true, cc: -275, rf: 1 });
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} بند عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
