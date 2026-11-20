@@ -445,7 +445,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.27.0';
+const WORKER_VERSION = 'v3.28.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1215,8 +1215,10 @@ function courierFeePolicy({ courier, shippingAmount, hasReturn, returnShipping }
     const rs = parseFloat(returnShipping);
     if (!Number.isFinite(rs) || rs > 0.005) return none;   // فيه رسوم مرتجع على شوبيفاي (أو مش معروفة) = الحساب القديم
   }
+  // 🆕 v3.28.0 — شرط «الشحن الأصلي = 0» بقى على الأوردر العادي (S1) بس. أجر مشوار S2 (استرجاع/استبدال) كان بييجي من «رسوم المرتجع»
+  //    (الحساب القديم: المبلغ − رسوم المرتجع، مفيش خصم للشحن الأصلي أصلاً) — فالشحن الأصلي مالوش علاقة بيه (#65513: شحن 75 + استبدال بلا رسوم ← الأجر ضايع).
   const ship = Number(shippingAmount);
-  if (Number.isFinite(ship) && ship > 0.005) return none;   // فيه شحن على شوبيفاي = الحساب القديم زي ما هو
+  if (!hasReturn && Number.isFinite(ship) && ship > 0.005) return none;   // أوردر عادي فيه شحن على شوبيفاي = الحساب القديم زي ما هو
   const c = String(courier || '').trim().toLowerCase();
   if (!c)               return { freeShipping: true, courierFee: null,            courierKind: null,       courierMissing: true,  leg };
   if (c === 'bosta')    return none;                         // بوسطة بتحسب رسومها في مسارها (§BOSTA)
@@ -1228,6 +1230,7 @@ function courierFeeFields(policy) {
   return {
     freeShipping: policy.freeShipping, courierFee: policy.courierFee, courierKind: policy.courierKind,
     courierMissing: policy.courierMissing, flatFee: COURIER_FLAT_FEE, feeLeg: policy.leg || null,
+    feeOnly: policy.feeOnly === true, feeReturnId: policy.returnId || null,   // 🆕 v3.28.0
   };
 }
 // تأكيد الموظف لازم يطابق اللي الـ Worker حسبه دلوقتي (النوع والرسوم والمرحلة) — وإلا الصفحة شايفة أوردر مختلف.
@@ -1235,7 +1238,8 @@ function courierFeeFields(policy) {
 function freeShippingAckOk(ack, policy) {
   return !!ack && ack.confirmed === true && ack.courierKind === policy.courierKind
     && Number(ack.courierFee) === Number(policy.courierFee)
-    && (ack.leg || null) === (policy.leg || null);
+    && (ack.leg || null) === (policy.leg || null)
+    && (ack.feeOnly === true) === (policy.feeOnly === true);   // 🆕 v3.28.0 — صفحة قديمة مابتعرفش «أجر مشوار فقط»
 }
 const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 // 🔴 فرض القاعدة وقت `pay`/`refund`: بيوقف (قبل أي كتابة) لو الأوردر شحنه مجاني ومفيش تأكيد مطابق، وإلا بيحسب `courierCollect` هنا
@@ -1244,7 +1248,8 @@ const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 function applyFreeShipping(policy, orderMeta, employee, collectBase, orderLabel) {
   if (!policy.freeShipping) return { block: null, orderMeta, info: null };
   const tag = orderLabel ? ` (${orderLabel})` : '';
-  const what = policy.leg === 'return' ? 'شحن المرتجع/الاستبدال مجاني (مفيش رسوم مرتجع على شوبيفاي)' : 'شحنه مجاني';
+  const what = policy.feeOnly ? 'مشوار المرتجع/الاستبدال بلا تحصيل ولا استرداد (مفيش رسوم مرتجع على شوبيفاي)'
+             : policy.leg === 'return' ? 'شحن المرتجع/الاستبدال مجاني (مفيش رسوم مرتجع على شوبيفاي)' : 'شحنه مجاني';
   if (policy.courierMissing) {
     return { block: `⛔ الأوردر${tag} ${what} ومالوش مندوب على شوبيفاي — حدد المندوب الأول. العملية اتوقفت من غير أي كتابة.` };
   }
@@ -1259,12 +1264,15 @@ function applyFreeShipping(policy, orderMeta, employee, collectBase, orderLabel)
       confirmed: true, confirmedBy: employee || null, confirmedAt: new Date().toISOString(),
       courierKind: policy.courierKind, courierFee: policy.courierFee, shopifyShipping: 0,
       ...(policy.leg ? { leg: policy.leg } : {}),
+      ...(policy.returnId ? { returnId: policy.returnId } : {}),   // 🆕 v3.28.0 — منع تكرار أجر نفس المرتجع
+      ...(policy.feeOnly ? { feeOnly: true } : {}),
     },
   };
 }
 // نص سطر `actions` — نفس الصيغة في `pay` و`refund` والمسجّل مسبقًا
 function freeShippingActionNote(info) {
   if (!info) return null;
+  if (info.feeOnly) return `أجر مشوار مرتجع/استبدال بلا تحصيل — اتحسب ${info.courierFee} ج للمندوب على الخزنة`;
   if (info.leg === 'return') return info.courierFee > 0 ? `شحن مرتجع مجاني — اتحسب ${info.courierFee} ج أجر مندوب على الخزنة` : 'شحن مرتجع مجاني (Showroom) — بدون أجر';
   return info.courierFee > 0 ? `شحن مجاني — اتخصم ${info.courierFee} ج رسوم مندوب من تحصيل الخزنة` : 'شحن مجاني (Showroom) — بدون خصم';
 }
@@ -1276,12 +1284,42 @@ function orderFeePolicy(orderData) {
   if (!orderData || orderData.cancelled) return off;
   if (orderData.hasReturn) {
     const out = parseFloat(orderData.outstanding);
-    if (!Number.isFinite(out) || Math.abs(out) < 0.005) return off;
-    return courierFeePolicy({ courier: orderData.courier, shippingAmount: orderData.shippingAmount, hasReturn: true, returnShipping: orderData.returnShipping });
+    if (!Number.isFinite(out)) return off;
+    const pol = courierFeePolicy({ courier: orderData.courier, shippingAmount: orderData.shippingAmount, hasReturn: true, returnShipping: orderData.returnShipping });
+    const withId = pol.freeShipping ? { ...pol, returnId: orderData.latestReturnId || null } : pol;
+    if (Math.abs(out) < 0.005) {
+      // 🆕 v3.28.0 — «أجر مشوار فقط»: استبدال بنفس السعر (رصيد صفر) ورسوم مرتجع صفر ← مفيش تحصيل ولا استرداد لكن المندوب راح المشوار.
+      //    مندوب عادي بس (Showroom مالوش أجر · ومندوب ناقص = مفيش حاجة نخمّنها). الحالة النهائية (المشوار خلص؟ اتسجّل قبل كده؟) في `feeOnlyCheck`.
+      if (pol.freeShipping && pol.courierKind === 'courier' && pol.courierFee > 0) return { ...withId, feeOnly: true };
+      return off;
+    }
+    return withId;
   }
   if (!orderData.canMarkAsPaid) return off;
   return courierFeePolicy({ courier: orderData.courier, shippingAmount: orderData.shippingAmount, hasReturn: false });
 }
+
+// 🆕 v3.28.0 — «أجر مشوار فقط»: شروط الإتاحة اللي محتاجة D1 (مش sync زي `orderFeePolicy`).
+//   ready            — المشوار خلص (المرتجع CLOSED أو S2 = Returned/Delivered) ومفيش صف أجر لنفس المرتجع
+//   trip_pending     — المرتجع لسه مفتوح والمشوار ما خلصش — مفيش أجر قبل ما يخلص
+//   already_recorded — فيه صف `freeShipping.leg='return'` على الأوردر (نفس المرتجع، أو صف أقدم بلا returnId — بنفترض إنه غطّى المشوار)
+//   check_failed     — D1 ما ردّتش: مفيش تخمين ← وقف (الصف مرتين = أجر مرتين)
+async function feeOnlyCheck(env, orderData, numericId) {
+  if (!orderData.tripDone) return 'trip_pending';
+  try {
+    const hit = await env.DB.prepare(
+      `SELECT id FROM logs WHERE tool = ? AND order_id = ? AND type IN ('payment','refund')
+         AND json_extract(extra,'$.freeShipping.leg') = 'return'
+         AND (json_extract(extra,'$.freeShipping.returnId') IS NULL OR json_extract(extra,'$.freeShipping.returnId') = ?) LIMIT 1`
+    ).bind(TOOL_NAME, String(numericId), String(orderData.latestReturnId || '')).first();
+    return hit ? 'already_recorded' : 'ready';
+  } catch (e) { return 'check_failed'; }
+}
+const FEE_ONLY_MSG = {
+  trip_pending:     'مشوار المرتجع/الاستبدال لسه ما خلصش (المرتجع مفتوح) — الأجر بيتسجّل بعد ما يتقفل',
+  already_recorded: 'أجر مشوار المرتجع/الاستبدال اتسجّل قبل كده على الأوردر ده',
+  check_failed:     'تعذّر التأكد من تسجيل أجر المشوار قبل كده (D1) — أعد المحاولة',
+};
 
 // ─── §SHOPIFY::classifyOrderKind (v3.9.0) ───
 // 🔴 النوع بيتقرا من **أحدث دورة** مش من `.some()` على كل الدورات (قاعدة 15 ②)،
@@ -1462,6 +1500,11 @@ async function getOrderDataById(env, numericId) {
   //    الجزئي عن الكلي هو «فيه قطعة لسه في الأوردر ولا لأ».
   const remainingQty = (order.lineItems?.nodes || []).reduce((n, li) => n + (Number(li.currentQuantity) || 0), 0);
   const kindInfo     = classifyOrderKind(returnsNodes, remainingQty);
+  // 🆕 v3.28.0 — أحدث دورة غير ملغاة (نفس ترتيب classifyOrderKind) + هل المشوار خلص (للأجر بلا تحصيل)
+  const liveCycles   = returnsNodes.filter(r => r && r.status !== 'CANCELED' && r.status !== 'DECLINED')
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+  const latestReturn = liveCycles[liveCycles.length - 1] || null;
+  const tripDone     = !!latestReturn && (latestReturn.status === 'CLOSED' || s2 === 'Returned');
 
   const txns        = order.transactions || [];
   const saleTransactions = txns
@@ -1513,6 +1556,8 @@ async function getOrderDataById(env, numericId) {
     canMarkAsPaid, skipReason, financialStatus, courier, preRegMetafield, s1, s2,
     lineItems, orderDiscount, hasReturn, returnShipping, returnedItems, saleTransactions,
     orderKind: kindInfo.orderKind, cycleCount: kindInfo.cycleCount, multiCycle: kindInfo.multiCycle,
+    latestReturnId: latestReturn?.id ? String(latestReturn.id).replace('gid://shopify/Return/', '') : null,
+    latestReturnStatus: latestReturn?.status || null, tripDone,
   };
 }
 
@@ -2594,6 +2639,15 @@ export default {
           }, 200, request);
         }
 
+        // 🆕 v3.28.0 — «أجر مشوار فقط»: الحالة النهائية (المشوار خلص؟ اتسجّل قبل كده؟) — غير `ready` بنرجّع القاعدة العادية + سبب معلّق
+        const feePol = orderFeePolicy(orderData);
+        let feeFields = courierFeeFields(feePol), feeInfo = {};
+        if (feePol.feeOnly) {
+          const st = await feeOnlyCheck(env, orderData, numericId);
+          feeInfo = { feeOnlyState: st, feeOnlyMsg: st === 'ready' ? null : (FEE_ONLY_MSG[st] || null) };
+          if (st !== 'ready') feeFields = courierFeeFields({ freeShipping: false, courierFee: null, courierKind: null, courierMissing: false, leg: null });
+        }
+
         if (orderData.preRegMetafield === 'Pre-Registered Payment') {
           return json({
             success: true, orderId: numericId, orderName: orderData.orderName,
@@ -2605,7 +2659,7 @@ export default {
             returnedItems: orderData.returnedItems, saleTransactions: orderData.saleTransactions || [],
             orderKind: orderData.orderKind, cycleCount: orderData.cycleCount, multiCycle: orderData.multiCycle,
             s1: orderData.s1, s2: orderData.s2,
-            ...courierFeeFields(orderFeePolicy(orderData)),
+            ...feeFields, ...feeInfo,
           }, 200, request);
         }
 
@@ -2618,7 +2672,7 @@ export default {
           hasReturn: orderData.hasReturn, returnShipping: orderData.returnShipping, returnedItems: orderData.returnedItems,
           orderKind: orderData.orderKind, cycleCount: orderData.cycleCount, multiCycle: orderData.multiCycle,
           saleTransactions: orderData.saleTransactions || [], s1: orderData.s1, s2: orderData.s2,
-          ...courierFeeFields(orderFeePolicy(orderData)),
+          ...feeFields, ...feeInfo,
         }, 200, request);
       }
 
@@ -2717,7 +2771,9 @@ export default {
         try {
           const od = await getOrderDataById(env, numericId);
           if (!od) return json({ success: false, status: 'error', error: 'الأوردر مش موجود على شوبيفاي — التحصيل اتوقف', actions: [] }, 200, request);
-          fsNorm = applyFreeShipping(orderFeePolicy(od), orderMeta, employee, parsedAmount, orderName || od.orderName);
+          const polP = orderFeePolicy(od);
+          if (polP.feeOnly) return json({ success: false, status: 'error', blocked: true, actions: [], error: '⛔ الأوردر رصيده بقى صفر على شوبيفاي — مفيش تحصيل. حدّث الصفحة وضيفه تاني. العملية اتوقفت من غير أي كتابة.' }, 200, request);
+          fsNorm = applyFreeShipping(polP, orderMeta, employee, parsedAmount, orderName || od.orderName);
         } catch (e) {
           return json({ success: false, status: 'error', error: `تعذّر التحقق من رسوم الشحن قبل التحصيل (${e.message}) — مفيش أي حاجة اتسجّلت، أعد المحاولة`, actions: [] }, 200, request);
         }
@@ -2741,7 +2797,41 @@ export default {
 
       // ── ACTION: refund ────────────────────────────────────────────
       if (action === 'refund') {
-        const { refundAmount, saleTransactions, currency, employee, orderName, batchId, sessionMeta, orderMeta } = bodyData;
+        const { refundAmount, saleTransactions, currency, employee, orderName, batchId, sessionMeta, orderMeta, feeOnly } = bodyData;
+
+        // 🆕 v3.28.0 — «أجر مشوار فقط»: استبدال بنفس السعر (رصيد صفر · رسوم مرتجع صفر) والمندوب راح المشوار — صف D1 بس بـ`courierCollect = −الأجر`،
+        //    **صفر كتابة على شوبيفاي**. كل الشروط بتتعاد هنا (مفيش تصديق للمتصفح): الأوردر لسه feeOnly · المشوار خلص · مفيش صف أجر قبل كده · نفس المندوب.
+        if (feeOnly === true) {
+          const blocked = (error) => json({ success: false, status: 'error', blocked: true, error, actions: [] }, 200, request);
+          let od, pol, st;
+          try {
+            od = await getOrderDataById(env, numericId);
+            if (!od) return json({ success: false, status: 'error', error: 'الأوردر مش موجود على شوبيفاي — التسجيل اتوقف', actions: [] }, 200, request);
+            pol = orderFeePolicy(od);
+            if (!pol.feeOnly) return blocked('⛔ الأوردر مابقاش «أجر مشوار فقط» (الرصيد أو الرسوم أو المندوب اتغيّروا على شوبيفاي) — حدّث الصفحة وضيفه تاني. العملية اتوقفت من غير أي كتابة.');
+            st = await feeOnlyCheck(env, od, numericId);
+          } catch (e) {
+            return json({ success: false, status: 'error', error: `تعذّر التحقق من الأوردر قبل تسجيل الأجر (${e.message}) — مفيش أي حاجة اتسجّلت، أعد المحاولة`, actions: [] }, 200, request);
+          }
+          if (st !== 'ready') return blocked(`⛔ ${FEE_ONLY_MSG[st] || 'مش مؤهل'} — العملية اتوقفت من غير أي كتابة.`);
+          const sCour = String(sessionMeta?.courier || '').trim().toLowerCase(), oCour = String(od.courier || '').trim().toLowerCase();
+          if (sCour && oCour && sCour !== oCour) {
+            return blocked(`⛔ مندوب الأوردر على شوبيفاي (${od.courier}) غير مندوب الجلسة (${sessionMeta.courier}) — أجر المشوار بيتسجّل للمندوب اللي عمل المشوار. العملية اتوقفت من غير أي كتابة.`);
+          }
+          const fsFee = applyFreeShipping(pol, orderMeta, employee, 0, orderName || od.orderName);
+          if (fsFee.block) return blocked(fsFee.block);
+          const actions = ['بدون أي تسجيل على شوبيفاي — مفيش تحصيل ولا استرداد (رصيد الأوردر صفر)', freeShippingActionNote(fsFee.info)];
+          const { logged, logError } = await safeWriteLog(env.DB, {
+            tool: TOOL_NAME, type: 'refund', employee: employee || null,
+            orderId: numericId, orderName: orderName || od.orderName || null,
+            valueAfter: 0, notes: 'أجر مشوار مرتجع/استبدال بلا تحصيل',
+            extra: { ...buildPayExtra({ batchId, sessionMeta, orderMeta: fsFee.orderMeta, courier: sessionMeta?.courier || od.courier, isRefund: true, refundAmount: 0, result: 'success', actions, freeShipping: fsFee.info }), feeOnly: true },
+          });
+          // الصف هو الأثر الوحيد — لو ما اتكتبش مفيش حاجة حصلت (إعادة المحاولة آمنة: feeOnlyCheck هتلاقي مفيش صف)
+          if (!logged) return json({ success: false, status: 'error', error: `الأجر ما اتسجّلش في السجل (${logError || 'D1'}) — مفيش أي حاجة اتغيّرت، أعد المحاولة`, actions: [] }, 200, request);
+          return json({ success: true, status: 'success', actions, logged, logError, orderId: numericId, feeOnly: true, amount: '0.00' }, 200, request);
+        }
+
         if (!refundAmount)         return json({ error: 'refundAmount is required' }, 400, request);
         if (!Array.isArray(saleTransactions) || !saleTransactions.length)
           return json({ error: 'saleTransactions is required' }, 400, request);
@@ -2758,7 +2848,9 @@ export default {
         try {
           const od = await getOrderDataById(env, numericId);
           if (!od) return json({ success: false, status: 'error', error: 'الأوردر مش موجود على شوبيفاي — الاسترداد اتوقف', actions: [] }, 200, request);
-          fsRef = applyFreeShipping(orderFeePolicy(od), orderMeta, employee, -parsedAmount, orderName || od.orderName);
+          const polR = orderFeePolicy(od);
+          if (polR.feeOnly) return json({ success: false, status: 'error', blocked: true, actions: [], error: '⛔ الأوردر رصيده بقى صفر على شوبيفاي — مفيش استرداد. حدّث الصفحة وضيفه تاني. العملية اتوقفت من غير أي كتابة.' }, 200, request);
+          fsRef = applyFreeShipping(polR, orderMeta, employee, -parsedAmount, orderName || od.orderName);
         } catch (e) {
           return json({ success: false, status: 'error', error: `تعذّر التحقق من رسوم الشحن قبل الاسترداد (${e.message}) — مفيش أي حاجة اتسجّلت، أعد المحاولة`, actions: [] }, 200, request);
         }
