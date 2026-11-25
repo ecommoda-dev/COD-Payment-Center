@@ -445,7 +445,7 @@ const TOOL_NAME = 'cod_payment';
 
 // مطلوب لـ ?action=get_config — الواجهة بتقارنه بنسختها وبتحذّر لو مختلفين
 // (بيكشف Promote ناقص أو Worker شبح). worker-builder Step 5A ⑨.
-const WORKER_VERSION = 'v3.28.0';
+const WORKER_VERSION = 'v3.29.0';
 
 // 🔴 توقيت القاهرة بـ`Intl` على Africa/Cairo — مش إزاحة ثابتة (v3.8.0).
 // كانت `CAIRO_OFFSET_HOURS = 3` ثابتة، ومصر رجعت UTC+2 يوم 29-10-2026 فكل حدود
@@ -1474,12 +1474,25 @@ async function getOrderDataById(env, numericId) {
   const returnsNodes = order.returns?.nodes || [];
   const hasReturn    = returnsNodes.length > 0;
 
+  // 🆕 v3.29.0 — رسوم المرتجع **المستحقة دلوقتي** = رسوم الدورات اللي اتفتحت بعد آخر تسجيل (`payment`/`refund` بمرتجع) لنفس الأوردر في D1.
+  //    الدورات اللي قبل كده رسومها اتحاسبت في جلسة سابقة — جمعها من كل الدورات كان بيخصمها تاني (#61997: 75 − 225 = -150 بدل 75 − 75 = 0).
+  //    D1 ما ردّتش = بنرمي (مفيش تخمين: الرقم ده بيدخل `courierCollect`). مفيش تسجيل سابق بمرتجع = كل الدورات (السلوك القديم).
+  const lastRetRow = !returnsNodes.length ? null : await env.DB.prepare(
+    `SELECT MAX(timestamp) AS ts FROM logs WHERE tool = ? AND order_id = ? AND type IN ('payment','refund')
+       AND json_valid(extra) AND json_extract(extra,'$.hasReturn') = 1`
+  ).bind(TOOL_NAME, String(numericId)).first();
+  const lastRetTs = lastRetRow?.ts ? Date.parse(lastRetRow.ts) : null;
+
   let returnShippingTotal = 0;
+  let returnShippingDueTotal = 0;
   const returnedItems = [];
 
   for (const ret of returnsNodes) {
+    const isNew = lastRetTs == null || !(Date.parse(ret.createdAt) <= lastRetTs);   // تاريخ باظ = بنعتبرها جديدة (أمان: مانخصمش أقل)
     for (const fee of (ret.returnShippingFees || [])) {
-      returnShippingTotal += parseFloat(fee.amountSet?.shopMoney?.amount || '0');
+      const amt = parseFloat(fee.amountSet?.shopMoney?.amount || '0');
+      returnShippingTotal += amt;
+      if (isNew) returnShippingDueTotal += amt;
     }
     for (const rli of (ret.returnLineItems?.nodes || [])) {
       const li = rli.fulfillmentLineItem?.lineItem;
@@ -1495,6 +1508,7 @@ async function getOrderDataById(env, numericId) {
   }
 
   const returnShipping = returnShippingTotal.toFixed(2);
+  const returnShippingDue = returnShippingDueTotal.toFixed(2);   // 🆕 v3.29.0 — اللي بيتخصم من `courierCollect` (الواجهة)
   // 🆕 v3.9.0 — نوع الأوردر من **أحدث** دورة (order-lifecycle قاعدة 8 + 15).
   //    `remainingQty` من **كل** سطور الأوردر (مش المصفّاة بـ sku) — فرق الاسترجاع
   //    الجزئي عن الكلي هو «فيه قطعة لسه في الأوردر ولا لأ».
@@ -1554,7 +1568,7 @@ async function getOrderDataById(env, numericId) {
     orderName: order.name, cancelled: false, cancelledAt: null,
     outstanding: outstanding.toFixed(2), subtotal: subtotal.toFixed(2), shippingAmount: shippingAmount.toFixed(2),
     canMarkAsPaid, skipReason, financialStatus, courier, preRegMetafield, s1, s2,
-    lineItems, orderDiscount, hasReturn, returnShipping, returnedItems, saleTransactions,
+    lineItems, orderDiscount, hasReturn, returnShipping, returnShippingDue, returnedItems, saleTransactions,
     orderKind: kindInfo.orderKind, cycleCount: kindInfo.cycleCount, multiCycle: kindInfo.multiCycle,
     latestReturnId: latestReturn?.id ? String(latestReturn.id).replace('gid://shopify/Return/', '') : null,
     latestReturnStatus: latestReturn?.status || null, tripDone,
@@ -2655,7 +2669,7 @@ export default {
             canMarkAsPaid: orderData.canMarkAsPaid, skipReason: orderData.skipReason || null,
             financialStatus: orderData.financialStatus, courier: orderData.courier, lineItems: orderData.lineItems,
             orderDiscount: orderData.orderDiscount, preRegistered: false, preRegisteredHistorically: true,
-            cancelled: false, hasReturn: orderData.hasReturn, returnShipping: orderData.returnShipping,
+            cancelled: false, hasReturn: orderData.hasReturn, returnShipping: orderData.returnShipping, returnShippingDue: orderData.returnShippingDue,
             returnedItems: orderData.returnedItems, saleTransactions: orderData.saleTransactions || [],
             orderKind: orderData.orderKind, cycleCount: orderData.cycleCount, multiCycle: orderData.multiCycle,
             s1: orderData.s1, s2: orderData.s2,
@@ -2669,7 +2683,7 @@ export default {
           canMarkAsPaid: orderData.canMarkAsPaid, skipReason: orderData.skipReason || null,
           financialStatus: orderData.financialStatus, courier: orderData.courier, lineItems: orderData.lineItems,
           orderDiscount: orderData.orderDiscount, preRegistered: false, cancelled: false,
-          hasReturn: orderData.hasReturn, returnShipping: orderData.returnShipping, returnedItems: orderData.returnedItems,
+          hasReturn: orderData.hasReturn, returnShipping: orderData.returnShipping, returnShippingDue: orderData.returnShippingDue, returnedItems: orderData.returnedItems,
           orderKind: orderData.orderKind, cycleCount: orderData.cycleCount, multiCycle: orderData.multiCycle,
           saleTransactions: orderData.saleTransactions || [], s1: orderData.s1, s2: orderData.s2,
           ...feeFields, ...feeInfo,
