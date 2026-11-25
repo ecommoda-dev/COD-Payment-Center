@@ -44,6 +44,11 @@ const ORDERS = {
   '28': { name: '#70045', amount: '0.0', ship: null,   courier: 'Saif',      s2: 'Delivered', returns: [RETX('5', 'OPEN')], refund: true },        // S2 = Delivered والمرتجع مفتوح ← لسه
   '29': { name: '#70046', amount: '100.0', ship: '75.0', courier: 'Saif',     s2: 'Delivered', returns: [RETX('6', 'CLOSED')] },                  // فرق استبدال 100 + شحن أصلي 75 ← الأجر بيتطرح (كان ضايع)
   '30': { name: '#70047', amount: '0.0', ship: '75.0', courier: 'Saif',      s2: 'Returned', returns: [RETX('7', 'CANCELED'), RETX('8', 'CLOSED')], refund: true },   // دورة ملغاة + دورة سليمة
+    // ── v3.29.0: رسوم المرتجع المستحقة = دورات بعد آخر تسجيل (#61997: 3 دورات × 75 · اتحاسب R1+R2 قبل كده) ──
+  '40': { name: '#61997', amount: '75.0', ship: '75.0', courier: 'Ashraf mahmoud', s2: 'Returned', returns: [
+    { ...RET(75), id: 'gid://shopify/Return/1', createdAt: '2026-11-13T14:16:06Z' },
+    { ...RET(75), id: 'gid://shopify/Return/2', createdAt: '2026-11-21T07:37:37Z' },
+    { ...RET(75), id: 'gid://shopify/Return/3', createdAt: '2026-11-24T09:29:50Z' }] },
   '21': { name: '#70031', amount: '0.0',    ship: null,  courier: 'Saif',          returns: [], noBal: true },             // شوبيفاي ما رجّعتش الإجمالي/المدفوع
 };
 // 🆕 v3.23.0 — مسارات المناديب بتقرا الرصيد الحقيقي (إجمالي − netPayment) مش totalOutstanding: الـ mock بيرجّع الحقلين (a موجب = عليه · سالب = له)
@@ -57,6 +62,7 @@ const gqlOrder = o => ({ data: { order: {
   discountApplications: { edges: [] }, lineItems: { nodes: [] }, returns: { nodes: o.returns }, refunds: [], transactions: [],
 } } });
 
+let LAST_RET_TS = null;
 let gqlCalls = 0, captures = 0, refunds = 0, KV_PENDING = null, PRE_STATE = null, FIRST_HIT = false, FIRST_THROW = false;
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
@@ -76,7 +82,7 @@ globalThis.fetch = async (url, init = {}) => {
   return new Response('{}', { status: 404 });
 };
 const rows = [];
-const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; }, async run() { if (/INSERT INTO logs/.test(sql)) rows.push(this._b); return {}; }, async first() { return FIRST_HIT ? { id: 1 } : (FIRST_THROW ? Promise.reject(new Error('d1 down')) : null); }, async all() { return { results: [] }; } }) };
+const DB = { prepare: sql => ({ _b: [], bind(...a) { this._b = a; return this; }, async run() { if (/INSERT INTO logs/.test(sql)) rows.push(this._b); return {}; }, async first() { if (/MAX\(timestamp\)/.test(sql)) return FIRST_THROW ? Promise.reject(new Error('d1 down')) : { ts: LAST_RET_TS }; return FIRST_HIT ? { id: 1 } : (FIRST_THROW ? Promise.reject(new Error('d1 down')) : null); }, async all() { return { results: [] }; } }) };
 const KV = { async get(k) { return KV_PENDING && k.startsWith('preReg:') ? JSON.stringify(KV_PENDING) : null; }, async delete() {}, async list() { return { keys: [] }; } };
 const env = { DB, PRE_REG_KV: KV, WORKER_SECRET: 's', SHOP_DOMAIN: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b' };
 const call = async body => (await w.fetch(new Request('https://x/', { method: 'POST', headers: { Authorization: 'Bearer s', 'Content-Type': 'application/json', Origin: 'https://ecommoda-dev.github.io' }, body: JSON.stringify(body) }), env)).json();
@@ -234,7 +240,8 @@ f22 = await pvF('22');
 eq('فيه صف أجر قبل كده لنفس الأوردر ← «already_recorded» ومفيش أجر', { fo: f22.feeOnly, fs: f22.freeShipping, st: f22.feeOnlyState }, { fo: false, fs: false, st: 'already_recorded' });
 FIRST_HIT = false; FIRST_THROW = true;
 f22 = await pvF('22');
-eq('D1 وقعت وقت التحقق ← «check_failed» (مفيش تخمين = مفيش أجر مرتين)', { fo: f22.feeOnly, st: f22.feeOnlyState }, { fo: false, st: 'check_failed' });
+eq('D1 وقعت وقت التحقق ← الـ preview بيفشل نضيف (v3.29.0: D1 دلوقتي داخلة في حساب رسوم المرتجع — مفيش تخمين)', { ok: f22.success === true, fo: f22.feeOnly }, { ok: false, fo: undefined });
+FIRST_THROW = false;
 FIRST_THROW = false;
 
 // تحصيل فرق استبدال + شحن أصلي (الفجوة ب — كان الأجر بيضيع)
@@ -279,6 +286,20 @@ eq('الـ batchExpected/sessionMeta بتتخزّن زي أي صف', { b: xr.bat
 rf0 = refunds;
 d = await call({ action: 'refund', orderId: '12', refundAmount: '200.00', saleTransactions: [{ id: 't1', amount: 200 }], employee: 'Fady', batchId: 'r9', sessionMeta: rsess, orderMeta: { hasReturn: true, courierCollect: -200, freeShipping: ackR('courier', 75) } });
 eq('الاسترداد العادي بعد v3.28.0 ← بنفس السلوك (−275 وشوبيفاي مرة)', { success: d.success, cc: extraOf(rows.length - 1).courierCollect, rf: refunds - rf0 }, { success: true, cc: -275, rf: 1 });
+
+console.log('══ ⑩ v3.29.0 — رسوم المرتجع المستحقة = الدورات بعد آخر تسجيل (#61997) ══');
+LAST_RET_TS = '2026-11-22T12:44:58.006Z';
+let p31 = await call({ action: 'preview', orderId: '40' });
+eq('#61997: الإجمالي 225 والمستحق 75 (R3 بس)', { all: p31.returnShipping, due: p31.returnShippingDue }, { all: '225.00', due: '75.00' });
+eq('#61997: السياسة لسه الحساب القديم (رسوم > 0) ← مفيش شحن مجاني', fee(p31), { freeShipping: false, courierFee: null, courierKind: null, courierMissing: false });
+LAST_RET_TS = null;
+p31 = await call({ action: 'preview', orderId: '40' });
+eq('مفيش تسجيل سابق بمرتجع ← كل الدورات (السلوك القديم)', p31.returnShippingDue, '225.00');
+LAST_RET_TS = '2026-11-25T00:00:00.000Z';
+p31 = await call({ action: 'preview', orderId: '40' });
+eq('آخر تسجيل بعد كل الدورات ← المستحق صفر والإجمالي زي ما هو', { all: p31.returnShipping, due: p31.returnShippingDue }, { all: '225.00', due: '0.00' });
+LAST_RET_TS = '2026-11-22T12:44:58.006Z';
+eq('أوردر بلا مرتجع ← returnShippingDue صفر ومفيش نداء D1', (await call({ action: 'preview', orderId: '3' })).returnShippingDue, '0.00');
 
 console.log(`\n${bad ? '❌' : '✅'} ${ok} بند عدّى · ${bad} فشل`);
 process.exit(bad ? 1 : 0);
